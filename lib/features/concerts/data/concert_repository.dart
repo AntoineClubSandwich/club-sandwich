@@ -2,21 +2,6 @@ import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class MissingMembershipException implements Exception {
-  const MissingMembershipException();
-
-  @override
-  String toString() => 'Aucune organisation associée à cet utilisateur.';
-}
-
-class AmbiguousProducerMembershipException implements Exception {
-  const AmbiguousProducerMembershipException();
-
-  @override
-  String toString() =>
-      'Plusieurs organisations producteur sont associées à ce compte.';
-}
-
 class ConcertRepository {
   const ConcertRepository(this._client);
 
@@ -43,11 +28,9 @@ class ConcertRepository {
       'operational_report:maraude_operational_reports(*)';
 
   Future<List<Concert>> fetchConcerts() async {
-    final context = await _currentContext();
     final rows = await _client
         .from('concerts')
         .select(_concertWithDetailsSelect)
-        .eq('organization_id', context.organizationId)
         .order('concert_date')
         .order('concert_time');
 
@@ -55,12 +38,10 @@ class ConcertRepository {
   }
 
   Future<Concert?> fetchConcert(String concertId) async {
-    final context = await _currentContext();
     final row = await _client
         .from('concerts')
         .select(_concertDetailSelect)
         .eq('id', concertId)
-        .eq('organization_id', context.organizationId)
         .maybeSingle();
 
     return row == null ? null : Concert.fromJson(row);
@@ -188,42 +169,19 @@ class ConcertRepository {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw const AuthException('Utilisateur non connecté.');
 
-    final rows = await _client
-        .from('memberships')
-        .select('organization_id, organizations!inner(kind, slug)')
-        .eq('profile_id', userId)
-        .order('created_at')
-        .limit(100);
-
-    if (rows.isEmpty) throw const MissingMembershipException();
-
-    final clubMemberships = rows
-        .where((row) {
-          final organization = row['organizations'] as Map<String, dynamic>;
-          return organization['kind'] == 'club_sandwich';
-        })
-        .toList(growable: false);
-    final producerMemberships = rows
-        .where((row) {
-          final organization = row['organizations'] as Map<String, dynamic>;
-          return organization['kind'] == 'producer';
-        })
-        .toList(growable: false);
-
-    if (producerMemberships.length > 1) {
-      throw const AmbiguousProducerMembershipException();
+    final rows = await _client.rpc<List<dynamic>>(
+      'get_concert_creation_context',
+    );
+    if (rows.isEmpty) {
+      throw const PostgrestException(message: 'Contexte de création absent.');
     }
-
-    final publishingMembership = clubMemberships.isNotEmpty
-        ? clubMemberships.first
-        : rows.first;
+    final creationContext = rows.first as Map<String, dynamic>;
 
     return _ConcertContext(
       userId: userId,
-      organizationId: publishingMembership['organization_id'] as String,
-      promoterOrganizationId: producerMemberships.isEmpty
-          ? null
-          : producerMemberships.first['organization_id'] as String,
+      organizationId: creationContext['organization_id'] as String,
+      promoterOrganizationId:
+          creationContext['promoter_organization_id'] as String?,
     );
   }
 }

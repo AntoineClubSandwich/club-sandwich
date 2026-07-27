@@ -155,7 +155,7 @@ void main() {
       ).fetchConcert('concert-id');
 
       expect(concert!.distribution?.distributedMeals, 35);
-      expect(requests, hasLength(2));
+      expect(requests, hasLength(1));
       expect(
         requests.last.url.queryParameters['select'],
         contains('distribution:maraude_distributions(*)'),

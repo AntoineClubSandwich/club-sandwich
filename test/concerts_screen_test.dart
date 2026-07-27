@@ -27,14 +27,14 @@ void main() {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final router = GoRouter(
-      initialLocation: '/concerts',
+      initialLocation: '/maraudes',
       routes: [
         GoRoute(
-          path: '/concerts',
+          path: '/maraudes',
           builder: (context, state) => const ConcertsScreen(),
         ),
         GoRoute(
-          path: '/concerts/:concertId',
+          path: '/maraudes/:concertId',
           builder: (context, state) =>
               Text('Détail ${state.pathParameters['concertId']}'),
         ),
@@ -63,14 +63,14 @@ void main() {
   ) async {
     await pumpConcerts(tester, const []);
 
-    expect(find.text('Aucun concert'), findsOneWidget);
-    expect(find.text('Créez votre premier concert.'), findsOneWidget);
+    expect(find.text('Aucune maraude'), findsOneWidget);
+    expect(find.text('Ouvrez votre première maraude.'), findsOneWidget);
 
-    await tester.tap(find.text('Créer un concert'));
+    await tester.tap(find.text('Ouvrir une maraude'));
     await tester.pumpAndSettle();
 
     expect(find.byType(ConcertForm), findsOneWidget);
-    expect(find.text('Nouveau concert'), findsWidgets);
+    expect(find.text('Nouvelle maraude'), findsWidgets);
     expect(find.text('Titre'), findsNothing);
   });
 
@@ -114,7 +114,7 @@ void main() {
       buildConcert(id: 'concert-id', artist: 'Artiste'),
     ]);
 
-    await tester.tap(find.text('Nouveau concert'));
+    await tester.tap(find.text('Nouvelle maraude'));
     await tester.pumpAndSettle();
     expect(find.byType(ConcertForm), findsOneWidget);
     await tester.tap(find.byTooltip('Fermer'));
@@ -126,7 +126,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(ConcertForm), findsOneWidget);
-    expect(find.text('Modifier le concert'), findsOneWidget);
+    expect(find.text('Modifier la maraude'), findsOneWidget);
     expect(find.text('Titre'), findsNothing);
   });
 
@@ -190,10 +190,10 @@ void main() {
     tester,
   ) async {
     await pumpConcerts(tester, const []);
-    await tester.tap(find.text('Créer un concert'));
+    await tester.tap(find.text('Ouvrir une maraude'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Publier le concert'));
+    await tester.tap(find.text('Ouvrir la maraude'));
     await tester.pump();
 
     expect(find.text('Ce champ est requis.'), findsNWidgets(2));
@@ -264,7 +264,7 @@ void main() {
       venueRepository: _FakeVenueRepository(),
     );
 
-    await tester.tap(find.text('Créer un concert'));
+    await tester.tap(find.text('Ouvrir une maraude'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('concert-artist-field')),
@@ -277,8 +277,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Salle Pleyel'));
-    await tester.ensureVisible(find.text('Publier le concert'));
-    await tester.tap(find.text('Publier le concert'));
+    await tester.ensureVisible(find.text('Ouvrir la maraude'));
+    await tester.tap(find.text('Ouvrir la maraude'));
     await tester.pumpAndSettle();
 
     expect(repository.createdDraft?.artist, 'Nouvel artiste');
@@ -324,7 +324,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Supprimer'));
     await tester.pumpAndSettle();
-    expect(find.text('Supprimer le concert ?'), findsOneWidget);
+    expect(find.text('Supprimer la maraude ?'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Supprimer'));
     await tester.pumpAndSettle();
@@ -418,7 +418,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('agenda-concert-remembered')));
     await tester.pumpAndSettle();
-    router.go('/concerts');
+    router.go('/maraudes');
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('month-agenda')), findsOneWidget);

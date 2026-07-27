@@ -26,14 +26,22 @@ void main() {
     'id': 'ba00539d-f3c5-49aa-9c33-b882516e3c83',
     'organization_id': '3bc8ad12-a047-4a80-a3de-abab6791dc35',
     'profile_id': '2ca333d2-f686-4084-a36e-cde0e811bc12',
-    'role': 'coordinator',
+    'role': 'promoter',
     'created_at': '2026-07-24T10:00:00.000Z',
   };
 
   test('Organization se sérialise depuis et vers JSON', () {
     final organization = Organization.fromJson(organizationJson);
 
-    expect(organization.toJson(), organizationJson);
+    expect(organization.toJson(), {
+      ...organizationJson,
+      'kind': 'producer',
+      'contact_email': null,
+      'phone': null,
+      'address': null,
+      'website_url': null,
+      'notes': null,
+    });
   });
 
   test('Profile se sérialise depuis et vers JSON', () {
@@ -45,7 +53,7 @@ void main() {
   test('Membership et son rôle se sérialisent depuis et vers JSON', () {
     final membership = Membership.fromJson(membershipJson);
 
-    expect(membership.role, MemberRole.coordinator);
+    expect(membership.role, MemberRole.promoter);
     expect(membership.toJson(), membershipJson);
   });
 

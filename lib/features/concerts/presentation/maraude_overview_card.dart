@@ -19,7 +19,7 @@ class MaraudeOverviewCard extends StatelessWidget {
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => context.go('/concerts/${maraude.concertId}'),
+        onTap: () => context.go('/maraudes/${maraude.concertId}'),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

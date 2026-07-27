@@ -1,3 +1,5 @@
+import 'package:club_sandwich/features/auth/application/auth_providers.dart';
+import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
@@ -11,6 +13,10 @@ class VolunteersScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final role = ref.watch(currentUserContextProvider).value?.role;
+    if (role == AppUserRole.admin) {
+      return _VolunteerDirectory(users: ref.watch(managedUsersProvider));
+    }
     final overview = ref.watch(maraudeOverviewProvider);
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -27,6 +33,59 @@ class VolunteersScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _VolunteerDirectory extends StatelessWidget {
+  const _VolunteerDirectory({required this.users});
+  final AsyncValue<List<ManagedUser>> users;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.transparent,
+    body: users.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, _) =>
+          const Center(child: Text('Impossible de charger les bénévoles.')),
+      data: (items) {
+        final volunteers = items
+            .where((item) => item.role == AppUserRole.volunteer)
+            .toList(growable: false);
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 48),
+          children: [
+            Text(
+              'Bénévoles',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 6),
+            Text('${volunteers.length} bénévole(s)'),
+            const SizedBox(height: 18),
+            if (volunteers.isEmpty)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text('Aucun bénévole.'),
+                ),
+              )
+            else
+              for (final volunteer in volunteers)
+                Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      child: Text(volunteer.displayName.characters.first),
+                    ),
+                    title: Text(volunteer.displayName),
+                    subtitle: Text(
+                      '${volunteer.email}\n${volunteer.status.label}',
+                    ),
+                    isThreeLine: true,
+                  ),
+                ),
+          ],
+        );
+      },
+    ),
+  );
 }
 
 class _VolunteerMaraudes extends StatelessWidget {

@@ -405,11 +405,21 @@ class ConcertVolunteerSectionData {
     required this.isAdmin,
     required this.applications,
     this.ownApplication,
-  });
+    this.isPromoter = false,
+    bool? canViewApplications,
+    bool? canManageConcert,
+    bool? canApply,
+  }) : canViewApplications = canViewApplications ?? isAdmin,
+       canManageConcert = canManageConcert ?? isAdmin,
+       canApply = canApply ?? !isAdmin;
 
   final ConcertVolunteerApplication? ownApplication;
   final ConcertVolunteerCounts counts;
   final bool isAdmin;
+  final bool isPromoter;
+  final bool canViewApplications;
+  final bool canManageConcert;
+  final bool canApply;
   final List<ConcertVolunteerApplication> applications;
 
   TeamAttendanceCounts get attendanceCounts =>

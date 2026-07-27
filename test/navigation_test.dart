@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:club_sandwich/core/router/app_router.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/data/auth_repository.dart';
+import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
 import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dart';
@@ -31,6 +32,13 @@ void main() {
         concertsProvider.overrideWith((ref) async => const []),
         concertDetailsProvider.overrideWith((ref, concertId) async => null),
         currentProfileProvider.overrideWith((ref) async => null),
+        currentUserContextProvider.overrideWith(
+          (ref) async => const CurrentUserContext(
+            profileId: 'profile-id',
+            role: AppUserRole.admin,
+            status: UserAccountStatus.active,
+          ),
+        ),
       ],
     );
     addTearDown(() async {
@@ -46,12 +54,12 @@ void main() {
       ),
     );
 
-    router.go('/concerts');
+    router.go('/maraudes');
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(ConcertsScreen), findsOneWidget);
 
-    router.go('/concerts/concert-id');
+    router.go('/maraudes/concert-id');
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(ConcertDetailScreen), findsOneWidget);

@@ -98,7 +98,7 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
         children: [
           Expanded(
             child: Text(
-              widget.isEditing ? 'Modifier le concert' : 'Nouveau concert',
+              widget.isEditing ? 'Modifier la maraude' : 'Nouvelle maraude',
             ),
           ),
           IconButton(
@@ -206,7 +206,7 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
                     labelText: 'Statut',
                     helperText: widget.isEditing
                         ? null
-                        : 'Un nouveau concert est toujours publié comme planifié.',
+                        : 'Une nouvelle maraude est publiée immédiatement.',
                   ),
                   items: [
                     for (final status in ConcertStatus.values)
@@ -311,7 +311,7 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
               : Text(
                   widget.isEditing
                       ? 'Enregistrer les modifications'
-                      : 'Publier le concert',
+                      : 'Ouvrir la maraude',
                 ),
         ),
       ],
@@ -460,7 +460,7 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
           content: Text(
             widget.isEditing
                 ? 'Impossible d’enregistrer les modifications.'
-                : 'Impossible de publier le concert.',
+                : 'Impossible d’ouvrir la maraude.',
           ),
         ),
       );

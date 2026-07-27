@@ -25,23 +25,31 @@ class ConcertVolunteerRepository {
     final userId = _requireUserId();
     final results = await Future.wait<Object?>([
       _fetchCounts(concertId),
-      _isClubSandwichAdmin(userId),
+      _fetchAccess(concertId),
     ]);
 
     final counts = results[0]! as ConcertVolunteerCounts;
-    final isAdmin = results[1]! as bool;
-    final details = await _fetchDetails(concertId);
-    final ownApplication = details
-        .where((application) => application.userId == userId)
-        .firstOrNull;
-    final applications = isAdmin
+    final access = results[1]! as _ConcertAccess;
+    final details = access.canViewApplications || access.canApply
+        ? await _fetchDetails(concertId, isPromoter: access.isPromoter)
+        : const <ConcertVolunteerApplication>[];
+    final ownApplication = access.canApply
+        ? details
+              .where((application) => application.userId == userId)
+              .firstOrNull
+        : null;
+    final applications = access.canViewApplications
         ? details
         : const <ConcertVolunteerApplication>[];
 
     return ConcertVolunteerSectionData(
       ownApplication: ownApplication,
       counts: counts,
-      isAdmin: isAdmin,
+      isAdmin: access.isAdmin,
+      isPromoter: access.isPromoter,
+      canViewApplications: access.canViewApplications,
+      canManageConcert: access.canManageConcert,
+      canApply: access.canApply,
       applications: applications,
     );
   }
@@ -164,25 +172,23 @@ class ConcertVolunteerRepository {
     return ConcertVolunteerCounts.fromJson(rows.first! as Map<String, dynamic>);
   }
 
-  Future<bool> _isClubSandwichAdmin(String userId) async {
-    final rows = await client
-        .from('memberships')
-        .select('role, organizations!inner(kind)')
-        .eq('profile_id', userId);
-
-    return rows.any((row) {
-      final role = row['role'] as String?;
-      final organization = row['organizations'] as Map<String, dynamic>?;
-      return organization?['kind'] == 'club_sandwich' &&
-          (role == 'super_admin' || role == 'admin');
-    });
+  Future<_ConcertAccess> _fetchAccess(String concertId) async {
+    final rows = await client.rpc<List<dynamic>>(
+      'get_concert_access',
+      params: {'requested_concert_id': concertId},
+    );
+    if (rows.isEmpty) return const _ConcertAccess();
+    return _ConcertAccess.fromJson(rows.first! as Map<String, dynamic>);
   }
 
   Future<List<ConcertVolunteerApplication>> _fetchDetails(
-    String concertId,
-  ) async {
+    String concertId, {
+    required bool isPromoter,
+  }) async {
     final rows = await client.rpc<List<dynamic>>(
-      'get_concert_volunteer_team_details',
+      isPromoter
+          ? 'get_promoter_concert_applications'
+          : 'get_concert_volunteer_team_details',
       params: {'requested_concert_id': concertId},
     );
 
@@ -194,4 +200,30 @@ class ConcertVolunteerRepository {
         )
         .toList(growable: false);
   }
+}
+
+class _ConcertAccess {
+  const _ConcertAccess({
+    this.isAdmin = false,
+    this.isPromoter = false,
+    this.canViewApplications = false,
+    this.canManageConcert = false,
+    this.canApply = false,
+  });
+
+  factory _ConcertAccess.fromJson(Map<String, dynamic> json) {
+    return _ConcertAccess(
+      isAdmin: json['is_admin'] as bool? ?? false,
+      isPromoter: json['is_promoter'] as bool? ?? false,
+      canViewApplications: json['can_view_applications'] as bool? ?? false,
+      canManageConcert: json['can_manage_concert'] as bool? ?? false,
+      canApply: json['can_apply'] as bool? ?? false,
+    );
+  }
+
+  final bool isAdmin;
+  final bool isPromoter;
+  final bool canViewApplications;
+  final bool canManageConcert;
+  final bool canApply;
 }

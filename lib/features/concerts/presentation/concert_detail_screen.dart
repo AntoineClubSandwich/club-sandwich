@@ -55,8 +55,9 @@ class _ConcertDetails extends ConsumerWidget {
     final volunteerSection = ref.watch(
       concertVolunteerSectionProvider(concert.id),
     );
-    final canManageMaraude = volunteerSection.value?.isAdmin ?? false;
     final volunteerData = volunteerSection.value;
+    final canManageMaraude = volunteerData?.isAdmin ?? false;
+    final canManageConcert = volunteerData?.canManageConcert ?? false;
     final ownApplication = volunteerData?.ownApplication;
     final isSelectedVolunteer =
         ownApplication?.status == ConcertVolunteerStatus.selected;
@@ -102,8 +103,10 @@ class _ConcertDetails extends ConsumerWidget {
                 children: [
                   _DetailHeader(
                     concert: concert,
-                    onEdit: () => _edit(context, ref),
-                    onDelete: () => _delete(context, ref),
+                    onEdit: canManageConcert ? () => _edit(context, ref) : null,
+                    onDelete: canManageMaraude
+                        ? () => _delete(context, ref)
+                        : null,
                   ),
                   const SizedBox(height: 24),
                   Wrap(
@@ -215,7 +218,7 @@ class _ConcertDetails extends ConsumerWidget {
 
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
     final deleted = await deleteConcertWithConfirmation(context, ref, concert);
-    if (deleted && context.mounted) context.go('/concerts');
+    if (deleted && context.mounted) context.go('/maraudes');
   }
 }
 
@@ -1056,8 +1059,8 @@ class _DetailHeader extends StatelessWidget {
   });
 
   final Concert concert;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1070,7 +1073,7 @@ class _DetailHeader extends StatelessWidget {
             if (context.canPop()) {
               context.pop();
             } else {
-              context.go('/concerts');
+              context.go('/maraudes');
             }
           },
           icon: const Icon(Icons.arrow_back),
@@ -1111,35 +1114,38 @@ class _DetailHeader extends StatelessWidget {
             ],
           ),
         ),
-        PopupMenuButton<_DetailAction>(
-          tooltip: 'Actions',
-          onSelected: (action) {
-            switch (action) {
-              case _DetailAction.edit:
-                onEdit();
-              case _DetailAction.delete:
-                onDelete();
-            }
-          },
-          itemBuilder: (context) => const [
-            PopupMenuItem(
-              value: _DetailAction.edit,
-              child: ListTile(
-                leading: Icon(Icons.edit_outlined),
-                title: Text('Modifier'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            PopupMenuItem(
-              value: _DetailAction.delete,
-              child: ListTile(
-                leading: Icon(Icons.delete_outline),
-                title: Text('Supprimer'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ],
-        ),
+        if (onEdit != null || onDelete != null)
+          PopupMenuButton<_DetailAction>(
+            tooltip: 'Actions',
+            onSelected: (action) {
+              switch (action) {
+                case _DetailAction.edit:
+                  onEdit?.call();
+                case _DetailAction.delete:
+                  onDelete?.call();
+              }
+            },
+            itemBuilder: (context) => [
+              if (onEdit != null)
+                const PopupMenuItem(
+                  value: _DetailAction.edit,
+                  child: ListTile(
+                    leading: Icon(Icons.edit_outlined),
+                    title: Text('Modifier'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              if (onDelete != null)
+                const PopupMenuItem(
+                  value: _DetailAction.delete,
+                  child: ListTile(
+                    leading: Icon(Icons.delete_outline),
+                    title: Text('Supprimer'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+            ],
+          ),
       ],
     );
   }
@@ -1324,35 +1330,42 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
         const SizedBox(height: 4),
         Text(_selectedCountLabel(data.counts.selectedCount)),
         const SizedBox(height: 20),
-        if (data.ownApplication == null)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton(
-              onPressed: _isSubmitting ? null : _apply,
-              child: _isSubmitting
-                  ? const SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Je me propose'),
+        if (data.canApply) ...[
+          if (data.ownApplication == null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton(
+                onPressed: _isSubmitting ? null : _apply,
+                child: _isSubmitting
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Je me propose'),
+              ),
+            )
+          else
+            _OwnApplication(
+              application: data.ownApplication!,
+              isSubmitting: _isSubmitting,
+              onWithdraw:
+                  data.ownApplication!.status ==
+                      ConcertVolunteerStatus.withdrawn
+                  ? null
+                  : _withdraw,
+              onReapply:
+                  data.ownApplication!.status ==
+                      ConcertVolunteerStatus.withdrawn
+                  ? _reapply
+                  : null,
             ),
-          )
-        else
-          _OwnApplication(
-            application: data.ownApplication!,
-            isSubmitting: _isSubmitting,
-            onWithdraw:
-                data.ownApplication!.status == ConcertVolunteerStatus.withdrawn
-                ? null
-                : _withdraw,
-            onReapply:
-                data.ownApplication!.status == ConcertVolunteerStatus.withdrawn
-                ? _reapply
-                : null,
-          ),
+        ],
         if (data.isAdmin) ...[
           const Divider(height: 32),
           _buildTeamBuilder(data, visibleApplications),
+        ] else if (data.isPromoter && data.canViewApplications) ...[
+          const Divider(height: 32),
+          _PromoterApplications(applications: visibleApplications),
         ],
       ],
     );
@@ -1722,6 +1735,54 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _PromoterApplications extends StatelessWidget {
+  const _PromoterApplications({required this.applications});
+
+  final List<ConcertVolunteerApplication> applications;
+
+  @override
+  Widget build(BuildContext context) {
+    if (applications.isEmpty) {
+      return const _FilteredApplicationsEmptyState();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Candidatures',
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        for (final application in applications)
+          Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundImage: application.profile?.avatarUrl == null
+                    ? null
+                    : NetworkImage(application.profile!.avatarUrl!),
+                child: application.profile?.avatarUrl == null
+                    ? const Icon(Icons.person_outline)
+                    : null,
+              ),
+              title: Text(application.displayName),
+              subtitle: Text(application.status.label),
+              trailing: application.teamRole == null
+                  ? null
+                  : Chip(
+                      visualDensity: VisualDensity.compact,
+                      label: Text(application.teamRole!.label),
+                    ),
+            ),
+          ),
+      ],
+    );
   }
 }
 
@@ -2853,8 +2914,8 @@ class _ConcertNotFound extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             FilledButton(
-              onPressed: () => context.go('/concerts'),
-              child: const Text('Retour aux concerts'),
+              onPressed: () => context.go('/maraudes'),
+              child: const Text('Retour aux maraudes'),
             ),
           ],
         ),

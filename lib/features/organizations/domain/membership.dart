@@ -1,7 +1,6 @@
 enum MemberRole {
-  superAdmin('super_admin'),
   admin('admin'),
-  coordinator('coordinator'),
+  promoter('promoter'),
   volunteer('volunteer');
 
   const MemberRole(this.jsonValue);

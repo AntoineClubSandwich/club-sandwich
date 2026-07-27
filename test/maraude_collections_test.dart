@@ -182,7 +182,7 @@ void main() {
       ).fetchConcert('concert-id');
 
       expect(concert!.collections, hasLength(2));
-      expect(requests, hasLength(2));
+      expect(requests, hasLength(1));
       expect(
         requests.last.url.queryParameters['select'],
         contains('collections:maraude_collections(*)'),

@@ -25,3 +25,10 @@ final membershipsProvider = FutureProvider.family<List<Membership>, String>((
       .watch(membershipRepositoryProvider)
       .fetchForOrganization(organizationId);
 });
+
+final organizationDetailsProvider =
+    FutureProvider.family<OrganizationDetails?, String>((ref, organizationId) {
+      return ref
+          .watch(organizationRepositoryProvider)
+          .fetchDetails(organizationId);
+    });

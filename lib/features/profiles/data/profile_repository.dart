@@ -17,4 +17,24 @@ class ProfileRepository {
         .maybeSingle();
     return row == null ? null : Profile.fromJson(row);
   }
+
+  Future<void> updateCurrentProfile({
+    required String firstName,
+    required String lastName,
+    String? phone,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw const AuthException('Utilisateur non connecté.');
+    final normalizedPhone = phone?.trim();
+    await _client
+        .from('profiles')
+        .update({
+          'first_name': firstName.trim(),
+          'last_name': lastName.trim(),
+          'phone': normalizedPhone == null || normalizedPhone.isEmpty
+              ? null
+              : normalizedPhone,
+        })
+        .eq('id', userId);
+  }
 }

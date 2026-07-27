@@ -190,12 +190,15 @@ void main() {
               request: request,
             );
           }
-          if (path.endsWith('/memberships')) {
+          if (path.endsWith('/get_concert_access')) {
             return Response(
               jsonEncode([
                 {
-                  'role': 'admin',
-                  'organizations': {'kind': 'club_sandwich'},
+                  'is_admin': true,
+                  'is_promoter': false,
+                  'can_view_applications': true,
+                  'can_manage_concert': true,
+                  'can_apply': false,
                 },
               ]),
               200,
@@ -259,6 +262,88 @@ void main() {
               )
               .length,
           1,
+        );
+      },
+    );
+
+    test(
+      'précharge une vue limitée des candidatures pour le tourneur',
+      () async {
+        final requests = <Request>[];
+        final client = await _authenticatedClient((request) async {
+          requests.add(request);
+          final path = request.url.path;
+          if (path.endsWith('/get_concert_volunteer_counts')) {
+            return Response(
+              jsonEncode([
+                {
+                  'application_count': 1,
+                  'selected_count': 0,
+                  'present_count': 0,
+                  'absent_count': 0,
+                },
+              ]),
+              200,
+              headers: _jsonHeaders,
+              request: request,
+            );
+          }
+          if (path.endsWith('/get_concert_access')) {
+            return Response(
+              jsonEncode([
+                {
+                  'is_admin': false,
+                  'is_promoter': true,
+                  'can_view_applications': true,
+                  'can_manage_concert': true,
+                  'can_apply': false,
+                },
+              ]),
+              200,
+              headers: _jsonHeaders,
+              request: request,
+            );
+          }
+          if (path.endsWith('/get_promoter_concert_applications')) {
+            return Response(
+              jsonEncode([
+                {
+                  ..._applicationJson(),
+                  'first_name': 'Camille',
+                  'last_name': 'Martin',
+                  'avatar_url': null,
+                  'total_applications': 0,
+                  'selected_applications': 0,
+                  'not_selected_applications': 0,
+                  'withdrawn_applications': 0,
+                  'history': const [],
+                },
+              ]),
+              200,
+              headers: _jsonHeaders,
+              request: request,
+            );
+          }
+          return Response('Not found', 404, request: request);
+        });
+        addTearDown(client.dispose);
+
+        final section = await ConcertVolunteerRepository(
+          client,
+        ).fetchSection('concert-id');
+
+        expect(section.isPromoter, isTrue);
+        expect(section.canManageConcert, isTrue);
+        expect(section.canApply, isFalse);
+        expect(section.ownApplication, isNull);
+        expect(section.applications.single.displayName, 'Camille Martin');
+        expect(section.applications.single.profile?.phone, isNull);
+        expect(
+          requests.where(
+            (request) =>
+                request.url.path.endsWith('/get_promoter_concert_applications'),
+          ),
+          hasLength(1),
         );
       },
     );

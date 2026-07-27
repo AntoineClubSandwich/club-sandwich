@@ -1,6 +1,8 @@
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
+import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/organizations/data/organization_providers.dart';
+import 'package:club_sandwich/features/invitations/data/invitation_providers.dart';
 import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
 import 'package:club_sandwich/features/profiles/domain/profile.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
@@ -14,60 +16,29 @@ class AppShell extends ConsumerWidget {
   final String location;
   final Widget child;
 
-  static const _destinations = [
-    _AppDestination(
-      label: 'Tableau de bord',
-      icon: Icons.dashboard_outlined,
-      selectedIcon: Icons.dashboard,
-      path: '/dashboard',
-    ),
-    _AppDestination(
-      label: 'Concerts',
-      icon: Icons.music_note_outlined,
-      selectedIcon: Icons.music_note,
-      path: '/concerts',
-    ),
-    _AppDestination(
-      label: 'Opérations',
-      icon: Icons.local_shipping_outlined,
-      selectedIcon: Icons.local_shipping,
-      path: '/operations',
-    ),
-    _AppDestination(
-      label: 'Bénévoles',
-      icon: Icons.groups_outlined,
-      selectedIcon: Icons.groups,
-      path: '/volunteers',
-    ),
-    _AppDestination(
-      label: 'Lieux',
-      icon: Icons.place_outlined,
-      selectedIcon: Icons.place,
-      path: '/venues',
-    ),
-    _AppDestination(
-      label: 'Paramètres',
-      icon: Icons.settings_outlined,
-      selectedIcon: Icons.settings,
-      path: '/settings',
-    ),
-  ];
-
-  int get _selectedIndex {
-    final index = _destinations.indexWhere(
+  int _selectedIndex(List<_AppDestination> destinations) {
+    final index = destinations.indexWhere(
       (destination) => location.startsWith(destination.path),
     );
     return index < 0 ? 0 : index;
   }
 
-  void _navigate(BuildContext context, int index) {
-    context.go(_destinations[index].path);
+  void _navigate(
+    BuildContext context,
+    List<_AppDestination> destinations,
+    int index,
+  ) {
+    context.go(destinations[index].path);
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 840;
-    final selectedIndex = _selectedIndex;
+    final userContext = ref.watch(currentUserContextProvider).value;
+    final destinations = _destinationsFor(
+      userContext?.role ?? AppUserRole.volunteer,
+    );
+    final selectedIndex = _selectedIndex(destinations);
     final accountPanel = _UserAccountPanel(
       onSignedOut: () {
         ref.invalidate(currentProfileProvider);
@@ -76,12 +47,15 @@ class AppShell extends ConsumerWidget {
         ref.invalidate(concertsProvider);
         ref.invalidate(concertDetailsProvider);
         ref.invalidate(concertVolunteerSectionProvider);
+        ref.invalidate(invitationCampaignsProvider);
+        ref.invalidate(currentUserContextProvider);
+        ref.invalidate(managedUsersProvider);
       },
     );
 
     if (!isDesktop) {
       return Scaffold(
-        appBar: AppBar(title: Text(_destinations[selectedIndex].label)),
+        appBar: AppBar(title: Text(destinations[selectedIndex].label)),
         drawer: Drawer(
           child: SafeArea(
             child: Column(
@@ -91,7 +65,7 @@ class AppShell extends ConsumerWidget {
                     selectedIndex: selectedIndex,
                     onDestinationSelected: (index) {
                       Navigator.of(context).pop();
-                      _navigate(context, index);
+                      _navigate(context, destinations, index);
                     },
                     children: [
                       const Padding(
@@ -104,7 +78,7 @@ class AppShell extends ConsumerWidget {
                           ),
                         ),
                       ),
-                      for (final destination in _destinations)
+                      for (final destination in destinations)
                         NavigationDrawerDestination(
                           icon: Icon(destination.icon),
                           selectedIcon: Icon(destination.selectedIcon),
@@ -124,7 +98,7 @@ class AppShell extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(_destinations[selectedIndex].label)),
+      appBar: AppBar(title: Text(destinations[selectedIndex].label)),
       body: Row(
         children: [
           SizedBox(
@@ -135,9 +109,10 @@ class AppShell extends ConsumerWidget {
                   child: NavigationRail(
                     extended: true,
                     selectedIndex: selectedIndex,
-                    onDestinationSelected: (index) => _navigate(context, index),
+                    onDestinationSelected: (index) =>
+                        _navigate(context, destinations, index),
                     destinations: [
-                      for (final destination in _destinations)
+                      for (final destination in destinations)
                         NavigationRailDestination(
                           icon: Icon(destination.icon),
                           selectedIcon: Icon(destination.selectedIcon),
@@ -278,4 +253,92 @@ class _AppDestination {
   final IconData icon;
   final IconData selectedIcon;
   final String path;
+}
+
+List<_AppDestination> _destinationsFor(AppUserRole role) {
+  const dashboard = _AppDestination(
+    label: 'Tableau de bord',
+    icon: Icons.dashboard_outlined,
+    selectedIcon: Icons.dashboard,
+    path: '/dashboard',
+  );
+  const maraudes = _AppDestination(
+    label: 'Maraudes',
+    icon: Icons.volunteer_activism_outlined,
+    selectedIcon: Icons.volunteer_activism,
+    path: '/maraudes',
+  );
+  const invitations = _AppDestination(
+    label: 'Invitations',
+    icon: Icons.confirmation_number_outlined,
+    selectedIcon: Icons.confirmation_number,
+    path: '/invitations',
+  );
+  return switch (role) {
+    AppUserRole.admin => const [
+      dashboard,
+      maraudes,
+      invitations,
+      _AppDestination(
+        label: 'Organisations',
+        icon: Icons.business_outlined,
+        selectedIcon: Icons.business,
+        path: '/organizations',
+      ),
+      _AppDestination(
+        label: 'Bénévoles',
+        icon: Icons.groups_outlined,
+        selectedIcon: Icons.groups,
+        path: '/volunteers',
+      ),
+      _AppDestination(
+        label: 'Administration',
+        icon: Icons.admin_panel_settings_outlined,
+        selectedIcon: Icons.admin_panel_settings,
+        path: '/administration',
+      ),
+    ],
+    AppUserRole.promoter => const [
+      dashboard,
+      _AppDestination(
+        label: 'Mes maraudes',
+        icon: Icons.volunteer_activism_outlined,
+        selectedIcon: Icons.volunteer_activism,
+        path: '/maraudes',
+      ),
+      _AppDestination(
+        label: 'Mes invitations',
+        icon: Icons.confirmation_number_outlined,
+        selectedIcon: Icons.confirmation_number,
+        path: '/invitations',
+      ),
+      _AppDestination(
+        label: 'Mon compte',
+        icon: Icons.account_circle_outlined,
+        selectedIcon: Icons.account_circle,
+        path: '/account',
+      ),
+    ],
+    AppUserRole.volunteer => const [
+      _AppDestination(
+        label: 'Accueil',
+        icon: Icons.home_outlined,
+        selectedIcon: Icons.home,
+        path: '/dashboard',
+      ),
+      _AppDestination(
+        label: 'Mes maraudes',
+        icon: Icons.volunteer_activism_outlined,
+        selectedIcon: Icons.volunteer_activism,
+        path: '/maraudes',
+      ),
+      invitations,
+      _AppDestination(
+        label: 'Mon profil',
+        icon: Icons.person_outline,
+        selectedIcon: Icons.person,
+        path: '/profile',
+      ),
+    ],
+  };
 }

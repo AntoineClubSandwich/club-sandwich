@@ -1,5 +1,4 @@
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
-import 'package:club_sandwich/features/concerts/data/concert_repository.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_form.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
@@ -135,7 +134,7 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _createConcert(context),
         icon: const Icon(Icons.add),
-        label: const Text('Nouveau concert'),
+        label: const Text('Nouvelle maraude'),
       ),
     );
   }
@@ -215,7 +214,7 @@ class _PageToolbar extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              'Concerts',
+              'Maraudes',
               style: Theme.of(
                 context,
               ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
@@ -454,7 +453,7 @@ class _ConcertCard extends ConsumerWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         key: ValueKey('concert-card-${concert.id}'),
-        onTap: () => context.go('/concerts/${concert.id}'),
+        onTap: () => context.go('/maraudes/${concert.id}'),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 8, 16),
           child: Column(
@@ -768,7 +767,7 @@ class _AgendaConcertTile extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           key: ValueKey('agenda-concert-${concert.id}'),
-          onTap: () => context.go('/concerts/${concert.id}'),
+          onTap: () => context.go('/maraudes/${concert.id}'),
           child: Padding(
             padding: const EdgeInsets.all(6),
             child: Column(
@@ -874,7 +873,7 @@ class _MobileAgendaCard extends StatelessWidget {
     return Card(
       child: InkWell(
         key: ValueKey('mobile-agenda-concert-${concert.id}'),
-        onTap: () => context.go('/concerts/${concert.id}'),
+        onTap: () => context.go('/maraudes/${concert.id}'),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -944,16 +943,16 @@ class _EmptyConcerts extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              'Aucun concert',
+              'Aucune maraude',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
-            const Text('Créez votre premier concert.'),
+            const Text('Ouvrez votre première maraude.'),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: onCreate,
               icon: const Icon(Icons.add),
-              label: const Text('Créer un concert'),
+              label: const Text('Ouvrir une maraude'),
             ),
           ],
         ),
@@ -1029,9 +1028,9 @@ Future<bool> deleteConcertWithConfirmation(
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Supprimer le concert ?'),
+      title: const Text('Supprimer la maraude ?'),
       content: Text(
-        'Le concert « ${concert.artist} », ses candidatures, sa collecte, '
+        'La maraude « ${concert.artist} », ses candidatures, sa collecte, '
         'sa distribution et son bilan seront définitivement supprimés.',
       ),
       actions: [
@@ -1233,11 +1232,7 @@ bool _contains(String? value, String query) {
 }
 
 String _errorMessage(Object error) {
-  if (error is MissingMembershipException ||
-      error is AmbiguousProducerMembershipException) {
-    return error.toString();
-  }
-  return 'Une erreur est survenue lors du chargement des concerts.';
+  return 'Une erreur est survenue lors du chargement des maraudes.';
 }
 
 void _showError(BuildContext context, Object error) {

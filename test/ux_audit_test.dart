@@ -210,7 +210,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Nouveau concert'), findsOneWidget);
+    expect(find.text('Nouvelle maraude'), findsOneWidget);
     expect(find.text('Artiste'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
