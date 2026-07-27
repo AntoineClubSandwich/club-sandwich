@@ -194,6 +194,9 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
     if (created != true || !context.mounted) return;
 
     ref.invalidate(concertsProvider);
+    await ref.read(concertsProvider.future);
+    if (!context.mounted) return;
+
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Concert créé.')));
