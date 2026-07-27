@@ -4,6 +4,7 @@ import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/data/concert_repository.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
+import 'package:club_sandwich/features/concerts/presentation/concert_form.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
@@ -174,7 +175,58 @@ void main() {
     );
   });
 
-  testWidgets('affiche et fait progresser les trois états de maraude', (
+  testWidgets('ouvre le formulaire unifié depuis la fiche concert', (
+    tester,
+  ) async {
+    final repository = _FakeEditConcertRepository();
+    final concert = buildConcert(
+      id: 'concert-id',
+      artist: 'Artiste initial',
+      venue: testVenue,
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          concertRepositoryProvider.overrideWithValue(repository),
+          concertDetailsProvider.overrideWith(
+            (ref, concertId) async => concert,
+          ),
+          concertVolunteerSectionProvider.overrideWith(
+            (ref, concertId) async => const ConcertVolunteerSectionData(
+              counts: ConcertVolunteerCounts.empty(),
+              isAdmin: true,
+              applications: [],
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          home: ConcertDetailScreen(concertId: 'concert-id'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Modifier'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ConcertForm), findsOneWidget);
+    expect(find.text('Titre'), findsNothing);
+    await tester.enterText(
+      find.byKey(const ValueKey('concert-artist-field')),
+      'Artiste modifié',
+    );
+    await tester.ensureVisible(find.text('Enregistrer les modifications'));
+    await tester.tap(find.text('Enregistrer les modifications'));
+    await tester.pumpAndSettle();
+
+    expect(repository.updatedConcertId, 'concert-id');
+    expect(repository.updatedDraft?.artist, 'Artiste modifié');
+    expect(repository.updatedDraft?.venueId, testVenue.id);
+  });
+
+  testWidgets('affiche et permet de corriger le cycle de maraude', (
     tester,
   ) async {
     final repository = _FakeLifecycleConcertRepository();
@@ -200,31 +252,27 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Préparation'), findsOneWidget);
-    expect(find.text('Démarrer la maraude'), findsOneWidget);
+    expect(find.text('Ouverte'), findsWidgets);
 
-    await tester.ensureVisible(find.text('Démarrer la maraude'));
-    await tester.tap(find.text('Démarrer la maraude'));
+    final selector = find.byKey(const ValueKey('maraude-status-selector'));
+    await tester.ensureVisible(selector);
+    await tester.tap(selector);
     await tester.pumpAndSettle();
-    expect(find.text('Démarrer la maraude ?'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'Démarrer'));
+    await tester.tap(find.text('En cours').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('En cours'), findsOneWidget);
-    expect(find.text('Terminer la maraude'), findsOneWidget);
+    expect(find.text('En cours'), findsWidgets);
     expect(find.text('27 juillet 2026\n21:12'), findsOneWidget);
 
-    await tester.tap(find.text('Terminer la maraude'));
+    await tester.ensureVisible(selector);
+    await tester.tap(selector);
     await tester.pumpAndSettle();
-    expect(find.text('Terminer la maraude ?'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'Terminer'));
+    await tester.tap(find.text('Terminée').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Terminée'), findsOneWidget);
+    expect(find.text('Terminée'), findsWidgets);
     expect(find.text('Maraude terminée'), findsOneWidget);
     expect(find.text('27 juillet 2026\n23:05'), findsOneWidget);
-    expect(find.text('Démarrer la maraude'), findsNothing);
-    expect(find.text('Terminer la maraude'), findsNothing);
     expect(repository.startCount, 1);
     expect(repository.completeCount, 1);
   });
@@ -233,7 +281,7 @@ void main() {
     tester,
   ) async {
     final concert = buildConcert(
-      maraudeStatus: MaraudeStatus.started,
+      maraudeStatus: MaraudeStatus.inProgress,
       actualStartAt: DateTime(2026, 7, 27, 21, 12),
     );
     await tester.pumpWidget(
@@ -280,21 +328,45 @@ class _FakeLifecycleConcertRepository extends ConcertRepository {
   int completeCount = 0;
 
   @override
-  Future<void> startMaraude(String concertId) async {
-    startCount++;
-    concert = buildConcert(
-      maraudeStatus: MaraudeStatus.started,
-      actualStartAt: DateTime(2026, 7, 27, 21, 12),
-    );
+  Future<void> setMaraudeStatus(
+    String concertId,
+    MaraudeStatus status, {
+    String? cancellationReason,
+  }) async {
+    if (status == MaraudeStatus.inProgress) {
+      startCount++;
+      concert = buildConcert(
+        maraudeStatus: status,
+        actualStartAt: DateTime(2026, 7, 27, 21, 12),
+      );
+    } else if (status == MaraudeStatus.completed) {
+      completeCount++;
+      concert = buildConcert(
+        maraudeStatus: status,
+        actualStartAt: DateTime(2026, 7, 27, 21, 12),
+        actualEndAt: DateTime(2026, 7, 27, 23, 5),
+      );
+    }
   }
+}
+
+class _FakeEditConcertRepository extends ConcertRepository {
+  _FakeEditConcertRepository()
+    : super(
+        SupabaseClient(
+          'http://localhost',
+          'test-key',
+          authOptions: const AuthClientOptions(autoRefreshToken: false),
+        ),
+      );
+
+  String? updatedConcertId;
+  ConcertDraft? updatedDraft;
 
   @override
-  Future<void> completeMaraude(String concertId) async {
-    completeCount++;
-    concert = buildConcert(
-      maraudeStatus: MaraudeStatus.completed,
-      actualStartAt: DateTime(2026, 7, 27, 21, 12),
-      actualEndAt: DateTime(2026, 7, 27, 23, 5),
-    );
+  Future<Concert> updateConcert(String concertId, ConcertDraft draft) async {
+    updatedConcertId = concertId;
+    updatedDraft = draft;
+    return buildConcert(id: concertId, artist: draft.artist, venue: testVenue);
   }
 }

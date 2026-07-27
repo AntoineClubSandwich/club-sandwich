@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(21);
+select plan(23);
 
 select has_table(
   'public',
@@ -317,6 +317,17 @@ select results_eq(
 
 select results_eq(
   $$
+    select email
+    from public.get_concert_volunteer_team_details(
+      '20000000-0000-0000-0000-000000000001'
+    )
+  $$,
+  array['volunteer-one@example.test'::text],
+  'Un bénévole accède uniquement à son propre e-mail dans la lecture groupée'
+);
+
+select results_eq(
+  $$
     select count(*)::bigint
     from public.profiles
     where id = '10000000-0000-0000-0000-000000000002'
@@ -454,6 +465,18 @@ select results_eq(
       )
   $$,
   'Les statistiques bénévoles sont calculées sans être stockées'
+);
+
+select results_eq(
+  $$
+    select email
+    from public.get_concert_volunteer_team_details(
+      '20000000-0000-0000-0000-000000000001'
+    )
+    where user_id = '10000000-0000-0000-0000-000000000002'
+  $$,
+  array['volunteer-two@example.test'::text],
+  'Un administrateur peut rechercher un candidat par son e-mail'
 );
 
 select results_eq(

@@ -256,8 +256,8 @@ select results_eq(
     from public.concerts
     where id = 'c1000000-0000-0000-0000-000000000001'
   $$,
-  array[0::bigint],
-  'Un bénévole absent ne consulte pas le bilan'
+  array[1::bigint],
+  'Un bénévole sélectionné conserve l’accès au bilan'
 );
 
 reset role;

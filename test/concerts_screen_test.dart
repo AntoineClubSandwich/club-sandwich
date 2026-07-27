@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/data/concert_repository.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
+import 'package:club_sandwich/features/concerts/presentation/concert_form.dart';
 import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dart';
 import 'package:club_sandwich/features/venues/data/venue_providers.dart';
 import 'package:club_sandwich/features/venues/data/venue_repository.dart';
@@ -21,7 +22,10 @@ void main() {
     List<Concert> concerts, {
     ConcertRepository? concertRepository,
     VenueRepository? venueRepository,
+    Size size = const Size(1200, 900),
   }) async {
+    await tester.binding.setSurfaceSize(size);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final router = GoRouter(
       initialLocation: '/concerts',
       routes: [
@@ -54,7 +58,7 @@ void main() {
     return router;
   }
 
-  testWidgets('affiche l’état vide et ouvre le dialogue de création', (
+  testWidgets('affiche l’état vide et ouvre le formulaire unique', (
     tester,
   ) async {
     await pumpConcerts(tester, const []);
@@ -65,18 +69,31 @@ void main() {
     await tester.tap(find.text('Créer un concert'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(CreateConcertDialog), findsOneWidget);
+    expect(find.byType(ConcertForm), findsOneWidget);
+    expect(find.text('Nouveau concert'), findsWidgets);
+    expect(find.text('Titre'), findsNothing);
   });
 
-  testWidgets('affiche plusieurs concerts', (tester) async {
+  testWidgets('la liste affiche plusieurs concerts et les vrais compteurs', (
+    tester,
+  ) async {
     await pumpConcerts(tester, [
-      buildConcert(id: 'first', artist: 'Premier artiste'),
-      buildConcert(id: 'second', artist: 'Deuxième artiste'),
+      buildConcert(
+        id: 'first',
+        artist: 'Premier artiste',
+        selectedVolunteerCount: 1,
+      ),
+      buildConcert(
+        id: 'second',
+        artist: 'Deuxième artiste',
+        selectedVolunteerCount: 5,
+      ),
     ]);
 
     expect(find.text('Premier artiste'), findsOneWidget);
     expect(find.text('Deuxième artiste'), findsOneWidget);
-    expect(find.text('0 bénévole'), findsNWidgets(2));
+    expect(find.text('1 bénévole'), findsOneWidget);
+    expect(find.text('5 bénévoles'), findsOneWidget);
   });
 
   testWidgets('un clic sur une carte ouvre sa route détaillée', (tester) async {
@@ -90,28 +107,108 @@ void main() {
     expect(find.text('Détail first'), findsOneWidget);
   });
 
-  testWidgets('le dialogue de création valide les champs obligatoires', (
+  testWidgets('le même ConcertForm sert à la création et à la modification', (
+    tester,
+  ) async {
+    await pumpConcerts(tester, [
+      buildConcert(id: 'concert-id', artist: 'Artiste'),
+    ]);
+
+    await tester.tap(find.text('Nouveau concert'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ConcertForm), findsOneWidget);
+    await tester.tap(find.byTooltip('Fermer'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Modifier'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ConcertForm), findsOneWidget);
+    expect(find.text('Modifier le concert'), findsOneWidget);
+    expect(find.text('Titre'), findsNothing);
+  });
+
+  testWidgets('préremplit tous les champs existants en modification', (
+    tester,
+  ) async {
+    const venue = Venue(
+      id: 'venue-id',
+      name: 'Olympia',
+      publicAddressLine1: '28 boulevard des Capucines',
+      postalCode: '75009',
+      city: 'Paris',
+      artistEntranceAddressLine1: 'Rue Caumartin',
+      artistEntrancePostalCode: '75009',
+      artistEntranceCity: 'Paris',
+      accessInstructions: 'Sonner à la porte noire.',
+    );
+    final concert = buildConcert(
+      artist: 'VICTOR',
+      tour: 'Nouvelle tournée',
+      time: '21:30:00',
+      status: ConcertStatus.confirmed,
+      venue: venue,
+      cateringClosesAt: '23:00:00',
+      notes: 'Récupération côté scène',
+      promoterOrganizationName: 'Producteur Exemple',
+      promoterContactName: 'Camille',
+      promoterContactPhone: '0600000000',
+      promoterContactEmail: 'camille@example.com',
+      cateringContactName: 'Alex',
+      cateringContactPhone: '0611111111',
+      cateringContactEmail: 'alex@example.com',
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ConcertForm(initialConcert: concert, onSubmit: (_) async {}),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_fieldText(tester, 'concert-artist-field'), 'VICTOR');
+    expect(_fieldText(tester, 'concert-tour-field'), 'Nouvelle tournée');
+    expect(_fieldText(tester, 'concert-venue-field'), 'Olympia');
+    expect(find.text('21:30'), findsOneWidget);
+    expect(find.text('Confirmé'), findsOneWidget);
+    expect(find.text('Fermeture du catering : 23:00'), findsOneWidget);
+    expect(find.text('Producteur Exemple'), findsOneWidget);
+    expect(find.text('Rue Caumartin, 75009 Paris'), findsOneWidget);
+    expect(find.text('Sonner à la porte noire.'), findsOneWidget);
+    expect(find.text('Récupération côté scène'), findsOneWidget);
+    expect(find.text('Camille'), findsOneWidget);
+    expect(find.text('Alex'), findsOneWidget);
+  });
+
+  testWidgets('valide uniquement les champs obligatoires du formulaire', (
     tester,
   ) async {
     await pumpConcerts(tester, const []);
     await tester.tap(find.text('Créer un concert'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Enregistrer'));
+    await tester.tap(find.text('Publier le concert'));
     await tester.pump();
 
-    expect(find.text('Ce champ est requis.'), findsNWidgets(3));
+    expect(find.text('Ce champ est requis.'), findsNWidgets(2));
+    expect(find.text('Titre'), findsNothing);
   });
 
-  testWidgets('le dialogue d’édition refuse un e-mail invalide', (
-    tester,
-  ) async {
+  testWidgets('refuse un e-mail invalide', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ConcertFormDialog(
-            initialConcert: buildConcert(title: 'Titre'),
-            onSubmit: (draft) async {},
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ConcertForm(
+              initialConcert: buildConcert(venue: testVenue),
+              onSubmit: (_) async {},
+            ),
           ),
         ),
       ),
@@ -119,7 +216,8 @@ void main() {
 
     final emailField = find.widgetWithText(TextFormField, 'E-mail').first;
     await tester.enterText(emailField, 'adresse-invalide');
-    await tester.tap(find.text('Enregistrer'));
+    await tester.ensureVisible(find.text('Enregistrer les modifications'));
+    await tester.tap(find.text('Enregistrer les modifications'));
     await tester.pump();
 
     expect(find.text('Saisissez une adresse e-mail valide.'), findsOneWidget);
@@ -128,104 +226,101 @@ void main() {
   testWidgets('désactive l’enregistrement pendant la requête', (tester) async {
     final completer = Completer<void>();
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ConcertFormDialog(
-            initialConcert: buildConcert(title: 'Titre'),
-            onSubmit: (draft) => completer.future,
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ConcertForm(
+              initialConcert: buildConcert(venue: testVenue),
+              onSubmit: (_) => completer.future,
+            ),
           ),
         ),
       ),
     );
 
-    await tester.tap(find.text('Enregistrer'));
+    await tester.ensureVisible(find.text('Enregistrer les modifications'));
+    await tester.tap(find.text('Enregistrer les modifications'));
     await tester.pump();
 
-    final submitButton = tester.widget<FilledButton>(
-      find.byType(FilledButton).last,
+    final button = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('concert-submit-button')),
     );
-    expect(submitButton.onPressed, isNull);
-    expect(
-      find.descendant(
-        of: find.byType(FilledButton),
-        matching: find.byType(CircularProgressIndicator),
-      ),
-      findsOneWidget,
-    );
+    expect(button.onPressed, isNull);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     completer.complete();
     await tester.pumpAndSettle();
-    expect(find.byType(ConcertFormDialog), findsNothing);
+    expect(find.byType(ConcertForm), findsNothing);
   });
 
-  testWidgets('le parcours de création transmet toujours le bon brouillon', (
+  testWidgets('crée puis modifie avec le même brouillon métier', (
     tester,
   ) async {
-    final concertRepository = _FakeConcertRepository();
+    final repository = _FakeConcertRepository();
     await pumpConcerts(
       tester,
       const [],
-      concertRepository: concertRepository,
+      concertRepository: repository,
       venueRepository: _FakeVenueRepository(),
     );
 
     await tester.tap(find.text('Créer un concert'));
     await tester.pumpAndSettle();
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Artiste'),
+      find.byKey(const ValueKey('concert-artist-field')),
       'Nouvel artiste',
     );
-
-    await tester.tap(find.text('Date du concert'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('OK'));
-    await tester.pumpAndSettle();
-
-    await tester.enterText(find.widgetWithText(TextField, 'Salle'), 'Pl');
+    await tester.enterText(
+      find.byKey(const ValueKey('concert-venue-field')),
+      'Pl',
+    );
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Salle Pleyel'));
-    await tester.tap(find.text('Enregistrer'));
+    await tester.ensureVisible(find.text('Publier le concert'));
+    await tester.tap(find.text('Publier le concert'));
     await tester.pumpAndSettle();
 
-    expect(concertRepository.createdDraft?.artist, 'Nouvel artiste');
-    expect(concertRepository.createdDraft?.venueId, testVenue.id);
+    expect(repository.createdDraft?.artist, 'Nouvel artiste');
+    expect(repository.createdDraft?.venueId, testVenue.id);
     expect(find.text('Concert créé.'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('le parcours d’édition enregistre toujours les modifications', (
+  testWidgets('le parcours d’édition enregistre les champs unifiés', (
     tester,
   ) async {
     final repository = _FakeConcertRepository();
     await pumpConcerts(tester, [
-      buildConcert(id: 'concert-id', title: 'Titre'),
+      buildConcert(id: 'concert-id', venue: testVenue),
     ], concertRepository: repository);
 
-    await tester.tap(find.byTooltip('Actions').first);
+    await tester.tap(find.byTooltip('Actions'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Modifier'));
     await tester.pumpAndSettle();
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Artiste'),
+      find.byKey(const ValueKey('concert-artist-field')),
       'Artiste modifié',
     );
-    await tester.tap(find.text('Enregistrer'));
+    await tester.ensureVisible(find.text('Enregistrer les modifications'));
+    await tester.tap(find.text('Enregistrer les modifications'));
     await tester.pumpAndSettle();
 
     expect(repository.updatedConcertId, 'concert-id');
     expect(repository.updatedDraft?.artist, 'Artiste modifié');
+    expect(repository.updatedDraft?.venueId, testVenue.id);
     expect(find.text('Concert modifié.'), findsOneWidget);
   });
 
-  testWidgets('le parcours de suppression confirme puis supprime', (
-    tester,
-  ) async {
+  testWidgets('confirme puis supprime un concert', (tester) async {
     final repository = _FakeConcertRepository();
     await pumpConcerts(tester, [
-      buildConcert(id: 'concert-id', title: 'Titre'),
+      buildConcert(id: 'concert-id'),
     ], concertRepository: repository);
 
-    await tester.tap(find.byTooltip('Actions').first);
+    await tester.tap(find.byTooltip('Actions'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Supprimer'));
     await tester.pumpAndSettle();
@@ -238,33 +333,160 @@ void main() {
     expect(find.text('Concert supprimé.'), findsOneWidget);
   });
 
-  testWidgets('conserve les valeurs du formulaire après une erreur', (
+  testWidgets('affiche l’agenda et ouvre un concert du calendrier', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ConcertFormDialog(
-            initialConcert: buildConcert(title: 'Titre'),
-            onSubmit: (draft) => Future.error(Exception('Erreur simulée')),
-          ),
+    final now = DateTime.now();
+    await pumpConcerts(tester, [
+      buildConcert(
+        id: 'agenda-id',
+        artist: 'Artiste agenda',
+        date: DateTime(now.year, now.month, 15),
+        time: '21:30:00',
+        venue: testVenue,
+        selectedVolunteerCount: 3,
+      ),
+    ]);
+
+    await tester.tap(find.text('Agenda'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('month-agenda')), findsOneWidget);
+    expect(find.text('Artiste agenda'), findsOneWidget);
+    expect(find.text('3/4 bénévoles'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('agenda-concert-agenda-id')));
+    await tester.pumpAndSettle();
+    expect(find.text('Détail agenda-id'), findsOneWidget);
+  });
+
+  testWidgets('navigue entre les mois et revient à aujourd’hui', (
+    tester,
+  ) async {
+    await pumpConcerts(tester, [buildConcert()]);
+    await tester.tap(find.text('Agenda'));
+    await tester.pumpAndSettle();
+    final initialHeading = _agendaHeading(tester);
+
+    await tester.tap(find.byKey(const ValueKey('agenda-next-month')));
+    await tester.pumpAndSettle();
+    expect(_agendaHeading(tester), isNot(initialHeading));
+
+    await tester.tap(find.text('Aujourd’hui'));
+    await tester.pumpAndSettle();
+    expect(_agendaHeading(tester), initialHeading);
+  });
+
+  testWidgets('affiche une chronologie à la place du mois sur mobile', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    await pumpConcerts(tester, [
+      buildConcert(
+        id: 'today',
+        artist: 'Concert du jour',
+        date: now,
+        venue: testVenue,
+      ),
+      buildConcert(
+        id: 'tomorrow',
+        artist: 'Concert de demain',
+        date: now.add(const Duration(days: 1)),
+        venue: testVenue,
+      ),
+    ], size: const Size(390, 844));
+
+    await tester.tap(find.text('Agenda'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('mobile-agenda')), findsOneWidget);
+    expect(find.byKey(const ValueKey('month-agenda')), findsNothing);
+    expect(find.text('Aujourd’hui'), findsOneWidget);
+    expect(find.text('Demain'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mémorise la vue agenda lors d’un aller-retour navigation', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final router = await pumpConcerts(tester, [
+      buildConcert(id: 'remembered', date: DateTime(now.year, now.month)),
+    ]);
+
+    await tester.tap(find.text('Agenda'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('agenda-concert-remembered')));
+    await tester.pumpAndSettle();
+    router.go('/concerts');
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('month-agenda')), findsOneWidget);
+  });
+
+  testWidgets('applique les filtres aux vues liste et agenda', (tester) async {
+    final now = DateTime.now();
+    await pumpConcerts(tester, [
+      buildConcert(
+        id: 'victor',
+        artist: 'VICTOR',
+        date: now,
+        venue: testVenue,
+        promoterOrganizationName: 'Producteur A',
+      ),
+      buildConcert(
+        id: 'other',
+        artist: 'Autre artiste',
+        date: now,
+        venue: const Venue(
+          id: 'other-venue',
+          name: 'Olympia',
+          publicAddressLine1: '28 boulevard des Capucines',
+          postalCode: '75009',
+          city: 'Paris',
         ),
       ),
-    );
+    ]);
 
-    final contactNameField = find.widgetWithText(TextFormField, 'Nom').first;
-    await tester.enterText(contactNameField, 'Camille');
-    await tester.tap(find.text('Enregistrer'));
+    await tester.tap(find.text('Filtres'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('concert-filter-artist')),
+      'victor',
+    );
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.byType(ConcertFormDialog), findsOneWidget);
-    expect(find.text('Camille'), findsOneWidget);
-    expect(
-      find.text('Impossible d’enregistrer les modifications.'),
-      findsOneWidget,
-    );
+    expect(find.text('VICTOR'), findsOneWidget);
+    expect(find.text('Autre artiste'), findsNothing);
+
+    await tester.tap(find.text('Agenda'));
+    await tester.pumpAndSettle();
+    expect(find.text('VICTOR'), findsOneWidget);
+    expect(find.text('Autre artiste'), findsNothing);
   });
+}
+
+String _fieldText(WidgetTester tester, String key) {
+  final widget = tester.widget(find.byKey(ValueKey(key)));
+  return switch (widget) {
+    TextFormField field => field.controller?.text ?? '',
+    TextField field => field.controller?.text ?? '',
+    _ => throw StateError('Champ texte introuvable : $key'),
+  };
+}
+
+String _agendaHeading(WidgetTester tester) {
+  final heading = tester
+      .widgetList<Text>(
+        find.descendant(
+          of: find.byKey(const ValueKey('month-agenda')),
+          matching: find.byType(Text),
+        ),
+      )
+      .map((text) => text.data)
+      .whereType<String>()
+      .firstWhere((text) => RegExp(r'^[a-zéû]+\s\d{4}$').hasMatch(text));
+  return heading;
 }
 
 SupabaseClient _testClient() {
@@ -286,17 +508,20 @@ class _FakeVenueRepository extends VenueRepository {
 class _FakeConcertRepository extends ConcertRepository {
   _FakeConcertRepository() : super(_testClient());
 
-  CreateConcertDraft? createdDraft;
+  ConcertDraft? createdDraft;
   String? updatedConcertId;
   ConcertDraft? updatedDraft;
   String? deletedConcertId;
 
   @override
-  Future<Concert> createConcert(CreateConcertDraft draft) async {
+  Future<Concert> createConcert(ConcertDraft draft) async {
     createdDraft = draft;
     return buildConcert(
       artist: draft.artist,
+      tour: draft.tour,
       date: draft.date,
+      time: draft.time,
+      status: draft.status,
       venue: testVenue,
       cateringClosesAt: draft.cateringClosesAt,
     );
@@ -309,8 +534,12 @@ class _FakeConcertRepository extends ConcertRepository {
     return buildConcert(
       id: concertId,
       artist: draft.artist,
+      tour: draft.tour,
       date: draft.date,
-      title: draft.title,
+      time: draft.time,
+      status: draft.status,
+      venue: testVenue,
+      cateringClosesAt: draft.cateringClosesAt,
     );
   }
 

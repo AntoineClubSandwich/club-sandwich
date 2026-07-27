@@ -8,21 +8,25 @@ select has_column(
   'public',
   'concerts',
   'maraude_status',
-  'Le concert porte l’état opérationnel de la maraude'
+  'Le concert porte le statut de maraude'
 );
-
 select has_column(
   'public',
   'concerts',
   'actual_start_at',
   'Le concert porte l’heure réelle de début'
 );
-
 select has_column(
   'public',
   'concerts',
   'actual_end_at',
   'Le concert porte l’heure réelle de fin'
+);
+select has_column(
+  'public',
+  'concerts',
+  'cancellation_reason',
+  'Le concert peut conserver un motif d’annulation'
 );
 
 select col_type_is(
@@ -30,14 +34,17 @@ select col_type_is(
   'concerts',
   'maraude_status',
   'public.maraude_status',
-  'Le cycle de vie utilise l’enum maraude_status'
+  'Le cycle utilise l’enum maraude_status'
 );
 
-insert into auth.users (
-  id,
-  email,
-  raw_user_meta_data
-)
+select enum_has_labels(
+  'public',
+  'maraude_status',
+  array['draft', 'open', 'team_ready', 'in_progress', 'completed', 'cancelled'],
+  'Les six états fonctionnels sont disponibles'
+);
+
+insert into auth.users (id, email, raw_user_meta_data)
 values
   (
     '90000000-0000-0000-0000-000000000001',
@@ -50,28 +57,18 @@ values
     '{"first_name":"Admin","last_name":"Maraude"}'::jsonb
   );
 
-insert into public.memberships (
-  organization_id,
-  profile_id,
-  role
-)
+insert into public.memberships (organization_id, profile_id, role)
 select
-  o.id,
+  organization.id,
   member_data.profile_id,
   member_data.role::public.app_role
-from public.organizations o
+from public.organizations organization
 cross join (
   values
-    (
-      '90000000-0000-0000-0000-000000000001'::uuid,
-      'volunteer'
-    ),
-    (
-      '90000000-0000-0000-0000-000000000002'::uuid,
-      'admin'
-    )
+    ('90000000-0000-0000-0000-000000000001'::uuid, 'volunteer'),
+    ('90000000-0000-0000-0000-000000000002'::uuid, 'admin')
 ) as member_data(profile_id, role)
-where o.slug = 'club-sandwich';
+where organization.slug = 'club-sandwich';
 
 insert into public.concerts (
   id,
@@ -82,63 +79,26 @@ insert into public.concerts (
   created_by
 )
 select
-  concert_data.id,
-  o.id,
-  concert_data.artist,
-  concert_data.concert_date,
-  v.id,
+  '91000000-0000-0000-0000-000000000001'::uuid,
+  organization.id,
+  'Cycle flexible',
+  '2026-12-10'::date,
+  venue.id,
   '90000000-0000-0000-0000-000000000002'::uuid
-from public.organizations o
+from public.organizations organization
 cross join lateral (
-  select id
-  from public.venues
-  order by name
-  limit 1
-) v
-cross join (
-  values
-    (
-      '91000000-0000-0000-0000-000000000001'::uuid,
-      'Maraude sans présence',
-      '2026-12-10'::date
-    ),
-    (
-      '91000000-0000-0000-0000-000000000002'::uuid,
-      'Maraude prête',
-      '2026-12-11'::date
-    )
-) as concert_data(id, artist, concert_date)
-where o.slug = 'club-sandwich';
+  select id from public.venues order by name limit 1
+) venue
+where organization.slug = 'club-sandwich';
 
 select results_eq(
   $$
-    select count(*)::bigint
+    select maraude_status::text
     from public.concerts
-    where id in (
-      '91000000-0000-0000-0000-000000000001',
-      '91000000-0000-0000-0000-000000000002'
-    )
-      and maraude_status = 'planned'
-      and actual_start_at is null
-      and actual_end_at is null
+    where id = '91000000-0000-0000-0000-000000000001'
   $$,
-  array[2::bigint],
-  'Toute nouvelle maraude est créée en préparation'
-);
-
-insert into public.concert_volunteers (
-  id,
-  concert_id,
-  user_id,
-  status,
-  attendance_status
-)
-values (
-  '92000000-0000-0000-0000-000000000001',
-  '91000000-0000-0000-0000-000000000002',
-  '90000000-0000-0000-0000-000000000001',
-  'selected',
-  'present'
+  array['open'::text],
+  'Une maraude existante est ouverte par défaut'
 );
 
 set local role authenticated;
@@ -150,13 +110,15 @@ select set_config(
 
 select throws_ok(
   $$
-    select public.start_maraude(
-      '91000000-0000-0000-0000-000000000002'
+    select public.set_maraude_status(
+      '91000000-0000-0000-0000-000000000001',
+      'in_progress',
+      null
     )
   $$,
   '42501',
-  'Seul un administrateur peut démarrer une maraude',
-  'Un bénévole ne peut pas démarrer une maraude'
+  'Seul un administrateur peut modifier la maraude',
+  'Un bénévole ne modifie pas le cycle'
 );
 
 reset role;
@@ -167,164 +129,128 @@ select set_config(
   true
 );
 
-select throws_ok(
-  $$
-    select public.complete_maraude(
-      '91000000-0000-0000-0000-000000000001'
-    )
-  $$,
-  '22023',
-  'Seule une maraude en cours peut être terminée',
-  'Une maraude en préparation ne peut pas être terminée'
-);
-
-select throws_ok(
-  $$
-    select public.start_maraude(
-      '91000000-0000-0000-0000-000000000001'
-    )
-  $$,
-  '22023',
-  'Au moins un bénévole sélectionné doit être présent',
-  'Le démarrage est refusé sans bénévole sélectionné présent'
-);
-
 select lives_ok(
   $$
     select public.start_maraude(
-      '91000000-0000-0000-0000-000000000002'
+      '91000000-0000-0000-0000-000000000001'
     )
   $$,
-  'Une maraude prête peut démarrer'
+  'Une maraude démarre sans condition opérationnelle bloquante'
 );
 
 select results_eq(
   $$
     select count(*)::bigint
     from public.concerts
-    where id = '91000000-0000-0000-0000-000000000002'
-      and maraude_status = 'started'
+    where id = '91000000-0000-0000-0000-000000000001'
+      and maraude_status = 'in_progress'
       and actual_start_at is not null
       and actual_end_at is null
   $$,
   array[1::bigint],
-  'Le démarrage enregistre une date réelle cohérente'
-);
-
-select throws_ok(
-  $$
-    select public.start_maraude(
-      '91000000-0000-0000-0000-000000000002'
-    )
-  $$,
-  '22023',
-  'La maraude n’est pas en préparation',
-  'Une maraude en cours ne peut pas être redémarrée'
+  'Le démarrage renseigne l’heure réelle'
 );
 
 select lives_ok(
   $$
     select public.complete_maraude(
-      '91000000-0000-0000-0000-000000000002'
+      '91000000-0000-0000-0000-000000000001'
     )
   $$,
-  'Une maraude en cours peut être terminée'
+  'La maraude peut être clôturée'
 );
 
 select results_eq(
   $$
     select count(*)::bigint
     from public.concerts
-    where id = '91000000-0000-0000-0000-000000000002'
+    where id = '91000000-0000-0000-0000-000000000001'
       and maraude_status = 'completed'
       and actual_start_at is not null
-      and actual_end_at is not null
       and actual_end_at >= actual_start_at
   $$,
   array[1::bigint],
-  'La fin enregistre des dates réelles chronologiques'
-);
-
-select throws_ok(
-  $$
-    select public.complete_maraude(
-      '91000000-0000-0000-0000-000000000002'
-    )
-  $$,
-  '22023',
-  'Seule une maraude en cours peut être terminée',
-  'Une maraude terminée ne peut pas être terminée une seconde fois'
-);
-
-reset role;
-
-select throws_ok(
-  $$
-    update public.concerts
-    set
-      maraude_status = 'started',
-      actual_end_at = null
-    where id = '91000000-0000-0000-0000-000000000002'
-  $$,
-  '22023',
-  'Transition de maraude interdite : completed vers started',
-  'Une maraude terminée ne peut pas revenir en cours'
-);
-
-select throws_ok(
-  $$
-    update public.concerts
-    set
-      maraude_status = 'planned',
-      actual_start_at = null,
-      actual_end_at = null
-    where id = '91000000-0000-0000-0000-000000000002'
-  $$,
-  '22023',
-  'Transition de maraude interdite : completed vers planned',
-  'Une maraude terminée ne peut pas revenir en préparation'
-);
-
-select throws_ok(
-  $$
-    update public.concerts
-    set actual_start_at = clock_timestamp()
-    where id = '91000000-0000-0000-0000-000000000001'
-  $$,
-  '23514',
-  'new row for relation "concerts" violates check constraint "concerts_maraude_dates_match_status"',
-  'Une maraude en préparation ne peut avoir de date réelle de début'
-);
-
-insert into public.concert_volunteers (
-  id,
-  concert_id,
-  user_id,
-  status,
-  attendance_status
-)
-values (
-  '92000000-0000-0000-0000-000000000002',
-  '91000000-0000-0000-0000-000000000001',
-  '90000000-0000-0000-0000-000000000001',
-  'selected',
-  'present'
-);
-
-set local role authenticated;
-select set_config(
-  'request.jwt.claim.sub',
-  '90000000-0000-0000-0000-000000000002',
-  true
+  'La clôture conserve des dates chronologiques'
 );
 
 select lives_ok(
   $$
-    select public.start_maraude(
-      '91000000-0000-0000-0000-000000000001'
+    select public.set_maraude_status(
+      '91000000-0000-0000-0000-000000000001',
+      'in_progress',
+      null
     )
   $$,
-  'La seconde maraude démarre après enregistrement d’une présence'
+  'Une maraude clôturée peut être rouverte'
+);
+
+select results_eq(
+  $$
+    select count(*)::bigint
+    from public.concerts
+    where id = '91000000-0000-0000-0000-000000000001'
+      and maraude_status = 'in_progress'
+      and actual_start_at is not null
+      and actual_end_at is null
+  $$,
+  array[1::bigint],
+  'La réouverture conserve le début et efface la fin'
+);
+
+select lives_ok(
+  $$
+    select public.set_maraude_status(
+      '91000000-0000-0000-0000-000000000001',
+      'open',
+      null
+    )
+  $$,
+  'L’administrateur peut corriger le statut vers Ouverte'
+);
+
+select results_eq(
+  $$
+    select count(*)::bigint
+    from public.concerts
+    where id = '91000000-0000-0000-0000-000000000001'
+      and maraude_status = 'open'
+      and actual_start_at is null
+      and actual_end_at is null
+  $$,
+  array[1::bigint],
+  'Revenir à Ouverte nettoie les dates réelles'
+);
+
+select lives_ok(
+  $$
+    select public.set_maraude_status(
+      '91000000-0000-0000-0000-000000000001',
+      'team_ready',
+      null
+    )
+  $$,
+  'Une équipe peut être déclarée validée sans composition imposée'
+);
+
+select lives_ok(
+  $$
+    select public.set_maraude_status(
+      '91000000-0000-0000-0000-000000000001',
+      'cancelled',
+      'Concert annulé'
+    )
+  $$,
+  'Une maraude peut être annulée sans suppression'
+);
+
+select results_eq(
+  $$
+    select maraude_status::text, cancellation_reason
+    from public.concerts
+    where id = '91000000-0000-0000-0000-000000000001'
+  $$,
+  $$ values ('cancelled'::text, 'Concert annulé'::text) $$,
+  'L’annulation et son motif facultatif sont conservés'
 );
 
 reset role;
@@ -333,59 +259,23 @@ select throws_ok(
   $$
     update public.concerts
     set
-      maraude_status = 'planned',
-      actual_start_at = null
-    where id = '91000000-0000-0000-0000-000000000001'
-  $$,
-  '22023',
-  'Transition de maraude interdite : started vers planned',
-  'Une maraude en cours ne peut pas revenir en préparation'
-);
-
-select throws_ok(
-  $$
-    update public.concerts
-    set
-      maraude_status = 'completed',
-      actual_end_at = actual_start_at - interval '1 minute'
+      actual_start_at = '2026-12-10 22:00:00+01',
+      actual_end_at = '2026-12-10 21:00:00+01'
     where id = '91000000-0000-0000-0000-000000000001'
   $$,
   '23514',
-  'new row for relation "concerts" violates check constraint "concerts_maraude_dates_chronological"',
-  'La fin réelle ne peut pas précéder le début réel'
+  'new row for relation "concerts" violates check constraint "concerts_maraude_dates_are_coherent"',
+  'La fin ne peut pas précéder le début'
 );
 
-select throws_ok(
+select results_eq(
   $$
-    insert into public.concerts (
-      organization_id,
-      artist,
-      concert_date,
-      venue_id,
-      created_by,
-      maraude_status,
-      actual_start_at
-    )
-    select
-      o.id,
-      'Création invalide',
-      '2026-12-12'::date,
-      v.id,
-      '90000000-0000-0000-0000-000000000002'::uuid,
-      'started'::public.maraude_status,
-      clock_timestamp()
-    from public.organizations o
-    cross join lateral (
-      select id
-      from public.venues
-      order by name
-      limit 1
-    ) v
-    where o.slug = 'club-sandwich'
+    select count(*)::bigint
+    from public.concerts
+    where id = '91000000-0000-0000-0000-000000000001'
   $$,
-  '22023',
-  'Une maraude doit être créée en préparation',
-  'Une maraude ne peut pas être créée dans un état avancé'
+  array[1::bigint],
+  'Le cycle ne supprime jamais la maraude'
 );
 
 select * from finish();

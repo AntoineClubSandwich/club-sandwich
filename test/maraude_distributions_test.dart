@@ -121,7 +121,7 @@ void main() {
             'artist': 'Artiste',
             'concert_date': '2026-09-15',
             'status': 'planned',
-            'maraude_status': 'started',
+            'maraude_status': 'in_progress',
             'actual_start_at': '2026-09-15T20:00:00.000Z',
             'actual_end_at': null,
             'created_by': 'user-id',
@@ -333,7 +333,10 @@ Future<void> _pumpDistribution(
 }
 
 class _DistributionStore {
-  _DistributionStore({this.distribution, this.status = MaraudeStatus.started}) {
+  _DistributionStore({
+    this.distribution,
+    this.status = MaraudeStatus.inProgress,
+  }) {
     repository = _FakeMaraudeDistributionRepository(this);
   }
 

@@ -24,12 +24,13 @@ abstract final class AppRoutes {
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
   final repository = ref.read(authRepositoryProvider);
-  final isAuthenticated =
+  final hasInitialSession =
       authState.value?.session != null || repository.session != null;
 
   return GoRouter(
-    initialLocation: isAuthenticated ? AppRoutes.dashboard : AppRoutes.login,
+    initialLocation: hasInitialSession ? AppRoutes.dashboard : AppRoutes.login,
     redirect: (context, state) {
+      final isAuthenticated = repository.session != null;
       final isOnLogin = state.matchedLocation == AppRoutes.login;
 
       if (!isAuthenticated && !isOnLogin) return AppRoutes.login;

@@ -1,160 +1,443 @@
-import 'dart:async';
-
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/data/concert_repository.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
+import 'package:club_sandwich/features/concerts/presentation/concert_form.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
-import 'package:club_sandwich/features/venues/data/venue_providers.dart';
-import 'package:club_sandwich/features/venues/domain/venue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class ConcertsScreen extends ConsumerWidget {
+class ConcertsScreen extends ConsumerStatefulWidget {
   const ConcertsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final concerts = ref.watch(concertsProvider);
+  ConsumerState<ConcertsScreen> createState() => _ConcertsScreenState();
+}
+
+class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
+  final _artistFilterController = TextEditingController();
+  final _venueFilterController = TextEditingController();
+  final _producerFilterController = TextEditingController();
+  final _promoterFilterController = TextEditingController();
+  ConcertStatus? _concertStatusFilter;
+  MaraudeStatus? _maraudeStatusFilter;
+  late DateTime _displayedMonth;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _displayedMonth = DateTime(now.year, now.month);
+  }
+
+  @override
+  void dispose() {
+    _artistFilterController.dispose();
+    _venueFilterController.dispose();
+    _producerFilterController.dispose();
+    _promoterFilterController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final asyncConcerts = ref.watch(concertsProvider);
+    final viewMode = ref.watch(concertViewModeProvider);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: concerts.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => _ConcertsError(
-          message: _errorMessage(error),
-          onRetry: () => ref.invalidate(concertsProvider),
-        ),
-        data: (items) {
-          final sortedItems = _sortForDashboard(items);
-          if (items.isEmpty) {
-            return _EmptyConcerts(
-              onCreate: () => _createConcert(context, ref),
-              onRefresh: () => ref.refresh(concertsProvider.future),
-            );
-          }
-
-          return _ConcertDashboard(
-            concerts: sortedItems,
-            onRefresh: () => ref.refresh(concertsProvider.future),
-          );
-        },
+      body: Column(
+        children: [
+          _PageToolbar(
+            viewMode: viewMode,
+            onViewChanged: (mode) =>
+                ref.read(concertViewModeProvider.notifier).select(mode),
+          ),
+          Expanded(
+            child: asyncConcerts.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stackTrace) => _ConcertsError(
+                message: _errorMessage(error),
+                onRetry: () => ref.invalidate(concertsProvider),
+              ),
+              data: (items) {
+                final filtered = _filterConcerts(items);
+                return RefreshIndicator(
+                  onRefresh: () => ref.refresh(concertsProvider.future),
+                  child: CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                        sliver: SliverToBoxAdapter(
+                          child: _ConcertFilters(
+                            artistController: _artistFilterController,
+                            venueController: _venueFilterController,
+                            producerController: _producerFilterController,
+                            promoterController: _promoterFilterController,
+                            concertStatus: _concertStatusFilter,
+                            maraudeStatus: _maraudeStatusFilter,
+                            onTextChanged: (_) => setState(() {}),
+                            onConcertStatusChanged: (value) =>
+                                setState(() => _concertStatusFilter = value),
+                            onMaraudeStatusChanged: (value) =>
+                                setState(() => _maraudeStatusFilter = value),
+                            onClear: _clearFilters,
+                          ),
+                        ),
+                      ),
+                      if (items.isEmpty)
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _EmptyConcerts(
+                            onCreate: () => _createConcert(context),
+                          ),
+                        )
+                      else if (filtered.isEmpty)
+                        const SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _NoFilterResults(),
+                        )
+                      else if (viewMode == ConcertViewMode.list)
+                        _ConcertListSliver(
+                          concerts: _sortForDashboard(filtered),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+                          sliver: SliverToBoxAdapter(
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                if (constraints.maxWidth < 700) {
+                                  return _MobileAgenda(
+                                    concerts: _sortChronologically(filtered),
+                                  );
+                                }
+                                return _MonthAgenda(
+                                  month: _displayedMonth,
+                                  concerts: filtered,
+                                  onPreviousMonth: () => _changeMonth(-1),
+                                  onNextMonth: () => _changeMonth(1),
+                                  onToday: _goToCurrentMonth,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _createConcert(context, ref),
+        onPressed: () => _createConcert(context),
         icon: const Icon(Icons.add),
         label: const Text('Nouveau concert'),
       ),
     );
   }
 
-  Future<void> _createConcert(BuildContext context, WidgetRef ref) async {
-    final draft = await showDialog<CreateConcertDraft>(
+  List<Concert> _filterConcerts(List<Concert> items) {
+    final artist = _normalize(_artistFilterController.text);
+    final venue = _normalize(_venueFilterController.text);
+    final producer = _normalize(_producerFilterController.text);
+    final promoter = _normalize(_promoterFilterController.text);
+    return items
+        .where((concert) {
+          return _contains(concert.artist, artist) &&
+              _contains(concert.venueName, venue) &&
+              _contains(concert.promoterOrganizationName, producer) &&
+              _contains(concert.promoterContactName, promoter) &&
+              (_concertStatusFilter == null ||
+                  concert.status == _concertStatusFilter) &&
+              (_maraudeStatusFilter == null ||
+                  concert.maraudeStatus == _maraudeStatusFilter);
+        })
+        .toList(growable: false);
+  }
+
+  void _clearFilters() {
+    _artistFilterController.clear();
+    _venueFilterController.clear();
+    _producerFilterController.clear();
+    _promoterFilterController.clear();
+    setState(() {
+      _concertStatusFilter = null;
+      _maraudeStatusFilter = null;
+    });
+  }
+
+  void _changeMonth(int delta) {
+    setState(() {
+      _displayedMonth = DateTime(
+        _displayedMonth.year,
+        _displayedMonth.month + delta,
+      );
+    });
+  }
+
+  void _goToCurrentMonth() {
+    final now = DateTime.now();
+    setState(() => _displayedMonth = DateTime(now.year, now.month));
+  }
+
+  Future<void> _createConcert(BuildContext context) async {
+    final created = await showDialog<bool>(
       context: context,
-      builder: (context) => const CreateConcertDialog(),
+      builder: (context) => ConcertForm(
+        onSubmit: (draft) =>
+            ref.read(concertRepositoryProvider).createConcert(draft),
+      ),
     );
-    if (draft == null || !context.mounted) return;
+    if (created != true || !context.mounted) return;
 
-    try {
-      await ref.read(concertRepositoryProvider).createConcert(draft);
-      ref.invalidate(concertsProvider);
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Concert créé.')));
-      }
-    } on Exception catch (error) {
-      if (context.mounted) _showError(context, error);
-    }
+    ref.invalidate(concertsProvider);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Concert créé.')));
   }
 }
 
-class _ConcertDashboard extends StatelessWidget {
-  const _ConcertDashboard({required this.concerts, required this.onRefresh});
+class _PageToolbar extends StatelessWidget {
+  const _PageToolbar({required this.viewMode, required this.onViewChanged});
 
-  final List<Concert> concerts;
-  final RefreshCallback onRefresh;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const spacing = 16.0;
-        final horizontalPadding = constraints.maxWidth < 600 ? 16.0 : 24.0;
-        final availableWidth = constraints.maxWidth - horizontalPadding * 2;
-        final cardWidth = availableWidth >= 900
-            ? (availableWidth - spacing) / 2
-            : availableWidth;
-
-        return RefreshIndicator(
-          onRefresh: onRefresh,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(
-              horizontalPadding,
-              24,
-              horizontalPadding,
-              96,
-            ),
-            child: Wrap(
-              spacing: spacing,
-              runSpacing: spacing,
-              children: [
-                for (final concert in concerts)
-                  SizedBox(
-                    width: cardWidth,
-                    child: _ConcertCard(concert: concert),
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _EmptyConcerts extends StatelessWidget {
-  const _EmptyConcerts({required this.onCreate, required this.onRefresh});
-
-  final VoidCallback onCreate;
-  final RefreshCallback onRefresh;
+  final ConcertViewMode viewMode;
+  final ValueChanged<ConcertViewMode> onViewChanged;
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+      child: Row(
         children: [
-          const SizedBox(height: 120),
-          Icon(
-            Icons.music_note_outlined,
-            size: 64,
-            color: Theme.of(context).colorScheme.primary,
+          Expanded(
+            child: Text(
+              'Concerts',
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
           ),
-          const SizedBox(height: 20),
-          Text(
-            'Aucun concert',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineSmall,
+          SegmentedButton<ConcertViewMode>(
+            key: const ValueKey('concert-view-selector'),
+            segments: const [
+              ButtonSegment(
+                value: ConcertViewMode.list,
+                icon: Icon(Icons.view_list_outlined),
+                label: Text('Liste'),
+              ),
+              ButtonSegment(
+                value: ConcertViewMode.agenda,
+                icon: Icon(Icons.calendar_month_outlined),
+                label: Text('Agenda'),
+              ),
+            ],
+            selected: {viewMode},
+            onSelectionChanged: (selection) => onViewChanged(selection.single),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConcertFilters extends StatelessWidget {
+  const _ConcertFilters({
+    required this.artistController,
+    required this.venueController,
+    required this.producerController,
+    required this.promoterController,
+    required this.concertStatus,
+    required this.maraudeStatus,
+    required this.onTextChanged,
+    required this.onConcertStatusChanged,
+    required this.onMaraudeStatusChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController artistController;
+  final TextEditingController venueController;
+  final TextEditingController producerController;
+  final TextEditingController promoterController;
+  final ConcertStatus? concertStatus;
+  final MaraudeStatus? maraudeStatus;
+  final ValueChanged<String> onTextChanged;
+  final ValueChanged<ConcertStatus?> onConcertStatusChanged;
+  final ValueChanged<MaraudeStatus?> onMaraudeStatusChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ExpansionTile(
+        key: const ValueKey('concert-filters'),
+        leading: const Icon(Icons.filter_list),
+        title: const Text('Filtres'),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final fieldWidth = constraints.maxWidth >= 900
+                  ? (constraints.maxWidth - 32) / 3
+                  : constraints.maxWidth >= 560
+                  ? (constraints.maxWidth - 16) / 2
+                  : constraints.maxWidth;
+              return Wrap(
+                spacing: 16,
+                runSpacing: 12,
+                children: [
+                  _FilterTextField(
+                    width: fieldWidth,
+                    keyValue: 'concert-filter-artist',
+                    controller: artistController,
+                    label: 'Artiste',
+                    onChanged: onTextChanged,
+                  ),
+                  _FilterTextField(
+                    width: fieldWidth,
+                    keyValue: 'concert-filter-venue',
+                    controller: venueController,
+                    label: 'Salle',
+                    onChanged: onTextChanged,
+                  ),
+                  _FilterTextField(
+                    width: fieldWidth,
+                    keyValue: 'concert-filter-producer',
+                    controller: producerController,
+                    label: 'Producteur',
+                    onChanged: onTextChanged,
+                  ),
+                  _FilterTextField(
+                    width: fieldWidth,
+                    keyValue: 'concert-filter-promoter',
+                    controller: promoterController,
+                    label: 'Tourneur',
+                    onChanged: onTextChanged,
+                  ),
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DropdownButtonFormField<ConcertStatus?>(
+                      key: const ValueKey('concert-filter-status'),
+                      initialValue: concertStatus,
+                      decoration: const InputDecoration(
+                        labelText: 'Statut concert',
+                      ),
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Tous'),
+                        ),
+                        for (final status in ConcertStatus.values)
+                          DropdownMenuItem(
+                            value: status,
+                            child: Text(_concertStatusLabel(status)),
+                          ),
+                      ],
+                      onChanged: onConcertStatusChanged,
+                    ),
+                  ),
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DropdownButtonFormField<MaraudeStatus?>(
+                      key: const ValueKey('concert-filter-maraude'),
+                      initialValue: maraudeStatus,
+                      decoration: const InputDecoration(
+                        labelText: 'Statut maraude',
+                      ),
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Tous'),
+                        ),
+                        for (final status in MaraudeStatus.values)
+                          DropdownMenuItem(
+                            value: status,
+                            child: Text(status.label),
+                          ),
+                      ],
+                      onChanged: onMaraudeStatusChanged,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 8),
-          Text(
-            'Créez votre premier concert.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-          const SizedBox(height: 24),
-          Center(
-            child: FilledButton.icon(
-              onPressed: onCreate,
-              icon: const Icon(Icons.add),
-              label: const Text('Créer un concert'),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: onClear,
+              icon: const Icon(Icons.filter_alt_off_outlined),
+              label: const Text('Effacer les filtres'),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FilterTextField extends StatelessWidget {
+  const _FilterTextField({
+    required this.width,
+    required this.keyValue,
+    required this.controller,
+    required this.label,
+    required this.onChanged,
+  });
+
+  final double width;
+  final String keyValue;
+  final TextEditingController controller;
+  final String label;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: TextField(
+        key: ValueKey(keyValue),
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: const Icon(Icons.search),
+        ),
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+class _ConcertListSliver extends StatelessWidget {
+  const _ConcertListSliver({required this.concerts});
+
+  final List<Concert> concerts;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+      sliver: SliverLayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.crossAxisExtent;
+          final columns = width >= 900 ? 2 : 1;
+          return SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              mainAxisExtent: 290,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => _ConcertCard(concert: concerts[index]),
+              childCount: concerts.length,
+            ),
+          );
+        },
       ),
     );
   }
@@ -170,9 +453,10 @@ class _ConcertCard extends ConsumerWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
+        key: ValueKey('concert-card-${concert.id}'),
         onTap: () => context.go('/concerts/${concert.id}'),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 8, 20),
+          padding: const EdgeInsets.fromLTRB(20, 16, 8, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -182,6 +466,8 @@ class _ConcertCard extends ConsumerWidget {
                   Expanded(
                     child: Text(
                       concert.artist,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -194,7 +480,7 @@ class _ConcertCard extends ConsumerWidget {
                         case _ConcertAction.edit:
                           _edit(context, ref);
                         case _ConcertAction.delete:
-                          _delete(context, ref);
+                          deleteConcertWithConfirmation(context, ref, concert);
                       }
                     },
                     itemBuilder: (context) => const [
@@ -243,9 +529,9 @@ class _ConcertCard extends ConsumerWidget {
                       '${recommendedArrivalFromDatabase(concert.cateringClosesAt!)}',
                 ),
               ],
-              const SizedBox(height: 16),
+              const Spacer(),
               const Divider(height: 1),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Wrap(
                 spacing: 24,
                 runSpacing: 8,
@@ -254,7 +540,10 @@ class _ConcertCard extends ConsumerWidget {
                     label: 'Producteur',
                     value: concert.promoterOrganizationName ?? '—',
                   ),
-                  const _Metadata(label: 'Équipe', value: '0 bénévole'),
+                  _Metadata(
+                    label: 'Équipe',
+                    value: _volunteerCountLabel(concert.selectedVolunteerCount),
+                  ),
                 ],
               ),
             ],
@@ -267,7 +556,7 @@ class _ConcertCard extends ConsumerWidget {
   Future<void> _edit(BuildContext context, WidgetRef ref) async {
     final updated = await showDialog<bool>(
       context: context,
-      builder: (context) => ConcertFormDialog(
+      builder: (context) => ConcertForm(
         initialConcert: concert,
         onSubmit: (draft) => ref
             .read(concertRepositoryProvider)
@@ -282,9 +571,453 @@ class _ConcertCard extends ConsumerWidget {
       context,
     ).showSnackBar(const SnackBar(content: Text('Concert modifié.')));
   }
+}
 
-  Future<void> _delete(BuildContext context, WidgetRef ref) async {
-    await deleteConcertWithConfirmation(context, ref, concert);
+class _MonthAgenda extends StatelessWidget {
+  const _MonthAgenda({
+    required this.month,
+    required this.concerts,
+    required this.onPreviousMonth,
+    required this.onNextMonth,
+    required this.onToday,
+  });
+
+  final DateTime month;
+  final List<Concert> concerts;
+  final VoidCallback onPreviousMonth;
+  final VoidCallback onNextMonth;
+  final VoidCallback onToday;
+
+  @override
+  Widget build(BuildContext context) {
+    final firstDay = DateTime(month.year, month.month);
+    final gridStart = firstDay.subtract(Duration(days: firstDay.weekday - 1));
+    final concertsByDay = <DateTime, List<Concert>>{};
+    for (final concert in concerts) {
+      final day = _dateOnly(concert.date);
+      concertsByDay.putIfAbsent(day, () => []).add(concert);
+    }
+    for (final values in concertsByDay.values) {
+      values.sort(_compareConcertTime);
+    }
+
+    return Column(
+      key: const ValueKey('month-agenda'),
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                IconButton(
+                  key: const ValueKey('agenda-previous-month'),
+                  tooltip: 'Mois précédent',
+                  onPressed: onPreviousMonth,
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                Expanded(
+                  child: Text(
+                    _monthLabel(month),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: onToday,
+                  child: const Text('Aujourd’hui'),
+                ),
+                IconButton(
+                  key: const ValueKey('agenda-next-month'),
+                  tooltip: 'Mois suivant',
+                  onPressed: onNextMonth,
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            for (final label in [
+              'Lun',
+              'Mar',
+              'Mer',
+              'Jeu',
+              'Ven',
+              'Sam',
+              'Dim',
+            ])
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            crossAxisSpacing: 4,
+            mainAxisSpacing: 4,
+            mainAxisExtent: 182,
+          ),
+          itemCount: 42,
+          itemBuilder: (context, index) {
+            final day = gridStart.add(Duration(days: index));
+            return _AgendaDay(
+              day: day,
+              isCurrentMonth: day.month == month.month,
+              concerts: concertsByDay[_dateOnly(day)] ?? const [],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _AgendaDay extends StatelessWidget {
+  const _AgendaDay({
+    required this.day,
+    required this.isCurrentMonth,
+    required this.concerts,
+  });
+
+  final DateTime day;
+  final bool isCurrentMonth;
+  final List<Concert> concerts;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final isToday = _isSameDay(day, DateTime.now());
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: isCurrentMonth
+            ? colors.surfaceContainerLowest
+            : colors.surfaceContainerLow,
+        border: Border.all(
+          color: isToday ? colors.primary : colors.outlineVariant,
+          width: isToday ? 2 : 1,
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(5),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${day.day}',
+              style: TextStyle(
+                fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                color: isCurrentMonth
+                    ? colors.onSurface
+                    : colors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Expanded(
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                itemCount: concerts.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 4),
+                itemBuilder: (context, index) =>
+                    _AgendaConcertTile(concert: concerts[index]),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AgendaConcertTile extends StatelessWidget {
+  const _AgendaConcertTile({required this.concert});
+
+  final Concert concert;
+
+  @override
+  Widget build(BuildContext context) {
+    final indicator = _agendaIndicator(context, concert);
+    final details = [
+      concert.artist,
+      concert.venueName ?? 'Salle non renseignée',
+      formatLongFrenchDate(concert.date),
+      if (concert.time != null) formatDatabaseTime(concert.time!),
+      '${concert.selectedVolunteerCount} bénévoles',
+      indicator.label,
+    ].join('\n');
+    return Tooltip(
+      message: details,
+      waitDuration: const Duration(milliseconds: 350),
+      child: Material(
+        color: indicator.color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: ValueKey('agenda-concert-${concert.id}'),
+          onTap: () => context.go('/concerts/${concert.id}'),
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  concert.artist,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  concert.venueName ?? '—',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11),
+                ),
+                Text(
+                  concert.time == null
+                      ? 'Heure non renseignée'
+                      : formatDatabaseTime(concert.time!),
+                  style: const TextStyle(fontSize: 11),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: indicator.color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        indicator.label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '${concert.selectedVolunteerCount}/4 bénévoles',
+                  style: const TextStyle(fontSize: 10),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileAgenda extends StatelessWidget {
+  const _MobileAgenda({required this.concerts});
+
+  final List<Concert> concerts;
+
+  @override
+  Widget build(BuildContext context) {
+    final grouped = <DateTime, List<Concert>>{};
+    for (final concert in concerts) {
+      grouped.putIfAbsent(_dateOnly(concert.date), () => []).add(concert);
+    }
+    return Column(
+      key: const ValueKey('mobile-agenda'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final entry in grouped.entries) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+            child: Text(
+              _relativeDateLabel(entry.key),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ),
+          for (final concert in entry.value)
+            _MobileAgendaCard(concert: concert),
+        ],
+      ],
+    );
+  }
+}
+
+class _MobileAgendaCard extends StatelessWidget {
+  const _MobileAgendaCard({required this.concert});
+
+  final Concert concert;
+
+  @override
+  Widget build(BuildContext context) {
+    final indicator = _agendaIndicator(context, concert);
+    return Card(
+      child: InkWell(
+        key: ValueKey('mobile-agenda-concert-${concert.id}'),
+        onTap: () => context.go('/concerts/${concert.id}'),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: indicator.color,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      concert.artist,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(concert.venueName ?? '—'),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${concert.time == null ? 'Heure non renseignée' : formatDatabaseTime(concert.time!)}'
+                      ' · ${concert.selectedVolunteerCount}/4 bénévoles',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    Text(
+                      indicator.label,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelMedium?.copyWith(color: indicator.color),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyConcerts extends StatelessWidget {
+  const _EmptyConcerts({required this.onCreate});
+
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.music_note_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Aucun concert',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 8),
+            const Text('Créez votre premier concert.'),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: onCreate,
+              icon: const Icon(Icons.add),
+              label: const Text('Créer un concert'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoFilterResults extends StatelessWidget {
+  const _NoFilterResults();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.search_off_outlined,
+              size: 56,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Aucun résultat',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            const Text('Modifiez ou effacez les filtres.'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConcertsError extends StatelessWidget {
+  const _ConcertsError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48),
+            const SizedBox(height: 16),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            FilledButton.tonal(
+              onPressed: onRetry,
+              child: const Text('Réessayer'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -347,7 +1080,9 @@ class _CardInformation extends StatelessWidget {
       children: [
         Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
         const SizedBox(width: 8),
-        Expanded(child: Text(text)),
+        Expanded(
+          child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis),
+        ),
       ],
     );
   }
@@ -377,703 +1112,29 @@ class _Metadata extends StatelessWidget {
 
 enum _ConcertAction { edit, delete }
 
-class CreateConcertDialog extends ConsumerStatefulWidget {
-  const CreateConcertDialog({super.key});
+class _AgendaIndicator {
+  const _AgendaIndicator(this.label, this.color);
 
-  @override
-  ConsumerState<CreateConcertDialog> createState() =>
-      _CreateConcertDialogState();
+  final String label;
+  final Color color;
 }
 
-class _CreateConcertDialogState extends ConsumerState<CreateConcertDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _artistController = TextEditingController();
-  final _venueController = TextEditingController();
-  final _notesController = TextEditingController();
-  Timer? _searchDebounce;
-  DateTime? _date;
-  TimeOfDay? _cateringClosesAt;
-  Venue? _selectedVenue;
-  List<Venue> _venueResults = const [];
-  bool _isSearchingVenues = false;
-  String? _venueSearchError;
-
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _artistController.dispose();
-    _venueController.dispose();
-    _notesController.dispose();
-    super.dispose();
+_AgendaIndicator _agendaIndicator(BuildContext context, Concert concert) {
+  final colors = Theme.of(context).colorScheme;
+  if (concert.status == ConcertStatus.cancelled) {
+    return _AgendaIndicator('Annulé', colors.error);
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Row(
-        children: [
-          const Expanded(child: Text('Nouveau concert')),
-          IconButton(
-            tooltip: 'Fermer',
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close),
-          ),
-        ],
-      ),
-      content: SizedBox(
-        width: 520,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextFormField(
-                  controller: _artistController,
-                  autofocus: true,
-                  decoration: const InputDecoration(labelText: 'Artiste'),
-                  validator: _requiredValidator,
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: 16),
-                FormField<DateTime>(
-                  validator: (value) =>
-                      value == null ? 'Ce champ est requis.' : null,
-                  builder: (field) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () => _selectDate(field),
-                        icon: const Icon(Icons.calendar_today_outlined),
-                        label: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            _date == null
-                                ? 'Date du concert'
-                                : _formatDate(_date!),
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: field.hasError
-                              ? Theme.of(context).colorScheme.error
-                              : null,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 18,
-                          ),
-                        ),
-                      ),
-                      if (field.errorText != null)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 12, top: 8),
-                          child: Text(
-                            field.errorText!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                FormField<Venue>(
-                  validator: (value) =>
-                      value == null ? 'Ce champ est requis.' : null,
-                  builder: (field) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextField(
-                        controller: _venueController,
-                        textInputAction: TextInputAction.next,
-                        decoration: InputDecoration(
-                          labelText: 'Salle',
-                          hintText: 'Saisissez au moins 2 caractères',
-                          errorText: field.errorText,
-                          suffixIcon: _isSearchingVenues
-                              ? const Padding(
-                                  padding: EdgeInsets.all(14),
-                                  child: SizedBox.square(
-                                    dimension: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                )
-                              : const Icon(Icons.search),
-                        ),
-                        onChanged: (value) {
-                          if (_selectedVenue?.name != value) {
-                            _selectedVenue = null;
-                            field.didChange(null);
-                          }
-                          _scheduleVenueSearch(value);
-                        },
-                      ),
-                      if (_venueSearchError != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            _venueSearchError!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                        ),
-                      if (_venueResults.isNotEmpty)
-                        Card(
-                          margin: const EdgeInsets.only(top: 4),
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxHeight: 240),
-                            child: ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: _venueResults.length,
-                              itemBuilder: (context, index) {
-                                final venue = _venueResults[index];
-                                return ListTile(
-                                  dense: true,
-                                  title: Text(venue.name),
-                                  subtitle: Text(venue.formattedAddress),
-                                  onTap: () {
-                                    _searchDebounce?.cancel();
-                                    setState(() {
-                                      _selectedVenue = venue;
-                                      _venueController.text = venue.name;
-                                      _venueResults = const [];
-                                      _venueSearchError = null;
-                                    });
-                                    field.didChange(venue);
-                                  },
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: _selectCateringTime,
-                  icon: const Icon(Icons.schedule_outlined),
-                  label: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      _cateringClosesAt == null
-                          ? 'Heure de fermeture du catering (optionnel)'
-                          : 'Fermeture du catering : '
-                                '${_cateringClosesAt!.format(context)}',
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 18,
-                    ),
-                  ),
-                ),
-                if (_cateringClosesAt != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Arrivée recommandée : '
-                    '${_recommendedArrival(_cateringClosesAt!).format(context)}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _notesController,
-                  keyboardType: TextInputType.multiline,
-                  textInputAction: TextInputAction.newline,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes (optionnel)',
-                  ),
-                  minLines: 3,
-                  maxLines: 5,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
-        ),
-        FilledButton(onPressed: _submit, child: const Text('Enregistrer')),
-      ],
-    );
+  if (concert.maraudeStatus == MaraudeStatus.completed ||
+      concert.status == ConcertStatus.completed) {
+    return _AgendaIndicator('Terminé', colors.onSurface);
   }
-
-  void _scheduleVenueSearch(String query) {
-    _searchDebounce?.cancel();
-    final normalizedQuery = query.trim();
-    if (normalizedQuery.length < 2) {
-      setState(() {
-        _venueResults = const [];
-        _venueSearchError = null;
-        _isSearchingVenues = false;
-      });
-      return;
-    }
-
-    _searchDebounce = Timer(
-      const Duration(milliseconds: 250),
-      () => _searchVenues(normalizedQuery),
-    );
+  if (concert.maraudeStatus == MaraudeStatus.inProgress) {
+    return _AgendaIndicator('En cours', colors.primary);
   }
-
-  Future<void> _searchVenues(String query) async {
-    setState(() {
-      _isSearchingVenues = true;
-      _venueSearchError = null;
-    });
-    try {
-      final results = await ref
-          .read(venueRepositoryProvider)
-          .searchActiveVenues(query);
-      if (!mounted ||
-          _selectedVenue != null ||
-          _venueController.text.trim() != query) {
-        return;
-      }
-      setState(() => _venueResults = results);
-    } on Exception {
-      if (!mounted || _venueController.text.trim() != query) return;
-      setState(() {
-        _venueResults = const [];
-        _venueSearchError = 'Impossible de rechercher les salles.';
-      });
-    } finally {
-      if (mounted && _venueController.text.trim() == query) {
-        setState(() => _isSearchingVenues = false);
-      }
-    }
+  if (concert.selectedVolunteerCount >= 4) {
+    return _AgendaIndicator('Préparation · Équipe complète', Colors.green);
   }
-
-  Future<void> _selectDate(FormFieldState<DateTime> field) async {
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: _date ?? DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime(2100),
-    );
-    if (selected != null) {
-      setState(() => _date = selected);
-      field.didChange(selected);
-    }
-  }
-
-  Future<void> _selectCateringTime() async {
-    final selected = await showTimePicker(
-      context: context,
-      initialTime: _cateringClosesAt ?? TimeOfDay.now(),
-    );
-    if (selected != null) setState(() => _cateringClosesAt = selected);
-  }
-
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
-    final venue = _selectedVenue;
-    final date = _date;
-    if (venue == null || date == null) return;
-
-    Navigator.of(context).pop(
-      CreateConcertDraft(
-        artist: _artistController.text.trim(),
-        date: date,
-        venueId: venue.id,
-        cateringClosesAt: _cateringClosesAt == null
-            ? null
-            : _timeToDatabase(_cateringClosesAt!),
-        notes: _optionalValue(_notesController.text),
-      ),
-    );
-  }
-}
-
-class ConcertFormDialog extends StatefulWidget {
-  const ConcertFormDialog({
-    required this.initialConcert,
-    required this.onSubmit,
-    super.key,
-  });
-
-  final Concert initialConcert;
-  final Future<void> Function(ConcertDraft draft) onSubmit;
-
-  @override
-  State<ConcertFormDialog> createState() => _ConcertFormDialogState();
-}
-
-class _ConcertFormDialogState extends State<ConcertFormDialog> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _titleController;
-  late final TextEditingController _artistController;
-  late final TextEditingController _tourController;
-  late final TextEditingController _notesController;
-  late final TextEditingController _promoterContactNameController;
-  late final TextEditingController _promoterContactPhoneController;
-  late final TextEditingController _promoterContactEmailController;
-  late final TextEditingController _cateringContactNameController;
-  late final TextEditingController _cateringContactPhoneController;
-  late final TextEditingController _cateringContactEmailController;
-  late DateTime _date;
-  late TimeOfDay _time;
-  late ConcertStatus _status;
-  bool _isSubmitting = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final concert = widget.initialConcert;
-    _titleController = TextEditingController(text: concert.title);
-    _artistController = TextEditingController(text: concert.artist);
-    _tourController = TextEditingController(text: concert.tour);
-    _notesController = TextEditingController(text: concert.notes);
-    _promoterContactNameController = TextEditingController(
-      text: concert.promoterContactName,
-    );
-    _promoterContactPhoneController = TextEditingController(
-      text: concert.promoterContactPhone,
-    );
-    _promoterContactEmailController = TextEditingController(
-      text: concert.promoterContactEmail,
-    );
-    _cateringContactNameController = TextEditingController(
-      text: concert.cateringContactName,
-    );
-    _cateringContactPhoneController = TextEditingController(
-      text: concert.cateringContactPhone,
-    );
-    _cateringContactEmailController = TextEditingController(
-      text: concert.cateringContactEmail,
-    );
-    _date = concert.date;
-    _time = concert.time == null
-        ? TimeOfDay.now()
-        : _timeFromDatabase(concert.time!);
-    _status = concert.status;
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _artistController.dispose();
-    _tourController.dispose();
-    _notesController.dispose();
-    _promoterContactNameController.dispose();
-    _promoterContactPhoneController.dispose();
-    _promoterContactEmailController.dispose();
-    _cateringContactNameController.dispose();
-    _cateringContactPhoneController.dispose();
-    _cateringContactEmailController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Row(
-        children: [
-          const Expanded(child: Text('Modifier le concert')),
-          IconButton(
-            tooltip: 'Fermer',
-            onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close),
-          ),
-        ],
-      ),
-      content: SizedBox(
-        width: 520,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _titleController,
-                  autofocus: true,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(labelText: 'Titre'),
-                  validator: _requiredValidator,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _artistController,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(labelText: 'Artiste'),
-                  validator: _requiredValidator,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _tourController,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Tournée (optionnel)',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _selectDate,
-                        icon: const Icon(Icons.calendar_today_outlined),
-                        label: Text(_formatDate(_date)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _selectTime,
-                        icon: const Icon(Icons.schedule),
-                        label: Text(_time.format(context)),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<ConcertStatus>(
-                  initialValue: _status,
-                  decoration: const InputDecoration(labelText: 'Statut'),
-                  items: [
-                    for (final status in ConcertStatus.values)
-                      DropdownMenuItem(
-                        value: status,
-                        child: Text(_statusLabel(status)),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) _status = value;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _notesController,
-                  keyboardType: TextInputType.multiline,
-                  textInputAction: TextInputAction.newline,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes (optionnel)',
-                  ),
-                  minLines: 3,
-                  maxLines: 5,
-                ),
-                const SizedBox(height: 24),
-                const Divider(),
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Contacts sur place',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _ContactFields(
-                  title: 'Contact tourneur',
-                  nameController: _promoterContactNameController,
-                  phoneController: _promoterContactPhoneController,
-                  emailController: _promoterContactEmailController,
-                ),
-                const SizedBox(height: 20),
-                _ContactFields(
-                  title: 'Contact catering',
-                  nameController: _cateringContactNameController,
-                  phoneController: _cateringContactPhoneController,
-                  emailController: _cateringContactEmailController,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
-        ),
-        FilledButton(
-          onPressed: _isSubmitting ? null : _submit,
-          child: _isSubmitting
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Enregistrer'),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _selectDate() async {
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-    if (selected != null) setState(() => _date = selected);
-  }
-
-  Future<void> _selectTime() async {
-    final selected = await showTimePicker(context: context, initialTime: _time);
-    if (selected != null) setState(() => _time = selected);
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    final draft = ConcertDraft(
-      title: _titleController.text.trim(),
-      artist: _artistController.text.trim(),
-      tour: _optionalValue(_tourController.text),
-      date: _date,
-      time:
-          '${_time.hour.toString().padLeft(2, '0')}:'
-          '${_time.minute.toString().padLeft(2, '0')}:00',
-      status: _status,
-      notes: _optionalValue(_notesController.text),
-      promoterContactName: _optionalValue(_promoterContactNameController.text),
-      promoterContactPhone: _optionalValue(
-        _promoterContactPhoneController.text,
-      ),
-      promoterContactEmail: _optionalValue(
-        _promoterContactEmailController.text,
-      ),
-      cateringContactName: _optionalValue(_cateringContactNameController.text),
-      cateringContactPhone: _optionalValue(
-        _cateringContactPhoneController.text,
-      ),
-      cateringContactEmail: _optionalValue(
-        _cateringContactEmailController.text,
-      ),
-    );
-
-    setState(() => _isSubmitting = true);
-    try {
-      await widget.onSubmit(draft);
-      if (mounted) Navigator.of(context).pop(true);
-    } on Exception {
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Impossible d’enregistrer les modifications.'),
-        ),
-      );
-    }
-  }
-}
-
-class _ContactFields extends StatelessWidget {
-  const _ContactFields({
-    required this.title,
-    required this.nameController,
-    required this.phoneController,
-    required this.emailController,
-  });
-
-  final String title;
-  final TextEditingController nameController;
-  final TextEditingController phoneController;
-  final TextEditingController emailController;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: nameController,
-          decoration: const InputDecoration(labelText: 'Nom'),
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: phoneController,
-          decoration: const InputDecoration(labelText: 'Téléphone'),
-          keyboardType: TextInputType.phone,
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: emailController,
-          decoration: const InputDecoration(labelText: 'E-mail'),
-          keyboardType: TextInputType.emailAddress,
-          validator: validateOptionalEmail,
-          autovalidateMode: AutovalidateMode.onUserInteraction,
-        ),
-      ],
-    );
-  }
-}
-
-class _ConcertsError extends StatelessWidget {
-  const _ConcertsError({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(height: 16),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Réessayer'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-String? _requiredValidator(String? value) {
-  if (value == null || value.trim().isEmpty) return 'Ce champ est requis.';
-  return null;
-}
-
-String? _optionalValue(String value) {
-  final trimmed = value.trim();
-  return trimmed.isEmpty ? null : trimmed;
-}
-
-String _formatDate(DateTime date) {
-  final day = date.day.toString().padLeft(2, '0');
-  final month = date.month.toString().padLeft(2, '0');
-  return '$day/$month/${date.year}';
-}
-
-String _timeToDatabase(TimeOfDay value) {
-  return '${value.hour.toString().padLeft(2, '0')}:'
-      '${value.minute.toString().padLeft(2, '0')}:00';
-}
-
-TimeOfDay _recommendedArrival(TimeOfDay cateringClosesAt) {
-  final totalMinutes =
-      (cateringClosesAt.hour * 60 + cateringClosesAt.minute - 15) % (24 * 60);
-  return TimeOfDay(hour: totalMinutes ~/ 60, minute: totalMinutes % 60);
+  return _AgendaIndicator('Préparation · Équipe incomplète', colors.tertiary);
 }
 
 List<Concert> _sortForDashboard(List<Concert> concerts) {
@@ -1091,18 +1152,84 @@ List<Concert> _sortForDashboard(List<Concert> concerts) {
   return sorted;
 }
 
-TimeOfDay _timeFromDatabase(String value) {
-  final parts = value.split(':');
-  return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+List<Concert> _sortChronologically(List<Concert> concerts) {
+  final sorted = List<Concert>.of(concerts);
+  sorted.sort((left, right) {
+    final date = left.date.compareTo(right.date);
+    return date == 0 ? _compareConcertTime(left, right) : date;
+  });
+  return sorted;
 }
 
-String _statusLabel(ConcertStatus status) {
+int _compareConcertTime(Concert left, Concert right) {
+  return (left.time ?? '').compareTo(right.time ?? '');
+}
+
+DateTime _dateOnly(DateTime value) {
+  return DateTime(value.year, value.month, value.day);
+}
+
+bool _isSameDay(DateTime left, DateTime right) {
+  return left.year == right.year &&
+      left.month == right.month &&
+      left.day == right.day;
+}
+
+String _relativeDateLabel(DateTime date) {
+  final today = _dateOnly(DateTime.now());
+  if (_isSameDay(date, today)) return 'Aujourd’hui';
+  if (_isSameDay(date, today.add(const Duration(days: 1)))) return 'Demain';
+  return formatLongFrenchDate(date);
+}
+
+String _monthLabel(DateTime month) {
+  const months = [
+    'janvier',
+    'février',
+    'mars',
+    'avril',
+    'mai',
+    'juin',
+    'juillet',
+    'août',
+    'septembre',
+    'octobre',
+    'novembre',
+    'décembre',
+  ];
+  return '${months[month.month - 1]} ${month.year}';
+}
+
+String _concertStatusLabel(ConcertStatus status) {
   return switch (status) {
     ConcertStatus.planned => 'Planifié',
     ConcertStatus.confirmed => 'Confirmé',
     ConcertStatus.completed => 'Terminé',
     ConcertStatus.cancelled => 'Annulé',
   };
+}
+
+String _volunteerCountLabel(int count) {
+  return '$count ${count > 1 ? 'bénévoles' : 'bénévole'}';
+}
+
+String _normalize(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp('[àáâäãå]'), 'a')
+      .replaceAll(RegExp('[ç]'), 'c')
+      .replaceAll(RegExp('[èéêë]'), 'e')
+      .replaceAll(RegExp('[ìíîï]'), 'i')
+      .replaceAll(RegExp('[ñ]'), 'n')
+      .replaceAll(RegExp('[òóôöõ]'), 'o')
+      .replaceAll(RegExp('[ùúûü]'), 'u')
+      .replaceAll(RegExp('[ýÿ]'), 'y')
+      .replaceAll('œ', 'oe');
+}
+
+bool _contains(String? value, String query) {
+  return query.isEmpty || _normalize(value ?? '').contains(query);
 }
 
 String _errorMessage(Object error) {

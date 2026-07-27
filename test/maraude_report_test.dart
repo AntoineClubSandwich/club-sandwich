@@ -164,7 +164,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('edit-closing-comment')));
     await tester.pumpAndSettle();
     await tester.enterText(
-      find.widgetWithText(TextField, 'Commentaire'),
+      find.byKey(const ValueKey('closing-comment-field')),
       'Commentaire mis à jour',
     );
     await tester.tap(find.widgetWithText(FilledButton, 'Enregistrer'));
@@ -195,7 +195,7 @@ void main() {
   ) async {
     final startedStore = _ReportStore(
       buildConcert(
-        maraudeStatus: MaraudeStatus.started,
+        maraudeStatus: MaraudeStatus.inProgress,
         actualStartAt: DateTime(2026, 7, 27, 21, 12),
       ),
     );

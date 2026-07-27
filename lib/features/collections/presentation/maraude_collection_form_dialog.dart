@@ -175,6 +175,7 @@ class _MaraudeCollectionFormDialogState
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
+                  key: const ValueKey('collection-comment'),
                   controller: _commentController,
                   enabled: !_isSubmitting,
                   maxLines: 3,

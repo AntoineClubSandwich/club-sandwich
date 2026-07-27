@@ -1,4 +1,5 @@
 import 'package:club_sandwich/features/collections/domain/maraude_collection.dart';
+import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
 import 'package:club_sandwich/features/distributions/domain/maraude_distribution.dart';
 import 'package:club_sandwich/features/venues/domain/venue.dart';
 
@@ -21,9 +22,12 @@ enum ConcertStatus {
 }
 
 enum MaraudeStatus {
-  planned('planned', 'Préparation'),
-  started('started', 'En cours'),
-  completed('completed', 'Terminée');
+  draft('draft', 'Brouillon'),
+  open('open', 'Ouverte'),
+  teamReady('team_ready', 'Équipe validée'),
+  inProgress('in_progress', 'En cours'),
+  completed('completed', 'Terminée'),
+  cancelled('cancelled', 'Annulée');
 
   const MaraudeStatus(this.jsonValue, this.label);
 
@@ -48,13 +52,14 @@ class Concert {
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
-    this.maraudeStatus = MaraudeStatus.planned,
+    this.maraudeStatus = MaraudeStatus.open,
     this.actualStartAt,
     this.actualEndAt,
     this.closingComment,
+    this.cancellationReason,
+    this.operationalReport,
     this.collections = const [],
     this.distribution,
-    this.title,
     this.tour,
     this.time,
     this.notes,
@@ -69,11 +74,11 @@ class Concert {
     this.cateringContactName,
     this.cateringContactPhone,
     this.cateringContactEmail,
+    this.selectedVolunteerCount = 0,
   });
 
   final String id;
   final String organizationId;
-  final String? title;
   final String artist;
   final String? tour;
   final DateTime date;
@@ -83,6 +88,8 @@ class Concert {
   final DateTime? actualStartAt;
   final DateTime? actualEndAt;
   final String? closingComment;
+  final String? cancellationReason;
+  final MaraudeOperationalReport? operationalReport;
   final List<MaraudeCollection> collections;
   final MaraudeDistribution? distribution;
   final String? notes;
@@ -98,6 +105,7 @@ class Concert {
   final String? cateringContactName;
   final String? cateringContactPhone;
   final String? cateringContactEmail;
+  final int selectedVolunteerCount;
   final String createdBy;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -106,18 +114,19 @@ class Concert {
     return Concert(
       id: json['id'] as String,
       organizationId: json['organization_id'] as String,
-      title: json['title'] as String?,
       artist: json['artist'] as String,
       tour: json['tour'] as String?,
       date: DateTime.parse(json['concert_date'] as String),
       time: json['concert_time'] as String?,
       status: ConcertStatus.fromJson(json['status'] as String),
       maraudeStatus: json['maraude_status'] == null
-          ? MaraudeStatus.planned
+          ? MaraudeStatus.open
           : MaraudeStatus.fromJson(json['maraude_status'] as String),
       actualStartAt: _optionalDateTime(json['actual_start_at']),
       actualEndAt: _optionalDateTime(json['actual_end_at']),
       closingComment: _nullIfBlank(json['closing_comment'] as String?),
+      cancellationReason: _nullIfBlank(json['cancellation_reason'] as String?),
+      operationalReport: _relatedOperationalReport(json['operational_report']),
       collections: List<MaraudeCollection>.unmodifiable(
         (json['collections'] as List<dynamic>? ?? const []).map(
           (row) => MaraudeCollection.fromJson(row as Map<String, dynamic>),
@@ -148,6 +157,9 @@ class Concert {
       cateringContactEmail: _nullIfBlank(
         json['catering_contact_email'] as String?,
       ),
+      selectedVolunteerCount: _selectedVolunteerCount(
+        json['volunteer_applications'],
+      ),
       createdBy: json['created_by'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
@@ -158,7 +170,6 @@ class Concert {
     return {
       'id': id,
       'organization_id': organizationId,
-      'title': title,
       'artist': artist,
       'tour': tour,
       'concert_date': _dateToJson(date),
@@ -168,6 +179,19 @@ class Concert {
       'actual_start_at': actualStartAt?.toIso8601String(),
       'actual_end_at': actualEndAt?.toIso8601String(),
       'closing_comment': closingComment,
+      'cancellation_reason': cancellationReason,
+      'operational_report': operationalReport == null
+          ? null
+          : {
+              'concert_id': operationalReport!.concertId,
+              'total_weight_kg': operationalReport!.totalWeightKg,
+              'estimated_meals': operationalReport!.estimatedMeals,
+              'comment': operationalReport!.comment,
+              'photo_folder_url': operationalReport!.photoFolderUrl,
+              'last_modified_by': operationalReport!.lastModifiedBy,
+              'created_at': operationalReport!.createdAt.toIso8601String(),
+              'updated_at': operationalReport!.updatedAt.toIso8601String(),
+            },
       'collections': collections
           .map((collection) => collection.toJson())
           .toList(),
@@ -187,6 +211,18 @@ class Concert {
       'updated_at': updatedAt.toIso8601String(),
     };
   }
+}
+
+MaraudeOperationalReport? _relatedOperationalReport(Object? relation) {
+  if (relation is Map<String, dynamic>) {
+    return MaraudeOperationalReport.fromJson(relation);
+  }
+  if (relation is List<dynamic> && relation.isNotEmpty) {
+    return MaraudeOperationalReport.fromJson(
+      relation.first as Map<String, dynamic>,
+    );
+  }
+  return null;
 }
 
 DateTime? _optionalDateTime(Object? value) {
@@ -213,40 +249,15 @@ Venue? _relatedVenue(Object? relation) {
   return null;
 }
 
-class CreateConcertDraft {
-  const CreateConcertDraft({
+class ConcertDraft {
+  const ConcertDraft({
     required this.artist,
     required this.date,
     required this.venueId,
-    this.cateringClosesAt,
-    this.notes,
-  });
-
-  final String artist;
-  final DateTime date;
-  final String venueId;
-  final String? cateringClosesAt;
-  final String? notes;
-
-  Map<String, dynamic> toJson() {
-    return {
-      'artist': artist,
-      'concert_date': _dateToJson(date),
-      'venue_id': venueId,
-      'catering_closes_at': cateringClosesAt,
-      'notes': notes,
-    };
-  }
-}
-
-class ConcertDraft {
-  const ConcertDraft({
-    required this.title,
-    required this.artist,
-    required this.date,
-    required this.time,
     required this.status,
     this.tour,
+    this.time,
+    this.cateringClosesAt,
     this.notes,
     this.promoterContactName,
     this.promoterContactPhone,
@@ -256,11 +267,12 @@ class ConcertDraft {
     this.cateringContactEmail,
   });
 
-  final String title;
   final String artist;
   final String? tour;
   final DateTime date;
-  final String time;
+  final String? time;
+  final String venueId;
+  final String? cateringClosesAt;
   final ConcertStatus status;
   final String? notes;
   final String? promoterContactName;
@@ -272,12 +284,13 @@ class ConcertDraft {
 
   Map<String, dynamic> toJson() {
     return {
-      'title': title,
       'artist': artist,
       'tour': tour,
       'concert_date': _dateToJson(date),
       'concert_time': time,
       'status': status.jsonValue,
+      'venue_id': venueId,
+      'catering_closes_at': cateringClosesAt,
       'notes': notes,
       'promoter_contact_name': _nullIfBlank(promoterContactName),
       'promoter_contact_phone': _nullIfBlank(promoterContactPhone),
@@ -287,6 +300,13 @@ class ConcertDraft {
       'catering_contact_email': _nullIfBlank(cateringContactEmail),
     };
   }
+}
+
+int _selectedVolunteerCount(Object? relation) {
+  if (relation is! List<dynamic>) return 0;
+  return relation.where((row) {
+    return row is Map<String, dynamic> && row['status'] == 'selected';
+  }).length;
 }
 
 String? _nullIfBlank(String? value) {

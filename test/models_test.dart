@@ -53,16 +53,17 @@ void main() {
     const json = {
       'id': '8714fd8c-c080-47e8-849a-1309bbd9950d',
       'organization_id': '3bc8ad12-a047-4a80-a3de-abab6791dc35',
-      'title': 'Titre',
       'artist': 'Artiste',
       'tour': null,
       'concert_date': '2026-07-24',
       'concert_time': '20:30:00',
       'status': 'confirmed',
-      'maraude_status': 'started',
+      'maraude_status': 'in_progress',
       'actual_start_at': '2026-07-24T19:12:00.000Z',
       'actual_end_at': null,
       'closing_comment': null,
+      'cancellation_reason': null,
+      'operational_report': null,
       'collections': <Map<String, dynamic>>[],
       'distribution': null,
       'notes': null,
@@ -83,36 +84,43 @@ void main() {
     final concert = Concert.fromJson(json);
 
     expect(concert.status, ConcertStatus.confirmed);
-    expect(concert.maraudeStatus, MaraudeStatus.started);
+    expect(concert.maraudeStatus, MaraudeStatus.inProgress);
     expect(concert.actualStartAt, DateTime.utc(2026, 7, 24, 19, 12));
     expect(concert.toJson(), json);
   });
 
-  test('CreateConcertDraft ne sérialise que les champs de publication', () {
-    final draft = CreateConcertDraft(
+  test('ConcertDraft sérialise les champs communs de création et édition', () {
+    final draft = ConcertDraft(
       artist: 'Artiste',
       date: DateTime(2026, 7, 24),
       venueId: 'eb3127ff-a9af-4968-ac67-cba782488eef',
+      status: ConcertStatus.planned,
       cateringClosesAt: '23:00:00',
     );
 
     expect(draft.toJson(), {
       'artist': 'Artiste',
+      'tour': null,
       'concert_date': '2026-07-24',
+      'concert_time': null,
+      'status': 'planned',
       'venue_id': 'eb3127ff-a9af-4968-ac67-cba782488eef',
       'catering_closes_at': '23:00:00',
       'notes': null,
+      'promoter_contact_name': null,
+      'promoter_contact_phone': null,
+      'promoter_contact_email': null,
+      'catering_contact_name': null,
+      'catering_contact_phone': null,
+      'catering_contact_email': null,
     });
-    expect(draft.toJson(), isNot(contains('status')));
     expect(draft.toJson(), isNot(contains('title')));
-    expect(draft.toJson(), isNot(contains('concert_time')));
   });
 
   test('Concert lit les noms de salle et de producteur préchargés', () {
     final concert = Concert.fromJson({
       'id': '8714fd8c-c080-47e8-849a-1309bbd9950d',
       'organization_id': '3bc8ad12-a047-4a80-a3de-abab6791dc35',
-      'title': null,
       'artist': 'Artiste',
       'tour': null,
       'concert_date': '2026-09-15',
@@ -132,6 +140,13 @@ void main() {
         'public_address_line2': null,
         'postal_code': '75008',
         'city': 'Paris',
+        'access_details': {
+          'artist_entrance_address_line1': 'Entrée artistes',
+          'artist_entrance_address_line2': null,
+          'artist_entrance_postal_code': '75008',
+          'artist_entrance_city': 'Paris',
+          'access_instructions': 'Porte noire',
+        },
       },
       'promoter_organization': {'name': 'Producteur'},
       'promoter_contact_name': 'Camille',
@@ -140,6 +155,11 @@ void main() {
       'catering_contact_name': 'Alex',
       'catering_contact_phone': '+33 6 11 11 11 11',
       'catering_contact_email': 'alex@example.com',
+      'volunteer_applications': [
+        {'status': 'selected'},
+        {'status': 'pending'},
+        {'status': 'selected'},
+      ],
     });
 
     expect(concert.venueName, 'Salle Pleyel');
@@ -152,13 +172,19 @@ void main() {
     expect(concert.promoterContactEmail, 'camille@example.com');
     expect(concert.cateringContactName, 'Alex');
     expect(concert.cateringContactPhone, '+33 6 11 11 11 11');
+    expect(
+      concert.venue?.formattedArtistEntrance,
+      'Entrée artistes, 75008 Paris',
+    );
+    expect(concert.venue?.accessInstructions, 'Porte noire');
+    expect(concert.selectedVolunteerCount, 2);
   });
 
   test('ConcertDraft transforme les contacts vides en NULL', () {
     final draft = ConcertDraft(
-      title: 'Titre',
       artist: 'Artiste',
       date: DateTime(2026, 9, 15),
+      venueId: 'venue-id',
       time: '20:00:00',
       status: ConcertStatus.planned,
       promoterContactName: '   ',
@@ -183,12 +209,11 @@ void main() {
       'updated_at': '2026-07-25T10:00:00.000Z',
     });
 
-    expect(concert.title, isNull);
     expect(concert.venue, isNull);
     expect(concert.notes, isNull);
     expect(concert.promoterContactName, isNull);
     expect(concert.cateringContactEmail, isNull);
-    expect(concert.maraudeStatus, MaraudeStatus.planned);
+    expect(concert.maraudeStatus, MaraudeStatus.open);
     expect(concert.actualStartAt, isNull);
     expect(concert.actualEndAt, isNull);
   });
@@ -210,12 +235,15 @@ void main() {
     );
   });
 
-  test('MaraudeStatus sérialise les trois états et rejette l’inconnu', () {
-    expect(MaraudeStatus.planned.label, 'Préparation');
-    expect(MaraudeStatus.started.label, 'En cours');
+  test('MaraudeStatus sérialise les six états et rejette l’inconnu', () {
+    expect(MaraudeStatus.draft.label, 'Brouillon');
+    expect(MaraudeStatus.open.label, 'Ouverte');
+    expect(MaraudeStatus.teamReady.label, 'Équipe validée');
+    expect(MaraudeStatus.inProgress.label, 'En cours');
     expect(MaraudeStatus.completed.label, 'Terminée');
+    expect(MaraudeStatus.cancelled.label, 'Annulée');
     expect(
-      () => MaraudeStatus.fromJson('cancelled'),
+      () => MaraudeStatus.fromJson('unknown'),
       throwsA(isA<FormatException>()),
     );
   });

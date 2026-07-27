@@ -63,6 +63,7 @@ void main() {
         ..._applicationJson(),
         'first_name': 'Camille',
         'last_name': 'Martin',
+        'email': 'camille@example.test',
         'phone': '+33 6 00 00 00 00',
         'avatar_url': 'https://example.test/avatar.png',
         'birth_date': '1992-04-12',
@@ -74,7 +75,7 @@ void main() {
         'selected_applications': 8,
         'not_selected_applications': 2,
         'withdrawn_applications': 1,
-        'team_role': 'driver',
+        'team_role': 'logistics',
         'attendance_status': 'present',
         'last_selected_date': '2026-07-15',
         'history': [
@@ -96,6 +97,7 @@ void main() {
       });
 
       expect(application.profile!.birthDate, DateTime(1992, 4, 12));
+      expect(application.profile!.email, 'camille@example.test');
       expect(application.profile!.hasDrivingLicense, isTrue);
       expect(application.profile!.canLiftHeavyLoads, isFalse);
       expect(application.profile!.hasEmergencyContact, isTrue);
@@ -106,11 +108,16 @@ void main() {
       expect(application.statistics.lastSelectedDate, DateTime(2026, 7, 15));
       expect(application.statistics.history.first.artist, 'The Blaze');
       expect(application.statistics.history.last.artist, 'Aupinard');
-      expect(application.teamRole, MaraudeRole.driver);
+      expect(application.teamRole, MaraudeRole.logistics);
       expect(application.attendanceStatus, VolunteerAttendanceStatus.present);
-      expect(application.toJson()['team_role'], 'driver');
+      expect(application.toJson()['team_role'], 'logistics');
       expect(application.toJson()['attendance_status'], 'present');
       expect(application.profile!.toJson()['birth_date'], '1992-04-12');
+      expect(MaraudeRole.communication.label, 'Chargé.e de communication');
+      expect(
+        MaraudeRole.collectionDistribution.label,
+        'Chargé.e de récolte et distribution',
+      );
     });
 
     test('accepte une candidature sans profil bénévole', () {
@@ -316,6 +323,22 @@ void main() {
       expect(capturedRequest.url.queryParameters['user_id'], 'eq.user-id');
     });
 
+    test('renouvelle explicitement une disponibilité par RPC', () async {
+      late Request capturedRequest;
+      final client = await _authenticatedClient((request) async {
+        capturedRequest = request;
+        return Response('null', 200, headers: _jsonHeaders, request: request);
+      });
+      addTearDown(client.dispose);
+
+      await ConcertVolunteerRepository(client).reapply('concert-id');
+
+      expect(capturedRequest.url.path, endsWith('/rpc/reapply_to_concert'));
+      expect(jsonDecode(capturedRequest.body), {
+        'requested_concert_id': 'concert-id',
+      });
+    });
+
     test(
       'limite le changement administrateur aux deux statuts prévus',
       () async {
@@ -370,35 +393,44 @@ void main() {
       });
     });
 
-    test('enregistre un rôle et traduit le conflit de chef d’équipe', () async {
-      var requestCount = 0;
+    test('enregistre l’équipe complète en une seule RPC', () async {
+      late Request capturedRequest;
       final client = await _authenticatedClient((request) async {
-        requestCount++;
-        if (requestCount == 1) {
-          expect(jsonDecode(request.body), {'team_role': 'driver'});
-          return Response('', 204, request: request);
-        }
-        return Response(
-          jsonEncode({
-            'code': '23505',
-            'message': 'duplicate key value violates unique constraint',
-            'details': null,
-            'hint': null,
-          }),
-          409,
-          headers: _jsonHeaders,
-          request: request,
-        );
+        capturedRequest = request;
+        return Response('null', 200, headers: _jsonHeaders, request: request);
+      });
+      addTearDown(client.dispose);
+
+      await ConcertVolunteerRepository(client).saveTeam('concert-id', const [
+        MaraudeTeamMemberDraft(
+          applicationId: 'application-1',
+          role: MaraudeRole.teamLeader,
+        ),
+        MaraudeTeamMemberDraft(
+          applicationId: 'application-2',
+          role: MaraudeRole.communication,
+        ),
+      ]);
+
+      expect(capturedRequest.url.path, endsWith('/rpc/save_maraude_team'));
+      expect(jsonDecode(capturedRequest.body), {
+        'requested_concert_id': 'concert-id',
+        'requested_team': [
+          {'application_id': 'application-1', 'team_role': 'team_leader'},
+          {'application_id': 'application-2', 'team_role': 'communication'},
+        ],
+      });
+    });
+
+    test('enregistre un rôle sans règle d’unicité applicative', () async {
+      final client = await _authenticatedClient((request) async {
+        expect(jsonDecode(request.body), {'team_role': 'logistics'});
+        return Response('', 204, request: request);
       });
       addTearDown(client.dispose);
       final repository = ConcertVolunteerRepository(client);
 
-      await repository.setTeamRole('application-id', MaraudeRole.driver);
-
-      expect(
-        repository.setTeamRole('another-application', MaraudeRole.teamLeader),
-        throwsA(isA<TeamLeaderAlreadyAssignedException>()),
-      );
+      await repository.setTeamRole('application-id', MaraudeRole.logistics);
     });
 
     test('enregistre les trois états de présence', () async {
@@ -489,6 +521,24 @@ void main() {
     expect(repository.ownApplication!.status, ConcertVolunteerStatus.withdrawn);
   });
 
+  testWidgets('permet un nouveau positionnement après un désistement', (
+    tester,
+  ) async {
+    final repository = _FakeConcertVolunteerRepository(
+      ownApplication: _application(status: ConcertVolunteerStatus.withdrawn),
+    );
+    await _pumpDetail(tester, repository);
+
+    expect(find.text('Désisté'), findsOneWidget);
+    final reapply = find.byKey(const ValueKey('reapply-to-concert'));
+    await tester.ensureVisible(reapply);
+    await tester.tap(reapply);
+    await tester.pumpAndSettle();
+
+    expect(repository.ownApplication?.status, ConcertVolunteerStatus.pending);
+    expect(find.text('Votre disponibilité a été transmise.'), findsOneWidget);
+  });
+
   testWidgets('le bénévole ouvre son propre historique', (tester) async {
     final repository = _FakeConcertVolunteerRepository(
       ownApplication: _application(
@@ -521,11 +571,11 @@ void main() {
     expect(find.text('Historique des maraudes'), findsOneWidget);
     expect(find.text('The Blaze'), findsOneWidget);
     expect(find.text('Olympia'), findsOneWidget);
-    expect(find.text('Rôle : Chef d’équipe'), findsOneWidget);
+    expect(find.text('Rôle : Chef.fe d’équipe'), findsOneWidget);
     expect(find.text('Présence : En attente'), findsOneWidget);
   });
 
-  testWidgets('affiche les compteurs et permet la sélection admin', (
+  testWidgets('sélectionne en un clic et met le résumé à jour sans requête', (
     tester,
   ) async {
     final repository = _FakeConcertVolunteerRepository(
@@ -544,7 +594,7 @@ void main() {
           id: 'selected-id',
           userId: 'user-2',
           status: ConcertVolunteerStatus.selected,
-          teamRole: MaraudeRole.volunteer,
+          teamRole: MaraudeRole.teamLeader,
           profile: const VolunteerProfile(
             userId: 'user-2',
             firstName: 'Alex',
@@ -558,37 +608,37 @@ void main() {
     expect(find.text('2 candidatures'), findsOneWidget);
     expect(find.text('1 bénévole sélectionné'), findsOneWidget);
     expect(find.text('Camille Martin'), findsOneWidget);
-    expect(find.text('Alex Durand'), findsOneWidget);
+    expect(find.text('Alex Durand'), findsWidgets);
 
-    final checkbox = find.bySemanticsLabel('Sélectionner Camille Martin');
-    await tester.ensureVisible(checkbox);
-    await tester.tap(checkbox);
-    await tester.pump();
-
-    final selectButton = find.widgetWithText(
-      FilledButton,
-      'Sélectionner les bénévoles',
+    final selectButton = find.byKey(
+      const ValueKey('select-volunteer-pending-id'),
     );
     await tester.ensureVisible(selectButton);
     await tester.tap(selectButton);
-    await tester.pumpAndSettle();
+    await tester.pump();
 
-    expect(find.text('2 bénévoles sélectionnés'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
+    await tester.tap(find.text('Équipe').last);
+    await tester.pump();
+    expect(find.text('2 / 4 bénévoles'), findsOneWidget);
+    expect(find.text('Camille Martin'), findsWidgets);
+    expect(find.text('Récolte & distribution'), findsWidgets);
     expect(
       repository.applications
           .firstWhere((application) => application.id == 'pending-id')
-          .teamRole,
-      MaraudeRole.volunteer,
+          .status,
+      ConcertVolunteerStatus.pending,
     );
+    expect(repository.saveTeamCount, 0);
   });
 
-  testWidgets('change le rôle d’un bénévole sélectionné', (tester) async {
+  testWidgets('attribue le rôle directement sur la carte', (tester) async {
     final repository = _FakeConcertVolunteerRepository(
       isAdmin: true,
       applications: [
         _application(
           status: ConcertVolunteerStatus.selected,
-          teamRole: MaraudeRole.volunteer,
+          teamRole: MaraudeRole.collectionDistribution,
           profile: const VolunteerProfile(
             userId: 'user-id',
             firstName: 'Camille',
@@ -599,16 +649,419 @@ void main() {
     );
     await _pumpDetail(tester, repository);
 
-    final dropdown = find.byKey(
-      const ValueKey('team-role-application-id-MaraudeRole.volunteer'),
+    final leaderRole = find.byKey(
+      const ValueKey('team-role-application-id-teamLeader'),
     );
-    await tester.ensureVisible(dropdown);
-    await tester.tap(dropdown);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Chef d’équipe').last);
+    await tester.ensureVisible(leaderRole);
+    await tester.tap(leaderRole);
+    await tester.pump();
+
+    expect(find.text('Chef.fe d’équipe'), findsWidgets);
+    expect(
+      repository.applications.single.teamRole,
+      MaraudeRole.collectionDistribution,
+    );
+    expect(repository.saveTeamCount, 0);
+  });
+
+  testWidgets('enregistre une équipe d’un bénévole sans chef', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1440, 900);
+    addTearDown(() {
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+    });
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [
+        _application(
+          profile: const VolunteerProfile(
+            userId: 'user-id',
+            firstName: 'Camille',
+          ),
+        ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
+
+    final select = find.byKey(
+      const ValueKey('select-volunteer-application-id'),
+    );
+    await tester.ensureVisible(select);
+    await tester.tap(select);
+    await tester.pump();
+    final save = find.byKey(const ValueKey('save-maraude-team'));
+    expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
+    expect(
+      find.textContaining('Cette recommandation ne bloque pas'),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(save);
+    await tester.tap(save);
     await tester.pumpAndSettle();
 
-    expect(repository.applications.single.teamRole, MaraudeRole.teamLeader);
+    expect(repository.saveTeamCount, 1);
+    expect(
+      repository.applications.single.status,
+      ConcertVolunteerStatus.selected,
+    );
+  });
+
+  testWidgets('enregistre une équipe vide après le retrait du dernier membre', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1440, 900);
+    addTearDown(() {
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+    });
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [
+        _application(
+          status: ConcertVolunteerStatus.selected,
+          teamRole: MaraudeRole.communication,
+          profile: const VolunteerProfile(
+            userId: 'user-id',
+            firstName: 'Camille',
+          ),
+        ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
+
+    final remove = find.byKey(
+      const ValueKey('remove-volunteer-application-id'),
+    );
+    await tester.ensureVisible(remove);
+    await tester.tap(remove);
+    await tester.pump();
+
+    final save = find.byKey(const ValueKey('save-maraude-team'));
+    expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+
+    expect(repository.saveTeamCount, 1);
+    expect(repository.lastSavedTeam, isEmpty);
+  });
+
+  testWidgets('autorise plusieurs chefs d’équipe dans le brouillon', (
+    tester,
+  ) async {
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [
+        _application(
+          id: 'first',
+          profile: const VolunteerProfile(
+            userId: 'first-user',
+            firstName: 'Camille',
+            lastName: 'Martin',
+          ),
+        ),
+        _application(
+          id: 'second',
+          userId: 'second-user',
+          profile: const VolunteerProfile(
+            userId: 'second-user',
+            firstName: 'Hugo',
+            lastName: 'Durand',
+          ),
+        ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('select-volunteer-first')),
+    );
+    await tester.tap(find.byKey(const ValueKey('select-volunteer-first')));
+    await tester.pump();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('team-role-first-teamLeader')),
+    );
+    await tester.tap(find.byKey(const ValueKey('team-role-first-teamLeader')));
+    await tester.pump();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('select-volunteer-second')),
+    );
+    await tester.tap(find.byKey(const ValueKey('select-volunteer-second')));
+    await tester.pump();
+    final secondLeader = tester.widget<RadioListTile<MaraudeRole>>(
+      find.byKey(const ValueKey('team-role-second-teamLeader')),
+    );
+
+    expect(secondLeader.enabled, isTrue);
+  });
+
+  testWidgets('valide atomiquement une équipe complète avec un chef', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1440, 1100);
+    addTearDown(() {
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+    });
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [
+        for (var index = 1; index <= 4; index++)
+          _application(
+            id: 'candidate-$index',
+            userId: 'user-$index',
+            profile: VolunteerProfile(
+              userId: 'user-$index',
+              firstName: 'Bénévole $index',
+            ),
+          ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
+
+    for (var index = 1; index <= 4; index++) {
+      final button = find.byKey(ValueKey('select-volunteer-candidate-$index'));
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await tester.pump();
+    }
+
+    var saveButton = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('save-maraude-team')),
+    );
+    expect(saveButton.onPressed, isNotNull);
+
+    final leaderRole = find.byKey(
+      const ValueKey('team-role-candidate-1-teamLeader'),
+    );
+    await tester.ensureVisible(leaderRole);
+    await tester.tap(leaderRole);
+    await tester.pump();
+
+    saveButton = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('save-maraude-team')),
+    );
+    expect(saveButton.onPressed, isNotNull);
+    await tester.ensureVisible(find.byKey(const ValueKey('save-maraude-team')));
+    await tester.tap(find.byKey(const ValueKey('save-maraude-team')));
+    await tester.pumpAndSettle();
+
+    expect(repository.saveTeamCount, 1);
+    expect(
+      repository.applications
+          .where(
+            (application) =>
+                application.status == ConcertVolunteerStatus.selected,
+          )
+          .length,
+      4,
+    );
+    expect(
+      repository.applications
+          .firstWhere((application) => application.id == 'candidate-1')
+          .teamRole,
+      MaraudeRole.teamLeader,
+    );
+    expect(find.text('Équipe enregistrée.'), findsOneWidget);
+  });
+
+  testWidgets('affiche Candidatures et Équipe sous forme d’onglets mobiles', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(() {
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+    });
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [
+        _application(
+          profile: const VolunteerProfile(
+            userId: 'user-id',
+            firstName: 'Camille',
+          ),
+        ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
+
+    expect(find.byKey(const ValueKey('team-builder-mobile')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('team-candidates-column')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('team-builder-summary')), findsNothing);
+
+    await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
+    await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
+    await tester.tap(find.text('Équipe').last);
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('team-builder-summary')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('recherche, filtre et ordonne les candidatures', (tester) async {
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [
+        _application(
+          id: 'not-selected-id',
+          status: ConcertVolunteerStatus.notSelected,
+          profile: const VolunteerProfile(
+            userId: 'user-4',
+            firstName: 'Zoé',
+            lastName: 'Bernard',
+            email: 'zoe@example.test',
+          ),
+        ),
+        _application(
+          id: 'withdrawn-id',
+          status: ConcertVolunteerStatus.withdrawn,
+          profile: const VolunteerProfile(
+            userId: 'user-3',
+            firstName: 'Inès',
+            lastName: 'Robert',
+            email: 'ines@example.test',
+          ),
+        ),
+        _application(
+          id: 'pending-id',
+          profile: const VolunteerProfile(
+            userId: 'user-2',
+            firstName: 'Barthélémy',
+            lastName: 'Durand',
+            email: 'barthelemy@example.test',
+            phone: '06 11 22 33 44',
+          ),
+        ),
+        _application(
+          id: 'selected-id',
+          status: ConcertVolunteerStatus.selected,
+          teamRole: MaraudeRole.teamLeader,
+          profile: const VolunteerProfile(
+            userId: 'user-1',
+            firstName: 'Antoine',
+            lastName: 'Vignol',
+            email: 'antoine@example.test',
+          ),
+        ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
+
+    await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
+    await tester.tap(find.text('Équipe').last);
+    await tester.pump();
+    expect(find.text('1 / 4 bénévoles'), findsOneWidget);
+    expect(find.textContaining('généralement recommandés'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
+    await tester.tap(find.text('Candidatures').last);
+    await tester.pump();
+    final selectedCard = find.byKey(
+      const ValueKey('volunteer-card-selected-id'),
+    );
+    final pendingCard = find.byKey(const ValueKey('volunteer-card-pending-id'));
+    final withdrawnCard = find.byKey(
+      const ValueKey('volunteer-card-withdrawn-id'),
+    );
+    final notSelectedCard = find.byKey(
+      const ValueKey('volunteer-card-not-selected-id'),
+    );
+    expect(
+      tester.getTopLeft(selectedCard).dy,
+      lessThan(tester.getTopLeft(pendingCard).dy),
+    );
+    expect(
+      tester.getTopLeft(pendingCard).dy,
+      lessThan(tester.getTopLeft(withdrawnCard).dy),
+    );
+    expect(
+      tester.getTopLeft(withdrawnCard).dy,
+      lessThan(tester.getTopLeft(notSelectedCard).dy),
+    );
+
+    final searchField = find.byKey(const ValueKey('volunteer-search-field'));
+    await tester.ensureVisible(searchField);
+    await tester.enterText(searchField, 'barthelemy@example.test');
+    await tester.pump();
+
+    expect(pendingCard, findsOneWidget);
+    expect(selectedCard, findsNothing);
+
+    await tester.enterText(searchField, '');
+    await tester.tap(find.byKey(const ValueKey('volunteer-filter-selected')));
+    await tester.pump();
+
+    expect(selectedCard, findsOneWidget);
+    expect(pendingCard, findsNothing);
+  });
+
+  testWidgets('affiche les deux colonnes desktop et le résumé des rôles', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1440, 1000);
+    addTearDown(() {
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+    });
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [
+        _application(
+          id: 'leader-id',
+          status: ConcertVolunteerStatus.selected,
+          teamRole: MaraudeRole.teamLeader,
+          profile: const VolunteerProfile(
+            userId: 'leader',
+            firstName: 'Antoine',
+          ),
+        ),
+        _application(
+          id: 'driver-id',
+          status: ConcertVolunteerStatus.selected,
+          teamRole: MaraudeRole.logistics,
+          profile: const VolunteerProfile(userId: 'driver', firstName: 'Hugo'),
+        ),
+        _application(
+          id: 'photographer-id',
+          status: ConcertVolunteerStatus.selected,
+          teamRole: MaraudeRole.communication,
+          profile: const VolunteerProfile(
+            userId: 'photographer',
+            firstName: 'Inès',
+          ),
+        ),
+        _application(
+          id: 'volunteer-id',
+          status: ConcertVolunteerStatus.selected,
+          teamRole: MaraudeRole.collectionDistribution,
+          profile: const VolunteerProfile(
+            userId: 'volunteer',
+            firstName: 'Barthélémy',
+          ),
+        ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
+
+    expect(find.byKey(const ValueKey('team-builder-desktop')), findsOneWidget);
+    expect(find.byType(DataTable), findsNothing);
+    expect(find.text('4 / 4 bénévoles'), findsOneWidget);
+    expect(find.text('Équipe enregistrable'), findsOneWidget);
+    expect(find.text('Équipe retenue'), findsOneWidget);
+    expect(find.text('Chargé.e de communication'), findsWidgets);
+    expect(find.text('Chargé.e de logistique'), findsWidgets);
+    expect(find.text('Chargé.e de récolte et distribution'), findsWidgets);
+    expect(find.text('Équipe enregistrée'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('affiche et met à jour la synthèse des présences', (
@@ -620,7 +1073,7 @@ void main() {
         _application(
           id: 'pending-attendance',
           status: ConcertVolunteerStatus.selected,
-          teamRole: MaraudeRole.volunteer,
+          teamRole: MaraudeRole.collectionDistribution,
           profile: const VolunteerProfile(
             userId: 'user-1',
             firstName: 'Julie',
@@ -631,25 +1084,31 @@ void main() {
           id: 'present-attendance',
           userId: 'user-2',
           status: ConcertVolunteerStatus.selected,
-          teamRole: MaraudeRole.driver,
+          teamRole: MaraudeRole.logistics,
           attendanceStatus: VolunteerAttendanceStatus.present,
         ),
         _application(
           id: 'absent-attendance',
           userId: 'user-3',
           status: ConcertVolunteerStatus.selected,
-          teamRole: MaraudeRole.volunteer,
+          teamRole: MaraudeRole.collectionDistribution,
           attendanceStatus: VolunteerAttendanceStatus.absent,
         ),
       ],
     );
     await _pumpDetail(tester, repository);
 
+    await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
+    await tester.tap(find.text('Équipe').last);
+    await tester.pump();
     expect(find.text('3 sélectionnés'), findsOneWidget);
     expect(find.text('Présents : 1'), findsOneWidget);
     expect(find.text('Absents : 1'), findsOneWidget);
     expect(find.text('En attente : 1'), findsOneWidget);
 
+    await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
+    await tester.tap(find.text('Candidatures').last);
+    await tester.pump();
     final dropdown = find.byKey(
       const ValueKey(
         'attendance-pending-attendance-'
@@ -662,6 +1121,9 @@ void main() {
     await tester.tap(find.text('Présent').last);
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
+    await tester.tap(find.text('Équipe').last);
+    await tester.pump();
     expect(find.text('Présents : 2'), findsOneWidget);
     expect(find.text('En attente : 0'), findsOneWidget);
     expect(
@@ -673,7 +1135,7 @@ void main() {
     expect(repository.fetchCount, greaterThanOrEqualTo(2));
   });
 
-  testWidgets('affiche une carte bénévole complète sans contact d’urgence', (
+  testWidgets('affiche les informations utiles à la décision sur la carte', (
     tester,
   ) async {
     final application = _application(
@@ -693,6 +1155,7 @@ void main() {
         selectedApplications: 8,
         notSelectedApplications: 2,
         withdrawnApplications: 1,
+        lastSelectedDate: null,
         history: [],
       ),
     );
@@ -703,11 +1166,16 @@ void main() {
     await _pumpDetail(tester, repository);
 
     expect(find.text('Camille Martin'), findsOneWidget);
-    expect(find.text('+33 6 00 00 00 00'), findsOneWidget);
-    expect(find.text('Permis : Oui'), findsOneWidget);
-    expect(find.text('12 candidatures'), findsOneWidget);
-    expect(find.text('8 maraudes sélectionnées'), findsOneWidget);
-    expect(find.text('1 désistement'), findsOneWidget);
+    expect(find.text('Maraudes'), findsOneWidget);
+    expect(find.text('8'), findsOneWidget);
+    expect(find.text('Dernière participation'), findsOneWidget);
+    expect(find.text('Aucune'), findsOneWidget);
+    expect(find.text('Désistements'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Disponibilité'), findsOneWidget);
+    expect(find.text('Confirmée'), findsOneWidget);
+    expect(find.text('+33 6 00 00 00 00'), findsNothing);
+    expect(find.text('Permis : Oui'), findsNothing);
     expect(find.text('Sophie Martin'), findsNothing);
     expect(find.text('+33 6 99 99 99 99'), findsNothing);
   });
@@ -757,7 +1225,9 @@ void main() {
 
     final card = find.byKey(const ValueKey('volunteer-card-application-id'));
     await tester.ensureVisible(card);
-    await tester.tap(card);
+    await tester.tap(
+      find.descendant(of: card, matching: find.byType(InkWell)).first,
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Profil bénévole'), findsOneWidget);
@@ -767,7 +1237,7 @@ void main() {
     expect(find.text('Sophie Martin'), findsOneWidget);
     expect(find.text('+33 6 99 99 99 99'), findsOneWidget);
     expect(find.text('2 non-sélections'), findsOneWidget);
-    expect(find.text('Dernière participation'), findsOneWidget);
+    expect(find.text('Dernière participation'), findsNWidgets(2));
     expect(find.text('15 juillet 2026'), findsNWidgets(2));
     expect(find.text('Taux de sélection : 67 %'), findsOneWidget);
     expect(find.text('Taux de désistement : 8 %'), findsOneWidget);
@@ -797,17 +1267,23 @@ void main() {
     );
     await _pumpDetail(tester, repository);
 
-    expect(find.text('Permis : Non renseigné'), findsOneWidget);
+    expect(find.text('Maraudes'), findsOneWidget);
+    final card = find.byKey(const ValueKey('volunteer-card-application-id'));
+    expect(find.descendant(of: card, matching: find.text('0')), findsOneWidget);
+    expect(find.text('Dernière participation'), findsOneWidget);
+    expect(find.text('Aucune'), findsOneWidget);
+    expect(find.text('Confirmée'), findsOneWidget);
     expect(find.byIcon(Icons.person_outline), findsWidgets);
 
-    final card = find.byKey(const ValueKey('volunteer-card-application-id'));
     await tester.ensureVisible(card);
-    await tester.tap(card);
+    await tester.tap(
+      find.descendant(of: card, matching: find.byType(InkWell)).first,
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Non renseignée'), findsOneWidget);
     expect(find.text('Non renseigné'), findsWidgets);
-    expect(find.text('Aucune'), findsOneWidget);
+    expect(find.text('Aucune'), findsNWidgets(2));
     expect(find.text('Aucun historique.'), findsOneWidget);
     expect(find.textContaining('Taux de sélection'), findsNothing);
   });
@@ -916,6 +1392,8 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
   final bool isAdmin;
   final List<ConcertVolunteerApplication> applications;
   int fetchCount = 0;
+  int saveTeamCount = 0;
+  List<MaraudeTeamMemberDraft> lastSavedTeam = const [];
 
   @override
   Future<ConcertVolunteerSectionData> fetchSection(String concertId) async {
@@ -990,6 +1468,15 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
   }
 
   @override
+  Future<void> reapply(String concertId) async {
+    ownApplication = ownApplication?.copyWith(
+      status: ConcertVolunteerStatus.pending,
+      teamRole: null,
+      attendanceStatus: null,
+    );
+  }
+
+  @override
   Future<void> setStatus(
     String applicationId,
     ConcertVolunteerStatus status,
@@ -1000,7 +1487,7 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
     applications[index] = applications[index].copyWith(
       status: status,
       teamRole: status == ConcertVolunteerStatus.selected
-          ? applications[index].teamRole ?? MaraudeRole.volunteer
+          ? applications[index].teamRole ?? MaraudeRole.collectionDistribution
           : null,
       attendanceStatus: status == ConcertVolunteerStatus.selected
           ? applications[index].attendanceStatus ??
@@ -1020,7 +1507,8 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
       );
       applications[index] = applications[index].copyWith(
         status: ConcertVolunteerStatus.selected,
-        teamRole: applications[index].teamRole ?? MaraudeRole.volunteer,
+        teamRole:
+            applications[index].teamRole ?? MaraudeRole.collectionDistribution,
         attendanceStatus:
             applications[index].attendanceStatus ??
             VolunteerAttendanceStatus.pending,
@@ -1029,15 +1517,37 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
   }
 
   @override
-  Future<void> setTeamRole(String applicationId, MaraudeRole role) async {
-    if (role == MaraudeRole.teamLeader &&
-        applications.any(
-          (application) =>
-              application.id != applicationId &&
-              application.teamRole == MaraudeRole.teamLeader,
-        )) {
-      throw const TeamLeaderAlreadyAssignedException();
+  Future<void> saveTeam(
+    String concertId,
+    Iterable<MaraudeTeamMemberDraft> members,
+  ) async {
+    saveTeamCount++;
+    lastSavedTeam = members.toList(growable: false);
+    final roles = {
+      for (final member in lastSavedTeam) member.applicationId: member.role,
+    };
+    for (var index = 0; index < applications.length; index++) {
+      final application = applications[index];
+      final role = roles[application.id];
+      if (role != null) {
+        applications[index] = application.copyWith(
+          status: ConcertVolunteerStatus.selected,
+          teamRole: role,
+          attendanceStatus:
+              application.attendanceStatus ?? VolunteerAttendanceStatus.pending,
+        );
+      } else if (application.status == ConcertVolunteerStatus.selected) {
+        applications[index] = application.copyWith(
+          status: ConcertVolunteerStatus.notSelected,
+          teamRole: null,
+          attendanceStatus: null,
+        );
+      }
     }
+  }
+
+  @override
+  Future<void> setTeamRole(String applicationId, MaraudeRole role) async {
     final index = applications.indexWhere(
       (application) => application.id == applicationId,
     );

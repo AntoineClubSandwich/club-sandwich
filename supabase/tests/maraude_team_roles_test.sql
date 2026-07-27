@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(15);
+select plan(16);
 
 select has_column(
   'public',
@@ -17,6 +17,18 @@ select col_type_is(
   'team_role',
   'public.maraude_role',
   'Le rôle utilise l’enum maraude_role'
+);
+
+select enum_has_labels(
+  'public',
+  'maraude_role',
+  array[
+    'team_leader',
+    'logistics',
+    'communication',
+    'collection_distribution'
+  ],
+  'Les quatre rôles de maraude sont disponibles'
 );
 
 insert into auth.users (
@@ -155,10 +167,10 @@ select results_eq(
     select count(*)::bigint
     from public.concert_volunteers
     where status = 'selected'
-      and team_role = 'volunteer'
+      and team_role = 'collection_distribution'
   $$,
   array[2::bigint],
-  'La sélection groupée affecte le rôle Bénévole par défaut'
+  'La sélection groupée affecte le rôle Récolte et distribution par défaut'
 );
 
 select lives_ok(
@@ -170,24 +182,22 @@ select lives_ok(
   'Un administrateur peut désigner un chef d’équipe'
 );
 
-select throws_ok(
+select lives_ok(
   $$
     update public.concert_volunteers
     set team_role = 'team_leader'
     where id = '50000000-0000-0000-0000-000000000002'
   $$,
-  '23505',
-  'duplicate key value violates unique constraint "concert_volunteers_one_team_leader_idx"',
-  'Un concert ne peut avoir qu’un seul chef d’équipe'
+  'Un concert peut avoir plusieurs chefs d’équipe'
 );
 
 select lives_ok(
   $$
     update public.concert_volunteers
-    set team_role = 'driver'
+    set team_role = 'logistics'
     where id = '50000000-0000-0000-0000-000000000002'
   $$,
-  'Un administrateur peut désigner un conducteur'
+  'Un administrateur peut désigner un responsable logistique'
 );
 
 reset role;
@@ -210,7 +220,7 @@ select results_eq(
 select throws_ok(
   $$
     update public.concert_volunteers
-    set team_role = 'driver'
+    set team_role = 'logistics'
     where id = '50000000-0000-0000-0000-000000000001'
   $$,
   '42501',

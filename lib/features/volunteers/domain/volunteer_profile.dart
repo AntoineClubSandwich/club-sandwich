@@ -3,6 +3,7 @@ class VolunteerProfile {
     required this.userId,
     this.firstName,
     this.lastName,
+    this.email,
     this.phone,
     this.avatarUrl,
     this.birthDate,
@@ -18,6 +19,7 @@ class VolunteerProfile {
       userId: json['user_id'] as String,
       firstName: json['first_name'] as String?,
       lastName: json['last_name'] as String?,
+      email: json['email'] as String?,
       phone: json['phone'] as String?,
       avatarUrl: json['avatar_url'] as String?,
       birthDate: birthDateValue == null ? null : DateTime.parse(birthDateValue),
@@ -31,6 +33,7 @@ class VolunteerProfile {
   final String userId;
   final String? firstName;
   final String? lastName;
+  final String? email;
   final String? phone;
   final String? avatarUrl;
   final DateTime? birthDate;
@@ -57,6 +60,7 @@ class VolunteerProfile {
     'user_id': userId,
     'first_name': firstName,
     'last_name': lastName,
+    'email': email,
     'phone': phone,
     'avatar_url': avatarUrl,
     'birth_date': _formatDate(birthDate),
@@ -73,6 +77,7 @@ class VolunteerProfile {
             userId == other.userId &&
             firstName == other.firstName &&
             lastName == other.lastName &&
+            email == other.email &&
             phone == other.phone &&
             avatarUrl == other.avatarUrl &&
             birthDate == other.birthDate &&
@@ -87,6 +92,7 @@ class VolunteerProfile {
     userId,
     firstName,
     lastName,
+    email,
     phone,
     avatarUrl,
     birthDate,

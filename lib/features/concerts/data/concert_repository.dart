@@ -1,4 +1,5 @@
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
+import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MissingMembershipException implements Exception {
@@ -25,15 +26,21 @@ class ConcertRepository {
       '*, '
       'venue:venues!concerts_venue_id_fkey('
       'id, name, public_address_line1, public_address_line2, '
-      'postal_code, city'
+      'postal_code, city, '
+      'access_details:venue_access_details('
+      'artist_entrance_address_line1, artist_entrance_address_line2, '
+      'artist_entrance_postal_code, artist_entrance_city, access_instructions'
+      ')'
       '), '
       'promoter_organization:organizations!'
-      'concerts_promoter_organization_id_fkey(name)';
+      'concerts_promoter_organization_id_fkey(name), '
+      'volunteer_applications:concert_volunteers(status)';
 
   static const _concertDetailSelect =
       '$_concertWithDetailsSelect, '
       'collections:maraude_collections(*), '
-      'distribution:maraude_distributions(*)';
+      'distribution:maraude_distributions(*), '
+      'operational_report:maraude_operational_reports(*)';
 
   Future<List<Concert>> fetchConcerts() async {
     final context = await _currentContext();
@@ -59,12 +66,13 @@ class ConcertRepository {
     return row == null ? null : Concert.fromJson(row);
   }
 
-  Future<Concert> createConcert(CreateConcertDraft draft) async {
+  Future<Concert> createConcert(ConcertDraft draft) async {
     final context = await _currentContext();
     final row = await _client
         .from('concerts')
         .insert({
           ...draft.toJson(),
+          'status': ConcertStatus.planned.jsonValue,
           'organization_id': context.organizationId,
           'created_by': context.userId,
           if (context.promoterOrganizationId != null)
@@ -102,6 +110,62 @@ class ConcertRepository {
     await _client.rpc<void>(
       'complete_maraude',
       params: {'requested_concert_id': concertId},
+    );
+  }
+
+  Future<void> setMaraudeStatus(
+    String concertId,
+    MaraudeStatus status, {
+    String? cancellationReason,
+  }) async {
+    await _client.rpc<void>(
+      'set_maraude_status',
+      params: {
+        'requested_concert_id': concertId,
+        'requested_status': status.jsonValue,
+        'requested_cancellation_reason': cancellationReason,
+      },
+    );
+  }
+
+  Future<void> saveMaraudeReport(
+    String concertId,
+    MaraudeReportDraft draft, {
+    bool complete = true,
+  }) async {
+    await _client.rpc<void>(
+      'save_maraude_report',
+      params: {
+        'requested_concert_id': concertId,
+        'requested_total_weight_kg': draft.totalWeightKg,
+        'requested_estimated_meals': draft.estimatedMeals,
+        'requested_comment': draft.comment,
+        'requested_photo_folder_url': draft.photoFolderUrl,
+        'requested_complete': complete,
+      },
+    );
+  }
+
+  Future<List<MaraudeOverview>> fetchMaraudeOverview({int limit = 100}) async {
+    final rows = await _client.rpc<List<dynamic>>(
+      'get_maraude_overview',
+      params: {'requested_limit': limit},
+    );
+    return rows
+        .map((row) => MaraudeOverview.fromJson(row! as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<void> updateMaraudePhotoLink(
+    String concertId,
+    String? photoFolderUrl,
+  ) async {
+    await _client.rpc<void>(
+      'update_maraude_photo_link',
+      params: {
+        'requested_concert_id': concertId,
+        'requested_photo_folder_url': photoFolderUrl,
+      },
     );
   }
 

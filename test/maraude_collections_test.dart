@@ -146,7 +146,7 @@ void main() {
             'artist': 'Artiste',
             'concert_date': '2026-09-15',
             'status': 'planned',
-            'maraude_status': 'started',
+            'maraude_status': 'in_progress',
             'actual_start_at': '2026-09-15T20:00:00.000Z',
             'actual_end_at': null,
             'created_by': 'user-id',
@@ -226,7 +226,7 @@ void main() {
       '10',
     );
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Commentaire'),
+      find.byKey(const ValueKey('collection-comment')),
       'Nouveau lot',
     );
     await tester.tap(find.text('Ajouter le lot'));
@@ -360,7 +360,7 @@ Future<void> _pumpCollections(
 class _CollectionStore {
   _CollectionStore(
     List<MaraudeCollection> initialCollections, {
-    this.status = MaraudeStatus.started,
+    this.status = MaraudeStatus.inProgress,
   }) : collections = [...initialCollections] {
     repository = _FakeMaraudeCollectionRepository(this);
   }

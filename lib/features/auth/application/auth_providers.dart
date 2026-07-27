@@ -10,3 +10,9 @@ final authRepositoryProvider = Provider<AuthRepository>(
 final authStateProvider = StreamProvider<AuthState>(
   (ref) => ref.watch(authRepositoryProvider).authStateChanges,
 );
+
+final currentAuthUserProvider = Provider<User?>((ref) {
+  final authState = ref.watch(authStateProvider);
+  return authState.value?.session?.user ??
+      ref.watch(authRepositoryProvider).currentUser;
+});

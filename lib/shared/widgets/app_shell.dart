@@ -1,7 +1,14 @@
+import 'package:club_sandwich/features/auth/application/auth_providers.dart';
+import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
+import 'package:club_sandwich/features/organizations/data/organization_providers.dart';
+import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
+import 'package:club_sandwich/features/profiles/domain/profile.dart';
+import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({required this.location, required this.child, super.key});
 
   final String location;
@@ -58,35 +65,56 @@ class AppShell extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 840;
     final selectedIndex = _selectedIndex;
+    final accountPanel = _UserAccountPanel(
+      onSignedOut: () {
+        ref.invalidate(currentProfileProvider);
+        ref.invalidate(organizationsProvider);
+        ref.invalidate(membershipsProvider);
+        ref.invalidate(concertsProvider);
+        ref.invalidate(concertDetailsProvider);
+        ref.invalidate(concertVolunteerSectionProvider);
+      },
+    );
 
     if (!isDesktop) {
       return Scaffold(
         appBar: AppBar(title: Text(_destinations[selectedIndex].label)),
         drawer: Drawer(
           child: SafeArea(
-            child: NavigationDrawer(
-              selectedIndex: selectedIndex,
-              onDestinationSelected: (index) {
-                Navigator.of(context).pop();
-                _navigate(context, index);
-              },
+            child: Column(
               children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(28, 20, 28, 24),
-                  child: Text(
-                    'Club Sandwich',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                Expanded(
+                  child: NavigationDrawer(
+                    selectedIndex: selectedIndex,
+                    onDestinationSelected: (index) {
+                      Navigator.of(context).pop();
+                      _navigate(context, index);
+                    },
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(28, 20, 28, 24),
+                        child: Text(
+                          'Club Sandwich',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      for (final destination in _destinations)
+                        NavigationDrawerDestination(
+                          icon: Icon(destination.icon),
+                          selectedIcon: Icon(destination.selectedIcon),
+                          label: Text(destination.label),
+                        ),
+                    ],
                   ),
                 ),
-                for (final destination in _destinations)
-                  NavigationDrawerDestination(
-                    icon: Icon(destination.icon),
-                    selectedIcon: Icon(destination.selectedIcon),
-                    label: Text(destination.label),
-                  ),
+                const Divider(height: 1),
+                accountPanel,
               ],
             ),
           ),
@@ -99,21 +127,29 @@ class AppShell extends StatelessWidget {
       appBar: AppBar(title: Text(_destinations[selectedIndex].label)),
       body: Row(
         children: [
-          NavigationRail(
-            extended: MediaQuery.sizeOf(context).width >= 1200,
-            selectedIndex: selectedIndex,
-            onDestinationSelected: (index) => _navigate(context, index),
-            labelType: MediaQuery.sizeOf(context).width >= 1200
-                ? NavigationRailLabelType.none
-                : NavigationRailLabelType.all,
-            destinations: [
-              for (final destination in _destinations)
-                NavigationRailDestination(
-                  icon: Icon(destination.icon),
-                  selectedIcon: Icon(destination.selectedIcon),
-                  label: Text(destination.label),
+          SizedBox(
+            width: 280,
+            child: Column(
+              children: [
+                Expanded(
+                  child: NavigationRail(
+                    extended: true,
+                    selectedIndex: selectedIndex,
+                    onDestinationSelected: (index) => _navigate(context, index),
+                    destinations: [
+                      for (final destination in _destinations)
+                        NavigationRailDestination(
+                          icon: Icon(destination.icon),
+                          selectedIcon: Icon(destination.selectedIcon),
+                          label: Text(destination.label),
+                        ),
+                    ],
+                  ),
                 ),
-            ],
+                const Divider(height: 1),
+                accountPanel,
+              ],
+            ),
           ),
           const VerticalDivider(width: 1),
           Expanded(child: child),
@@ -121,6 +157,113 @@ class AppShell extends StatelessWidget {
       ),
     );
   }
+}
+
+class _UserAccountPanel extends ConsumerStatefulWidget {
+  const _UserAccountPanel({required this.onSignedOut});
+
+  final VoidCallback onSignedOut;
+
+  @override
+  ConsumerState<_UserAccountPanel> createState() => _UserAccountPanelState();
+}
+
+class _UserAccountPanelState extends ConsumerState<_UserAccountPanel> {
+  bool _isSigningOut = false;
+
+  Future<void> _signOut() async {
+    if (_isSigningOut) return;
+
+    setState(() => _isSigningOut = true);
+    try {
+      await ref.read(authRepositoryProvider).signOut();
+      widget.onSignedOut();
+      if (mounted) context.go('/login');
+    } on Exception {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'La déconnexion a échoué. Vérifiez votre connexion et réessayez.',
+          ),
+        ),
+      );
+      setState(() => _isSigningOut = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = ref.watch(currentProfileProvider).value;
+    final user = ref.watch(currentAuthUserProvider);
+    final email = user?.email?.trim();
+    final displayName = _profileDisplayName(profile);
+    final primaryLabel = displayName ?? email ?? 'Compte connecté';
+    final showEmail =
+        email != null && email.isNotEmpty && email != primaryLabel;
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                child: Text(
+                  _accountInitial(primaryLabel),
+                  semanticsLabel: 'Compte utilisateur',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      primaryLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    if (showEmail)
+                      Text(
+                        email,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: _isSigningOut ? null : _signOut,
+            icon: _isSigningOut
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.logout),
+            label: Text(_isSigningOut ? 'Déconnexion…' : 'Se déconnecter'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String? _profileDisplayName(Profile? profile) {
+  if (profile == null) return null;
+  final name = '${profile.firstName.trim()} ${profile.lastName.trim()}'.trim();
+  return name.isEmpty ? null : name;
+}
+
+String _accountInitial(String label) {
+  final normalizedLabel = label.trim();
+  return normalizedLabel.isEmpty ? '?' : normalizedLabel[0].toUpperCase();
 }
 
 class _AppDestination {

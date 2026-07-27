@@ -23,9 +23,13 @@ enum ConcertVolunteerStatus {
 }
 
 enum MaraudeRole {
-  teamLeader('team_leader', 'Chef d’équipe'),
-  driver('driver', 'Conducteur'),
-  volunteer('volunteer', 'Bénévole');
+  teamLeader('team_leader', 'Chef.fe d’équipe'),
+  communication('communication', 'Chargé.e de communication'),
+  logistics('logistics', 'Chargé.e de logistique'),
+  collectionDistribution(
+    'collection_distribution',
+    'Chargé.e de récolte et distribution',
+  );
 
   const MaraudeRole(this.databaseValue, this.label);
 

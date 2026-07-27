@@ -4,8 +4,10 @@ import 'package:club_sandwich/features/collections/presentation/maraude_collecti
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_report.dart';
+import 'package:club_sandwich/features/concerts/presentation/concert_form.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_report_providers.dart';
+import 'package:club_sandwich/features/concerts/presentation/maraude_operational_report_card.dart';
 import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dart';
 import 'package:club_sandwich/features/distributions/data/maraude_distribution_providers.dart';
 import 'package:club_sandwich/features/distributions/domain/maraude_distribution.dart';
@@ -56,6 +58,16 @@ class _ConcertDetails extends ConsumerWidget {
     final canManageMaraude = volunteerSection.value?.isAdmin ?? false;
     final volunteerData = volunteerSection.value;
     final ownApplication = volunteerData?.ownApplication;
+    final isSelectedVolunteer =
+        ownApplication?.status == ConcertVolunteerStatus.selected;
+    final canEditOperationalReport =
+        canManageMaraude ||
+        (isSelectedVolunteer &&
+            ownApplication?.teamRole == MaraudeRole.teamLeader);
+    final canEditOperationalPhoto =
+        !canEditOperationalReport &&
+        isSelectedVolunteer &&
+        ownApplication?.teamRole == MaraudeRole.communication;
     final canViewReport =
         concert.maraudeStatus == MaraudeStatus.completed &&
         volunteerData != null &&
@@ -127,6 +139,17 @@ class _ConcertDetails extends ConsumerWidget {
                           canManage: canManageMaraude,
                         ),
                       ),
+                      if (concert.maraudeStatus == MaraudeStatus.inProgress ||
+                          concert.maraudeStatus == MaraudeStatus.completed ||
+                          concert.operationalReport != null)
+                        SizedBox(
+                          width: sectionWidth,
+                          child: MaraudeOperationalReportCard(
+                            concert: concert,
+                            canEdit: canEditOperationalReport,
+                            canEditPhoto: canEditOperationalPhoto,
+                          ),
+                        ),
                       if (canViewReport)
                         SizedBox(
                           width: sectionWidth,
@@ -141,7 +164,7 @@ class _ConcertDetails extends ConsumerWidget {
                         child: _ContactsSection(concert: concert),
                       ),
                       SizedBox(
-                        width: sectionWidth,
+                        width: availableWidth,
                         child: _VolunteersSection(concertId: concert.id),
                       ),
                       SizedBox(
@@ -174,7 +197,7 @@ class _ConcertDetails extends ConsumerWidget {
   Future<void> _edit(BuildContext context, WidgetRef ref) async {
     final updated = await showDialog<bool>(
       context: context,
-      builder: (context) => ConcertFormDialog(
+      builder: (context) => ConcertForm(
         initialConcert: concert,
         onSubmit: (draft) => ref
             .read(concertRepositoryProvider)
@@ -235,111 +258,54 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
                 : formatFrenchDateTime(concert.actualEndAt!),
             showDivider: widget.canManage,
           ),
-          if (widget.canManage)
-            switch (concert.maraudeStatus) {
-              MaraudeStatus.planned => FilledButton.icon(
-                key: const ValueKey('start-maraude'),
-                onPressed: _isSubmitting ? null : _confirmStart,
-                icon: _isSubmitting
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.play_arrow),
-                label: const Text('Démarrer la maraude'),
-              ),
-              MaraudeStatus.started => FilledButton.icon(
-                key: const ValueKey('complete-maraude'),
-                onPressed: _isSubmitting ? null : _confirmComplete,
-                icon: _isSubmitting
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.stop_circle_outlined),
-                label: const Text('Terminer la maraude'),
-              ),
-              MaraudeStatus.completed => const Text(
+          if (widget.canManage) ...[
+            DropdownButtonFormField<MaraudeStatus>(
+              key: const ValueKey('maraude-status-selector'),
+              initialValue: concert.maraudeStatus,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Modifier l’état'),
+              items: [
+                for (final status in MaraudeStatus.values)
+                  DropdownMenuItem(value: status, child: Text(status.label)),
+              ],
+              onChanged: _isSubmitting
+                  ? null
+                  : (status) {
+                      if (status != null && status != concert.maraudeStatus) {
+                        _setStatus(status);
+                      }
+                    },
+            ),
+            if (_isSubmitting) ...[
+              const SizedBox(height: 12),
+              const LinearProgressIndicator(),
+            ],
+            if (concert.maraudeStatus == MaraudeStatus.completed) ...[
+              const SizedBox(height: 12),
+              const Text(
                 'Maraude terminée',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
-            },
+            ],
+            if (concert.maraudeStatus == MaraudeStatus.cancelled &&
+                concert.cancellationReason != null) ...[
+              const SizedBox(height: 12),
+              Text('Motif : ${concert.cancellationReason}'),
+            ],
+          ],
         ],
       ),
     );
   }
 
-  Future<void> _start() async {
-    await _changeStatus(
-      action: () =>
-          ref.read(concertRepositoryProvider).startMaraude(widget.concert.id),
-      successMessage: 'Maraude démarrée.',
-      errorMessage:
-          'Impossible de démarrer la maraude. '
-          'Vérifiez qu’au moins un bénévole sélectionné est présent.',
-    );
-  }
-
-  Future<void> _complete() async {
+  Future<void> _setStatus(MaraudeStatus status) async {
     await _changeStatus(
       action: () => ref
           .read(concertRepositoryProvider)
-          .completeMaraude(widget.concert.id),
-      successMessage: 'Maraude terminée.',
-      errorMessage: 'Impossible de terminer la maraude.',
+          .setMaraudeStatus(widget.concert.id, status),
+      successMessage: 'État de la maraude mis à jour.',
+      errorMessage: 'Impossible de modifier l’état de la maraude.',
     );
-  }
-
-  Future<void> _confirmStart() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Démarrer la maraude ?'),
-        content: const Text(
-          'L’heure réelle de début sera enregistrée. '
-          'La maraude ne pourra plus revenir en préparation.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Démarrer'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) await _start();
-  }
-
-  Future<void> _confirmComplete() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Terminer la maraude ?'),
-        content: const Text(
-          'La collecte et la distribution deviendront définitivement '
-          'en lecture seule.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
-            ),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Terminer'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) await _complete();
   }
 
   Future<void> _changeStatus({
@@ -376,9 +342,12 @@ class _MaraudeStatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final (icon, color) = switch (status) {
-      MaraudeStatus.planned => (Icons.schedule_outlined, colors.secondary),
-      MaraudeStatus.started => (Icons.play_circle_outline, colors.primary),
+      MaraudeStatus.draft => (Icons.edit_note_outlined, colors.outline),
+      MaraudeStatus.open => (Icons.campaign_outlined, colors.secondary),
+      MaraudeStatus.teamReady => (Icons.groups_outlined, colors.primary),
+      MaraudeStatus.inProgress => (Icons.play_circle_outline, colors.primary),
       MaraudeStatus.completed => (Icons.check_circle_outline, colors.tertiary),
+      MaraudeStatus.cancelled => (Icons.cancel_outlined, colors.error),
     };
 
     return Chip(
@@ -404,7 +373,8 @@ class _CollectionsSectionState extends ConsumerState<_CollectionsSection> {
   final Set<String> _deletingIds = {};
 
   bool get _canEdit =>
-      widget.canManage && widget.concert.maraudeStatus == MaraudeStatus.started;
+      widget.canManage &&
+      widget.concert.maraudeStatus == MaraudeStatus.inProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -672,7 +642,7 @@ class _DistributionSection extends ConsumerWidget {
   final bool canManage;
 
   bool get canEdit =>
-      canManage && concert.maraudeStatus == MaraudeStatus.started;
+      canManage && concert.maraudeStatus == MaraudeStatus.inProgress;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1002,6 +972,7 @@ class _ClosingCommentDialogState extends State<_ClosingCommentDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             TextField(
+              key: const ValueKey('closing-comment-field'),
               controller: _controller,
               enabled: !_isSubmitting,
               autofocus: true,
@@ -1255,6 +1226,32 @@ class _VenueSection extends StatelessWidget {
   }
 }
 
+enum _ApplicationFilter {
+  all('Tous'),
+  selected('Sélectionnés'),
+  pending('En attente'),
+  withdrawn('Désistés'),
+  notSelected('Non sélectionnés');
+
+  const _ApplicationFilter(this.label);
+
+  final String label;
+}
+
+extension on _ApplicationFilter {
+  bool matches(ConcertVolunteerStatus status) {
+    return switch (this) {
+      _ApplicationFilter.all => true,
+      _ApplicationFilter.selected => status == ConcertVolunteerStatus.selected,
+      _ApplicationFilter.pending => status == ConcertVolunteerStatus.pending,
+      _ApplicationFilter.withdrawn =>
+        status == ConcertVolunteerStatus.withdrawn,
+      _ApplicationFilter.notSelected =>
+        status == ConcertVolunteerStatus.notSelected,
+    };
+  }
+}
+
 class _VolunteersSection extends ConsumerStatefulWidget {
   const _VolunteersSection({required this.concertId});
 
@@ -1265,10 +1262,23 @@ class _VolunteersSection extends ConsumerStatefulWidget {
 }
 
 class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
+  static const _minimumTeamSize = 4;
+
   bool _isSubmitting = false;
-  bool _isBulkSelecting = false;
+  bool _isSavingTeam = false;
+  bool _teamDirty = false;
+  int _mobileTeamView = 0;
   final Set<String> _updatingApplications = {};
-  final Set<String> _selectedApplications = {};
+  final Map<String, MaraudeRole> _draftTeamRoles = {};
+  String? _serverTeamSignature;
+  final TextEditingController _searchController = TextEditingController();
+  _ApplicationFilter _filter = _ApplicationFilter.all;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1301,18 +1311,8 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
   }
 
   Widget _buildContent(ConcertVolunteerSectionData data) {
-    final teamApplications = data.applications
-        .where(
-          (application) =>
-              application.status == ConcertVolunteerStatus.selected,
-        )
-        .toList(growable: false);
-    final otherApplications = data.applications
-        .where(
-          (application) =>
-              application.status != ConcertVolunteerStatus.selected,
-        )
-        .toList(growable: false);
+    _synchronizeTeamDraft(data.applications);
+    final visibleApplications = _visibleApplications(data.applications);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1345,69 +1345,230 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
                 data.ownApplication!.status == ConcertVolunteerStatus.withdrawn
                 ? null
                 : _withdraw,
+            onReapply:
+                data.ownApplication!.status == ConcertVolunteerStatus.withdrawn
+                ? _reapply
+                : null,
           ),
         if (data.isAdmin) ...[
           const Divider(height: 32),
-          _TeamAttendanceSummary(counts: data.attendanceCounts),
-          const SizedBox(height: 12),
-          if (teamApplications.isEmpty)
-            const Text('Aucun bénévole sélectionné.')
-          else
-            for (final application in teamApplications)
-              _AdminApplication(
-                application: application,
-                isUpdating: _updatingApplications.contains(application.id),
-                isChosen: false,
-                onSelectionChanged: (_) {},
-                onStatusChanged: (status) => _setStatus(application.id, status),
-                onRoleChanged: (role) => _setTeamRole(application.id, role),
-                onAttendanceChanged: (status) =>
-                    _setAttendanceStatus(application.id, status),
-              ),
-          const Divider(height: 32),
-          Text('Candidatures', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton.icon(
-              onPressed: _selectedApplications.isEmpty || _isBulkSelecting
-                  ? null
-                  : _selectVolunteers,
-              icon: _isBulkSelecting
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.group_add_outlined),
-              label: const Text('Sélectionner les bénévoles'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (otherApplications.isEmpty)
-            const Text('Aucune candidature.')
-          else
-            for (final application in otherApplications)
-              _AdminApplication(
-                application: application,
-                isUpdating: _updatingApplications.contains(application.id),
-                isChosen: _selectedApplications.contains(application.id),
-                onSelectionChanged: (selected) {
-                  setState(() {
-                    if (selected) {
-                      _selectedApplications.add(application.id);
-                    } else {
-                      _selectedApplications.remove(application.id);
-                    }
-                  });
-                },
-                onStatusChanged: (status) => _setStatus(application.id, status),
-                onRoleChanged: (role) => _setTeamRole(application.id, role),
-                onAttendanceChanged: (status) =>
-                    _setAttendanceStatus(application.id, status),
-              ),
+          _buildTeamBuilder(data, visibleApplications),
         ],
       ],
     );
+  }
+
+  Widget _buildTeamBuilder(
+    ConcertVolunteerSectionData data,
+    List<ConcertVolunteerApplication> visibleApplications,
+  ) {
+    final candidates = Column(
+      key: const ValueKey('team-candidates-column'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Candidatures',
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('volunteer-search-field'),
+          controller: _searchController,
+          onChanged: (_) => setState(() {}),
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            labelText: 'Rechercher',
+            hintText: 'Nom, téléphone ou e-mail',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _searchController.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Effacer la recherche',
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.clear),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final filter in _ApplicationFilter.values)
+              FilterChip(
+                key: ValueKey('volunteer-filter-${filter.name}'),
+                label: Text(filter.label),
+                selected: _filter == filter,
+                onSelected: (_) => setState(() => _filter = filter),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (visibleApplications.isEmpty)
+          const _FilteredApplicationsEmptyState()
+        else
+          for (final application in visibleApplications)
+            _TeamCandidateCard(
+              application: application,
+              selectedRole: _draftTeamRoles[application.id],
+              isUpdating: _updatingApplications.contains(application.id),
+              isRoleAvailable: (role) => _isRoleAvailable(role, application.id),
+              onSelect: () => _selectInDraft(application.id),
+              onRemove: () => _removeFromDraft(application.id),
+              onRoleChanged: (role) => _assignDraftRole(application.id, role),
+              onAttendanceChanged:
+                  application.status == ConcertVolunteerStatus.selected
+                  ? (status) => _setAttendanceStatus(application.id, status)
+                  : null,
+            ),
+      ],
+    );
+
+    final summary = _TeamBuilderSummary(
+      applications: data.applications,
+      roles: _draftTeamRoles,
+      minimumTeamSize: _minimumTeamSize,
+      isDirty: _teamDirty,
+      isSaving: _isSavingTeam,
+      attendanceCounts: data.attendanceCounts,
+      onSave: _canSaveTeam ? _saveTeam : null,
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 900) {
+          return Row(
+            key: const ValueKey('team-builder-desktop'),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 2, child: candidates),
+              const SizedBox(width: 24),
+              SizedBox(width: 320, child: summary),
+            ],
+          );
+        }
+
+        return Column(
+          key: const ValueKey('team-builder-mobile'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SegmentedButton<int>(
+              key: const ValueKey('team-mobile-tabs'),
+              segments: const [
+                ButtonSegment(value: 0, label: Text('Candidatures')),
+                ButtonSegment(value: 1, label: Text('Équipe')),
+              ],
+              selected: {_mobileTeamView},
+              onSelectionChanged: (selection) =>
+                  setState(() => _mobileTeamView = selection.single),
+            ),
+            const SizedBox(height: 16),
+            if (_mobileTeamView == 0) candidates else summary,
+          ],
+        );
+      },
+    );
+  }
+
+  bool get _canSaveTeam {
+    return _teamDirty && !_isSavingTeam;
+  }
+
+  void _synchronizeTeamDraft(List<ConcertVolunteerApplication> applications) {
+    final serverMembers =
+        applications
+            .where(
+              (application) =>
+                  application.status == ConcertVolunteerStatus.selected,
+            )
+            .map(
+              (application) =>
+                  '${application.id}:${application.teamRole?.databaseValue}',
+            )
+            .toList()
+          ..sort();
+    final signature = serverMembers.join('|');
+    if (_serverTeamSignature == signature || _teamDirty) return;
+
+    _serverTeamSignature = signature;
+    _draftTeamRoles
+      ..clear()
+      ..addEntries(
+        applications
+            .where(
+              (application) =>
+                  application.status == ConcertVolunteerStatus.selected,
+            )
+            .map(
+              (application) => MapEntry(
+                application.id,
+                application.teamRole ?? MaraudeRole.collectionDistribution,
+              ),
+            ),
+      );
+  }
+
+  List<ConcertVolunteerApplication> _visibleApplications(
+    List<ConcertVolunteerApplication> applications,
+  ) {
+    final query = _normalizeVolunteerSearch(_searchController.text);
+    final visible =
+        applications.where((application) {
+          final effectiveStatus = _draftTeamRoles.containsKey(application.id)
+              ? ConcertVolunteerStatus.selected
+              : application.status == ConcertVolunteerStatus.selected
+              ? ConcertVolunteerStatus.notSelected
+              : application.status;
+          if (!_filter.matches(effectiveStatus)) return false;
+          if (query.isEmpty) return true;
+
+          final profile = application.profile;
+          final searchableValue = _normalizeVolunteerSearch(
+            [
+              application.displayName,
+              profile?.phone,
+              profile?.email,
+            ].whereType<String>().join(' '),
+          );
+          return searchableValue.contains(query);
+        }).toList()..sort((left, right) {
+          final leftSelected = _draftTeamRoles.containsKey(left.id);
+          final rightSelected = _draftTeamRoles.containsKey(right.id);
+          if (leftSelected != rightSelected) return leftSelected ? -1 : 1;
+          return _compareApplications(left, right);
+        });
+    return visible;
+  }
+
+  bool _isRoleAvailable(MaraudeRole role, String applicationId) {
+    return true;
+  }
+
+  void _selectInDraft(String applicationId) {
+    setState(() {
+      _draftTeamRoles[applicationId] = MaraudeRole.collectionDistribution;
+      _teamDirty = true;
+    });
+  }
+
+  void _removeFromDraft(String applicationId) {
+    setState(() {
+      _draftTeamRoles.remove(applicationId);
+      _teamDirty = true;
+    });
+  }
+
+  void _assignDraftRole(String applicationId, MaraudeRole role) {
+    if (!_isRoleAvailable(role, applicationId)) return;
+    setState(() {
+      _draftTeamRoles[applicationId] = role;
+      _teamDirty = true;
+    });
   }
 
   Future<void> _apply() async {
@@ -1485,72 +1646,51 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
     }
   }
 
-  Future<void> _setStatus(
-    String applicationId,
-    ConcertVolunteerStatus status,
-  ) async {
-    setState(() => _updatingApplications.add(applicationId));
+  Future<void> _reapply() async {
+    setState(() => _isSubmitting = true);
     try {
       await ref
           .read(concertVolunteerRepositoryProvider)
-          .setStatus(applicationId, status);
-      _selectedApplications.remove(applicationId);
+          .reapply(widget.concertId);
       ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Candidature : ${status.label}.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Votre disponibilité a été transmise.')),
+      );
     } catch (error) {
       if (!mounted) return;
-      _showError('Impossible de modifier cette candidature.');
+      _showError('Impossible de renouveler votre disponibilité.');
     } finally {
-      if (mounted) {
-        setState(() => _updatingApplications.remove(applicationId));
-      }
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
-  Future<void> _selectVolunteers() async {
-    setState(() => _isBulkSelecting = true);
+  Future<void> _saveTeam() async {
+    setState(() => _isSavingTeam = true);
     try {
       await ref
           .read(concertVolunteerRepositoryProvider)
-          .selectVolunteers(widget.concertId, _selectedApplications);
-      _selectedApplications.clear();
+          .saveTeam(
+            widget.concertId,
+            _draftTeamRoles.entries.map(
+              (entry) => MaraudeTeamMemberDraft(
+                applicationId: entry.key,
+                role: entry.value,
+              ),
+            ),
+          );
+      _teamDirty = false;
+      _serverTeamSignature = null;
       ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Bénévoles sélectionnés.')));
+      ).showSnackBar(const SnackBar(content: Text('Équipe enregistrée.')));
     } catch (error) {
       if (!mounted) return;
-      _showError('Impossible de sélectionner ces bénévoles.');
+      _showError('Impossible d’enregistrer l’équipe.');
     } finally {
-      if (mounted) setState(() => _isBulkSelecting = false);
-    }
-  }
-
-  Future<void> _setTeamRole(String applicationId, MaraudeRole role) async {
-    setState(() => _updatingApplications.add(applicationId));
-    try {
-      await ref
-          .read(concertVolunteerRepositoryProvider)
-          .setTeamRole(applicationId, role);
-      ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Rôle : ${role.label}.')));
-    } on TeamLeaderAlreadyAssignedException {
-      if (!mounted) return;
-      _showError('Un chef d’équipe est déjà attribué à ce concert.');
-    } catch (error) {
-      if (!mounted) return;
-      _showError('Impossible de modifier ce rôle.');
-    } finally {
-      if (mounted) {
-        setState(() => _updatingApplications.remove(applicationId));
-      }
+      if (mounted) setState(() => _isSavingTeam = false);
     }
   }
 
@@ -1590,11 +1730,13 @@ class _OwnApplication extends StatelessWidget {
     required this.application,
     required this.isSubmitting,
     required this.onWithdraw,
+    required this.onReapply,
   });
 
   final ConcertVolunteerApplication application;
   final bool isSubmitting;
   final VoidCallback? onWithdraw;
+  final VoidCallback? onReapply;
 
   @override
   Widget build(BuildContext context) {
@@ -1629,126 +1771,378 @@ class _OwnApplication extends StatelessWidget {
                 : const Text('Je me désiste'),
           ),
         ],
+        if (onReapply != null) ...[
+          const SizedBox(height: 4),
+          FilledButton(
+            key: const ValueKey('reapply-to-concert'),
+            onPressed: isSubmitting ? null : onReapply,
+            child: isSubmitting
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Je suis de nouveau disponible'),
+          ),
+        ],
       ],
     );
   }
 }
 
-class _AdminApplication extends StatelessWidget {
-  const _AdminApplication({
+class _TeamBuilderSummary extends StatelessWidget {
+  const _TeamBuilderSummary({
+    required this.applications,
+    required this.roles,
+    required this.minimumTeamSize,
+    required this.isDirty,
+    required this.isSaving,
+    required this.attendanceCounts,
+    required this.onSave,
+  });
+
+  final List<ConcertVolunteerApplication> applications;
+  final Map<String, MaraudeRole> roles;
+  final int minimumTeamSize;
+  final bool isDirty;
+  final bool isSaving;
+  final TeamAttendanceCounts attendanceCounts;
+  final VoidCallback? onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasLeader = roles.containsValue(MaraudeRole.teamLeader);
+    final isRecommendedSize = roles.length >= minimumTeamSize;
+    final colors = Theme.of(context).colorScheme;
+
+    return Card.filled(
+      key: const ValueKey('team-builder-summary'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Équipe retenue',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${roles.length} / $minimumTeamSize bénévoles',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const Divider(height: 28),
+            _TeamRoleSummary(
+              label: 'Chef d’équipe',
+              names: _namesForRole(MaraudeRole.teamLeader),
+            ),
+            const Divider(height: 24),
+            _TeamRoleSummary(
+              label: 'Communication',
+              names: _namesForRole(MaraudeRole.communication),
+            ),
+            const Divider(height: 24),
+            _TeamRoleSummary(
+              label: 'Logistique',
+              names: _namesForRole(MaraudeRole.logistics),
+            ),
+            const Divider(height: 24),
+            _TeamRoleSummary(
+              label: 'Récolte & distribution',
+              names: _namesForRole(MaraudeRole.collectionDistribution),
+            ),
+            const Divider(height: 28),
+            Row(
+              children: [
+                Icon(
+                  isRecommendedSize
+                      ? Icons.check_circle_outline
+                      : Icons.pending_actions_outlined,
+                  color: isRecommendedSize ? colors.primary : colors.tertiary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isRecommendedSize
+                        ? 'Équipe enregistrable'
+                        : '${roles.length} bénévole${roles.length > 1 ? 's' : ''} — '
+                              '$minimumTeamSize sont généralement recommandés.',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              key: const ValueKey('save-maraude-team'),
+              onPressed: onSave,
+              icon: isSaving
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check),
+              label: Text(
+                !isDirty ? 'Équipe enregistrée' : 'Enregistrer l’équipe',
+              ),
+            ),
+            if (!hasLeader) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Aucun rôle Chef.fe d’équipe n’est attribué. '
+                'Cette recommandation ne bloque pas l’enregistrement.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+            if (attendanceCounts.selectedCount > 0) ...[
+              const Divider(height: 28),
+              _TeamAttendanceSummary(counts: attendanceCounts),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<String> _namesForRole(MaraudeRole role) {
+    final applicationsById = {
+      for (final application in applications) application.id: application,
+    };
+    return roles.entries
+        .where((entry) => entry.value == role)
+        .map((entry) => applicationsById[entry.key]?.displayName ?? 'Bénévole')
+        .toList(growable: false);
+  }
+}
+
+class _TeamRoleSummary extends StatelessWidget {
+  const _TeamRoleSummary({required this.label, required this.names});
+
+  final String label;
+  final List<String> names;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.labelMedium),
+        const SizedBox(height: 4),
+        Text(names.isEmpty ? '—' : names.join('\n')),
+      ],
+    );
+  }
+}
+
+class _FilteredApplicationsEmptyState extends StatelessWidget {
+  const _FilteredApplicationsEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 24),
+      child: Center(child: Text('Aucune candidature ne correspond.')),
+    );
+  }
+}
+
+class _ApplicationStatusChip extends StatelessWidget {
+  const _ApplicationStatusChip({required this.status});
+
+  final ConcertVolunteerStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final (backgroundColor, foregroundColor) = switch (status) {
+      ConcertVolunteerStatus.selected => (
+        colors.primaryContainer,
+        colors.onPrimaryContainer,
+      ),
+      ConcertVolunteerStatus.pending => (
+        colors.secondaryContainer,
+        colors.onSecondaryContainer,
+      ),
+      ConcertVolunteerStatus.withdrawn => (
+        colors.surfaceContainerHighest,
+        colors.onSurfaceVariant,
+      ),
+      ConcertVolunteerStatus.notSelected => (
+        colors.errorContainer,
+        colors.onErrorContainer,
+      ),
+    };
+
+    return Chip(
+      visualDensity: VisualDensity.compact,
+      backgroundColor: backgroundColor,
+      side: BorderSide.none,
+      label: Text(status.label, style: TextStyle(color: foregroundColor)),
+    );
+  }
+}
+
+class _TeamCandidateCard extends StatelessWidget {
+  const _TeamCandidateCard({
     required this.application,
+    required this.selectedRole,
     required this.isUpdating,
-    required this.isChosen,
-    required this.onSelectionChanged,
-    required this.onStatusChanged,
+    required this.isRoleAvailable,
+    required this.onSelect,
+    required this.onRemove,
     required this.onRoleChanged,
     required this.onAttendanceChanged,
   });
 
   final ConcertVolunteerApplication application;
+  final MaraudeRole? selectedRole;
   final bool isUpdating;
-  final bool isChosen;
-  final ValueChanged<bool> onSelectionChanged;
-  final ValueChanged<ConcertVolunteerStatus> onStatusChanged;
+  final bool Function(MaraudeRole role) isRoleAvailable;
+  final VoidCallback onSelect;
+  final VoidCallback onRemove;
   final ValueChanged<MaraudeRole> onRoleChanged;
-  final ValueChanged<VolunteerAttendanceStatus> onAttendanceChanged;
+  final ValueChanged<VolunteerAttendanceStatus>? onAttendanceChanged;
 
   @override
   Widget build(BuildContext context) {
     final profile = application.profile;
-    final phone = profile?.phone?.trim();
     final statistics = application.statistics;
+    final isSelected = selectedRole != null;
+    final effectiveStatus = isSelected
+        ? ConcertVolunteerStatus.selected
+        : application.status == ConcertVolunteerStatus.selected
+        ? ConcertVolunteerStatus.notSelected
+        : application.status;
 
     return Card(
       key: ValueKey('volunteer-card-${application.id}'),
       clipBehavior: Clip.antiAlias,
       margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () => _showVolunteerProfileDialog(context, application),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (application.status !=
-                      ConcertVolunteerStatus.selected) ...[
-                    Checkbox(
-                      value: isChosen,
-                      onChanged:
-                          isUpdating ||
-                              application.status ==
-                                  ConcertVolunteerStatus.withdrawn
-                          ? null
-                          : (value) => onSelectionChanged(value ?? false),
-                      semanticLabel: 'Sélectionner ${application.displayName}',
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => _showVolunteerProfileDialog(context, application),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _VolunteerAvatar(profile: profile),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            application.displayName,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              _ApplicationStatusChip(status: effectiveStatus),
+                              if (isSelected)
+                                const Chip(
+                                  visualDensity: VisualDensity.compact,
+                                  avatar: Icon(
+                                    Icons.assignment_ind_outlined,
+                                    size: 18,
+                                  ),
+                                  label: Text('Rôle attribué'),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(width: 4),
+                    const Icon(Icons.open_in_new, size: 18),
                   ],
-                  _VolunteerAvatar(profile: profile),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          application.displayName,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 6),
-                        Chip(
-                          visualDensity: VisualDensity.compact,
-                          label: Text(application.status.label),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              if (phone?.isNotEmpty == true) ...[
-                const SizedBox(height: 12),
-                _ProfileIconLine(icon: Icons.phone_outlined, text: phone!),
-              ],
-              const SizedBox(height: 8),
-              _ProfileIconLine(
-                icon: Icons.directions_car_outlined,
-                text: 'Permis : ${_booleanLabel(profile?.hasDrivingLicense)}',
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 6,
-                children: [
-                  Text(_totalApplicationsLabel(statistics.totalApplications)),
-                  Text(_selectedMissionsLabel(statistics.selectedApplications)),
-                  Text(_withdrawalsLabel(statistics.withdrawnApplications)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (application.status == ConcertVolunteerStatus.selected) ...[
-                DropdownButtonFormField<MaraudeRole>(
-                  key: ValueKey(
-                    'team-role-${application.id}-${application.teamRole}',
-                  ),
-                  initialValue: application.teamRole,
-                  decoration: const InputDecoration(
-                    labelText: 'Rôle dans la maraude',
-                    hintText: 'Aucun rôle attribué',
-                  ),
-                  items: [
-                    for (final role in MaraudeRole.values)
-                      DropdownMenuItem(value: role, child: Text(role.label)),
-                  ],
-                  onChanged: isUpdating
-                      ? null
-                      : (role) {
-                          if (role != null) onRoleChanged(role);
-                        },
                 ),
-                const SizedBox(height: 12),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 20,
+              runSpacing: 10,
+              children: [
+                _CandidateFact(
+                  label: 'Maraudes',
+                  value: '${statistics.selectedApplications}',
+                ),
+                _CandidateFact(
+                  label: 'Dernière participation',
+                  value: _compactDateOrNone(statistics.lastSelectedDate),
+                ),
+                _CandidateFact(
+                  label: 'Désistements',
+                  value: statistics.withdrawnApplications == 0
+                      ? 'Aucun'
+                      : '${statistics.withdrawnApplications}',
+                ),
+                _CandidateFact(
+                  label: 'Disponibilité',
+                  value: application.status == ConcertVolunteerStatus.withdrawn
+                      ? 'Non disponible'
+                      : 'Confirmée',
+                ),
+              ],
+            ),
+            const Divider(height: 28),
+            if (!isSelected)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton(
+                  key: ValueKey('select-volunteer-${application.id}'),
+                  onPressed:
+                      isUpdating ||
+                          application.status == ConcertVolunteerStatus.withdrawn
+                      ? null
+                      : onSelect,
+                  child: const Text('Sélectionner'),
+                ),
+              )
+            else ...[
+              Text(
+                'Rôle dans la maraude',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 6),
+              RadioGroup<MaraudeRole>(
+                groupValue: selectedRole,
+                onChanged: (value) {
+                  if (value != null && isRoleAvailable(value)) {
+                    onRoleChanged(value);
+                  }
+                },
+                child: Column(
+                  children: [
+                    for (final role in MaraudeRole.values)
+                      RadioListTile<MaraudeRole>(
+                        key: ValueKey(
+                          'team-role-${application.id}-${role.name}',
+                        ),
+                        value: role,
+                        enabled:
+                            !isUpdating &&
+                            (isRoleAvailable(role) || selectedRole == role),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(role.label),
+                      ),
+                  ],
+                ),
+              ),
+              if (onAttendanceChanged != null) ...[
+                const SizedBox(height: 8),
                 DropdownButtonFormField<VolunteerAttendanceStatus>(
                   key: ValueKey(
                     'attendance-${application.id}-'
@@ -1769,50 +2163,56 @@ class _AdminApplication extends StatelessWidget {
                     for (final status in VolunteerAttendanceStatus.values)
                       DropdownMenuItem(
                         value: status,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _attendanceIcon(status),
-                              color: _attendanceColor(context, status),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(status.label),
-                          ],
-                        ),
+                        child: Text(status.label),
                       ),
                   ],
                   onChanged: isUpdating
                       ? null
-                      : (status) {
-                          if (status != null) onAttendanceChanged(status);
+                      : (value) {
+                          if (value != null) onAttendanceChanged!(value);
                         },
                 ),
-                const SizedBox(height: 12),
               ],
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  OutlinedButton(
-                    onPressed:
-                        isUpdating ||
-                            application.status ==
-                                ConcertVolunteerStatus.notSelected ||
-                            application.status ==
-                                ConcertVolunteerStatus.withdrawn
-                        ? null
-                        : () => onStatusChanged(
-                            ConcertVolunteerStatus.notSelected,
-                          ),
-                    child: const Text('Ne pas sélectionner'),
-                  ),
-                ],
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: ValueKey('remove-volunteer-${application.id}'),
+                  onPressed: isUpdating ? null : onRemove,
+                  icon: const Icon(Icons.person_remove_outlined),
+                  label: const Text('Retirer'),
+                ),
               ),
             ],
-          ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _CandidateFact extends StatelessWidget {
+  const _CandidateFact({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 120),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.labelSmall),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
     );
   }
@@ -1927,25 +2327,6 @@ class _VolunteerAvatar extends StatelessWidget {
   }
 }
 
-class _ProfileIconLine extends StatelessWidget {
-  const _ProfileIconLine({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 18),
-        const SizedBox(width: 8),
-        Flexible(child: Text(text)),
-      ],
-    );
-  }
-}
-
 Future<void> _showVolunteerProfileDialog(
   BuildContext context,
   ConcertVolunteerApplication application,
@@ -1985,6 +2366,10 @@ Future<void> _showVolunteerProfileDialog(
               _ProfileDetailRow(
                 label: 'Téléphone',
                 value: _optionalValue(profile?.phone),
+              ),
+              _ProfileDetailRow(
+                label: 'E-mail',
+                value: _optionalValue(profile?.email),
               ),
               _ProfileDetailRow(
                 label: 'Permis',
@@ -2160,6 +2545,62 @@ String _notSelectedMissionsLabel(int count) {
 
 String _withdrawalsLabel(int count) {
   return '$count ${count == 1 ? 'désistement' : 'désistements'}';
+}
+
+int _compareApplications(
+  ConcertVolunteerApplication first,
+  ConcertVolunteerApplication second,
+) {
+  final statusComparison = _statusOrder(
+    first.status,
+  ).compareTo(_statusOrder(second.status));
+  if (statusComparison != 0) return statusComparison;
+  return _normalizeVolunteerSearch(
+    first.displayName,
+  ).compareTo(_normalizeVolunteerSearch(second.displayName));
+}
+
+int _statusOrder(ConcertVolunteerStatus status) {
+  return switch (status) {
+    ConcertVolunteerStatus.selected => 0,
+    ConcertVolunteerStatus.pending => 1,
+    ConcertVolunteerStatus.withdrawn => 2,
+    ConcertVolunteerStatus.notSelected => 3,
+  };
+}
+
+String _normalizeVolunteerSearch(String value) {
+  var normalized = value.trim().toLowerCase();
+  const replacements = {
+    'à': 'a',
+    'â': 'a',
+    'ä': 'a',
+    'ç': 'c',
+    'é': 'e',
+    'è': 'e',
+    'ê': 'e',
+    'ë': 'e',
+    'î': 'i',
+    'ï': 'i',
+    'ô': 'o',
+    'ö': 'o',
+    'ù': 'u',
+    'û': 'u',
+    'ü': 'u',
+    'ÿ': 'y',
+    'œ': 'oe',
+  };
+  for (final replacement in replacements.entries) {
+    normalized = normalized.replaceAll(replacement.key, replacement.value);
+  }
+  return normalized;
+}
+
+String _compactDateOrNone(DateTime? value) {
+  if (value == null) return 'Aucune';
+  final day = value.day.toString().padLeft(2, '0');
+  final month = value.month.toString().padLeft(2, '0');
+  return '$day/$month';
 }
 
 String _booleanLabel(bool? value) {

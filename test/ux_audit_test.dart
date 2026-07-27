@@ -1,12 +1,14 @@
 import 'package:club_sandwich/core/config/environment.dart';
 import 'package:club_sandwich/core/theme/app_theme.dart';
+import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/presentation/login_screen.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
-import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dart';
+import 'package:club_sandwich/features/concerts/presentation/concert_form.dart';
 import 'package:club_sandwich/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:club_sandwich/features/distributions/presentation/maraude_distribution_form_dialog.dart';
+import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
 import 'package:club_sandwich/shared/widgets/app_shell.dart';
@@ -46,16 +48,24 @@ void main() {
   testWidgets('le shell reste lisible sur mobile et desktop', (tester) async {
     await _setViewport(tester, const Size(320, 640));
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light,
-        home: const AppShell(location: '/dashboard', child: DashboardScreen()),
+      ProviderScope(
+        overrides: [
+          currentProfileProvider.overrideWith((ref) async => null),
+          currentAuthUserProvider.overrideWithValue(null),
+          maraudeOverviewProvider.overrideWith((ref) async => const []),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: const AppShell(
+            location: '/dashboard',
+            child: DashboardScreen(),
+          ),
+        ),
       ),
     );
+    await tester.pumpAndSettle();
 
-    expect(
-      find.text('Aucun indicateur disponible pour le moment.'),
-      findsOneWidget,
-    );
+    expect(find.text('Aucune action en attente.'), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
     expect(tester.takeException(), isNull);
 
@@ -194,7 +204,7 @@ void main() {
       ProviderScope(
         child: MaterialApp(
           theme: AppTheme.light,
-          home: const Scaffold(body: CreateConcertDialog()),
+          home: Scaffold(body: ConcertForm(onSubmit: (_) async {})),
         ),
       ),
     );

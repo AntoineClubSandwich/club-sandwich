@@ -1,11 +1,19 @@
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class TeamLeaderAlreadyAssignedException implements Exception {
-  const TeamLeaderAlreadyAssignedException();
+class MaraudeTeamMemberDraft {
+  const MaraudeTeamMemberDraft({
+    required this.applicationId,
+    required this.role,
+  });
 
-  @override
-  String toString() => 'Un chef d’équipe est déjà attribué à ce concert.';
+  final String applicationId;
+  final MaraudeRole role;
+
+  Map<String, dynamic> toJson() => {
+    'application_id': applicationId,
+    'team_role': role.databaseValue,
+  };
 }
 
 class ConcertVolunteerRepository {
@@ -51,6 +59,13 @@ class ConcertVolunteerRepository {
         .single();
 
     return ConcertVolunteerApplication.fromJson(row);
+  }
+
+  Future<void> reapply(String concertId) async {
+    await client.rpc<void>(
+      'reapply_to_concert',
+      params: {'requested_concert_id': concertId},
+    );
   }
 
   Future<void> withdraw(String applicationId) async {
@@ -103,18 +118,25 @@ class ConcertVolunteerRepository {
     );
   }
 
+  Future<void> saveTeam(
+    String concertId,
+    Iterable<MaraudeTeamMemberDraft> members,
+  ) async {
+    final team = members.toList(growable: false);
+    await client.rpc<void>(
+      'save_maraude_team',
+      params: {
+        'requested_concert_id': concertId,
+        'requested_team': team.map((member) => member.toJson()).toList(),
+      },
+    );
+  }
+
   Future<void> setTeamRole(String applicationId, MaraudeRole role) async {
-    try {
-      await client
-          .from('concert_volunteers')
-          .update({'team_role': role.databaseValue})
-          .eq('id', applicationId);
-    } on PostgrestException catch (error) {
-      if (error.code == '23505') {
-        throw const TeamLeaderAlreadyAssignedException();
-      }
-      rethrow;
-    }
+    await client
+        .from('concert_volunteers')
+        .update({'team_role': role.databaseValue})
+        .eq('id', applicationId);
   }
 
   Future<void> setAttendanceStatus(
