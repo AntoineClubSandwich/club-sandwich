@@ -1,0 +1,1062 @@
+import 'dart:convert';
+
+import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
+import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
+import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
+import 'package:club_sandwich/features/volunteers/data/concert_volunteer_repository.dart';
+import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
+import 'package:club_sandwich/features/volunteers/domain/volunteer_profile.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart';
+import 'package:http/testing.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'helpers/test_data.dart';
+
+void main() {
+  group('ConcertVolunteerApplication', () {
+    test('parse, sérialise, copie et compare une candidature', () {
+      final application = ConcertVolunteerApplication.fromJson({
+        'id': 'application-id',
+        'concert_id': 'concert-id',
+        'user_id': 'user-id',
+        'status': 'pending',
+        'team_role': null,
+        'created_at': '2026-07-25T10:00:00.000Z',
+        'updated_at': '2026-07-25T10:30:00.000Z',
+        'profile': {'first_name': 'Camille', 'last_name': 'Martin'},
+      });
+
+      expect(application.status.label, 'En attente');
+      expect(application.displayName, 'Camille Martin');
+      expect(application.toJson()['status'], 'pending');
+      expect(application.teamRole, isNull);
+      expect(application.attendanceStatus, isNull);
+      expect(application.copyWith(), application);
+      expect(
+        application.copyWith(status: ConcertVolunteerStatus.selected).status,
+        ConcertVolunteerStatus.selected,
+      );
+    });
+
+    test('gère un profil absent et rejette un statut inconnu', () {
+      final application = _application();
+
+      expect(application.displayName, 'Bénévole');
+      expect(
+        () => ConcertVolunteerStatus.fromDatabase('accepted'),
+        throwsFormatException,
+      );
+      expect(ConcertVolunteerStatus.notSelected.label, 'Non sélectionné');
+      expect(ConcertVolunteerStatus.withdrawn.label, 'Désisté');
+    });
+
+    test('parse des compteurs absents comme zéro', () {
+      expect(ConcertVolunteerCounts.fromJson(const {}).applicationCount, 0);
+      expect(ConcertVolunteerCounts.fromJson(const {}).selectedCount, 0);
+    });
+
+    test('parse un profil bénévole complet et ses statistiques', () {
+      final application = ConcertVolunteerApplication.fromJson({
+        ..._applicationJson(),
+        'first_name': 'Camille',
+        'last_name': 'Martin',
+        'phone': '+33 6 00 00 00 00',
+        'avatar_url': 'https://example.test/avatar.png',
+        'birth_date': '1992-04-12',
+        'has_driving_license': true,
+        'can_lift_heavy_loads': false,
+        'emergency_contact_name': 'Sophie Martin',
+        'emergency_contact_phone': '+33 6 99 99 99 99',
+        'total_applications': 12,
+        'selected_applications': 8,
+        'not_selected_applications': 2,
+        'withdrawn_applications': 1,
+        'team_role': 'driver',
+        'attendance_status': 'present',
+        'last_selected_date': '2026-07-15',
+        'history': [
+          {
+            'concert_id': 'older-concert',
+            'concert_date': '2026-07-02',
+            'artist': 'Aupinard',
+            'venue_name': 'Bataclan',
+            'status': 'withdrawn',
+          },
+          {
+            'concert_id': 'recent-concert',
+            'concert_date': '2026-07-15',
+            'artist': 'The Blaze',
+            'venue_name': 'Olympia',
+            'status': 'selected',
+          },
+        ],
+      });
+
+      expect(application.profile!.birthDate, DateTime(1992, 4, 12));
+      expect(application.profile!.hasDrivingLicense, isTrue);
+      expect(application.profile!.canLiftHeavyLoads, isFalse);
+      expect(application.profile!.hasEmergencyContact, isTrue);
+      expect(application.statistics.totalApplications, 12);
+      expect(application.statistics.selectedApplications, 8);
+      expect(application.statistics.notSelectedApplications, 2);
+      expect(application.statistics.withdrawnApplications, 1);
+      expect(application.statistics.lastSelectedDate, DateTime(2026, 7, 15));
+      expect(application.statistics.history.first.artist, 'The Blaze');
+      expect(application.statistics.history.last.artist, 'Aupinard');
+      expect(application.teamRole, MaraudeRole.driver);
+      expect(application.attendanceStatus, VolunteerAttendanceStatus.present);
+      expect(application.toJson()['team_role'], 'driver');
+      expect(application.toJson()['attendance_status'], 'present');
+      expect(application.profile!.toJson()['birth_date'], '1992-04-12');
+    });
+
+    test('accepte une candidature sans profil bénévole', () {
+      final application = ConcertVolunteerApplication.fromJson(
+        _applicationJson(),
+      );
+
+      expect(application.profile, isNull);
+      expect(application.statistics.totalApplications, 0);
+      expect(application.displayName, 'Bénévole');
+    });
+
+    test('calcule les taux et masque ceux d’un historique vide', () {
+      final statistics = VolunteerStatistics.fromJson({
+        'total_applications': 9,
+        'selected_applications': 7,
+        'not_selected_applications': 1,
+        'withdrawn_applications': 1,
+      });
+      const emptyStatistics = VolunteerStatistics.empty();
+
+      expect(statistics.selectionRate, 78);
+      expect(statistics.withdrawalRate, 11);
+      expect(emptyStatistics.selectionRate, isNull);
+      expect(emptyStatistics.withdrawalRate, isNull);
+      expect(emptyStatistics.lastSelectedDate, isNull);
+    });
+
+    test('calcule les compteurs de présence des seuls sélectionnés', () {
+      final counts = TeamAttendanceCounts.fromApplications([
+        _application(status: ConcertVolunteerStatus.pending),
+        _application(
+          id: 'legacy-selected',
+          status: ConcertVolunteerStatus.selected,
+        ),
+        _application(
+          id: 'present',
+          status: ConcertVolunteerStatus.selected,
+          attendanceStatus: VolunteerAttendanceStatus.present,
+        ),
+        _application(
+          id: 'absent',
+          status: ConcertVolunteerStatus.selected,
+          attendanceStatus: VolunteerAttendanceStatus.absent,
+        ),
+      ]);
+
+      expect(counts.selectedCount, 3);
+      expect(counts.pendingCount, 1);
+      expect(counts.presentCount, 1);
+      expect(counts.absentCount, 1);
+    });
+  });
+
+  group('ConcertVolunteerRepository', () {
+    test(
+      'précharge en lot les profils et statistiques administrateur',
+      () async {
+        final requests = <Request>[];
+        final client = await _authenticatedClient((request) async {
+          requests.add(request);
+          final path = request.url.path;
+          if (path.endsWith('/get_concert_volunteer_counts')) {
+            return Response(
+              jsonEncode([
+                {'application_count': 1, 'selected_count': 0},
+              ]),
+              200,
+              headers: _jsonHeaders,
+              request: request,
+            );
+          }
+          if (path.endsWith('/memberships')) {
+            return Response(
+              jsonEncode([
+                {
+                  'role': 'admin',
+                  'organizations': {'kind': 'club_sandwich'},
+                },
+              ]),
+              200,
+              headers: _jsonHeaders,
+              request: request,
+            );
+          }
+          if (path.endsWith('/get_concert_volunteer_team_details')) {
+            return Response(
+              jsonEncode([
+                {
+                  ..._applicationJson(),
+                  'first_name': 'Camille',
+                  'last_name': 'Martin',
+                  'phone': '+33 6 00 00 00 00',
+                  'has_driving_license': true,
+                  'total_applications': 12,
+                  'selected_applications': 8,
+                  'not_selected_applications': 2,
+                  'withdrawn_applications': 1,
+                  'attendance_status': 'present',
+                  'last_selected_date': '2026-07-15',
+                  'history': [
+                    {
+                      'concert_id': 'recent-concert',
+                      'concert_date': '2026-07-15',
+                      'artist': 'The Blaze',
+                      'venue_name': 'Olympia',
+                      'status': 'selected',
+                    },
+                  ],
+                },
+              ]),
+              200,
+              headers: _jsonHeaders,
+              request: request,
+            );
+          }
+          return Response('Not found', 404, request: request);
+        });
+        addTearDown(client.dispose);
+
+        final section = await ConcertVolunteerRepository(
+          client,
+        ).fetchSection('concert-id');
+
+        expect(section.applications, hasLength(1));
+        expect(section.applications.single.displayName, 'Camille Martin');
+        expect(section.applications.single.statistics.totalApplications, 12);
+        expect(
+          section.applications.single.attendanceStatus,
+          VolunteerAttendanceStatus.present,
+        );
+        expect(requests, hasLength(3));
+        expect(
+          requests
+              .where(
+                (request) => request.url.path.endsWith(
+                  '/get_concert_volunteer_team_details',
+                ),
+              )
+              .length,
+          1,
+        );
+      },
+    );
+
+    test(
+      'crée une candidature pending et propage le doublon Supabase',
+      () async {
+        var requestCount = 0;
+        final client = await _authenticatedClient((request) async {
+          requestCount++;
+          if (requestCount == 1) {
+            final body = jsonDecode(request.body) as Map<String, dynamic>;
+            expect(body['concert_id'], 'concert-id');
+            expect(body['user_id'], 'user-id');
+            expect(body['status'], 'pending');
+            return Response(
+              jsonEncode(_applicationJson()),
+              201,
+              headers: _jsonHeaders,
+              request: request,
+            );
+          }
+          return Response(
+            jsonEncode({
+              'code': '23505',
+              'message': 'duplicate key value violates unique constraint',
+              'details': null,
+              'hint': null,
+            }),
+            409,
+            headers: _jsonHeaders,
+            request: request,
+          );
+        });
+        addTearDown(client.dispose);
+        final repository = ConcertVolunteerRepository(client);
+
+        final created = await repository.apply('concert-id');
+
+        expect(created.status, ConcertVolunteerStatus.pending);
+        expect(
+          repository.apply('concert-id'),
+          throwsA(isA<PostgrestException>()),
+        );
+      },
+    );
+
+    test('enregistre un désistement sans supprimer la ligne', () async {
+      late Request capturedRequest;
+      final client = await _authenticatedClient((request) async {
+        capturedRequest = request;
+        return Response('', 204, request: request);
+      });
+      addTearDown(client.dispose);
+
+      await ConcertVolunteerRepository(client).withdraw('application-id');
+
+      expect(capturedRequest.method, 'PATCH');
+      expect(capturedRequest.url.path, endsWith('/concert_volunteers'));
+      expect(jsonDecode(capturedRequest.body), {'status': 'withdrawn'});
+      expect(capturedRequest.url.queryParameters['id'], 'eq.application-id');
+      expect(capturedRequest.url.queryParameters['user_id'], 'eq.user-id');
+    });
+
+    test(
+      'limite le changement administrateur aux deux statuts prévus',
+      () async {
+        final requests = <Request>[];
+        final client = await _authenticatedClient((request) async {
+          requests.add(request);
+          return Response('', 204, request: request);
+        });
+        addTearDown(client.dispose);
+        final repository = ConcertVolunteerRepository(client);
+
+        await repository.setStatus(
+          'application-id',
+          ConcertVolunteerStatus.selected,
+        );
+        await repository.setStatus(
+          'application-id',
+          ConcertVolunteerStatus.notSelected,
+        );
+
+        expect(jsonDecode(requests[0].body), {'status': 'selected'});
+        expect(jsonDecode(requests[1].body), {'status': 'not_selected'});
+        expect(
+          () => repository.setStatus(
+            'application-id',
+            ConcertVolunteerStatus.pending,
+          ),
+          throwsArgumentError,
+        );
+      },
+    );
+
+    test('sélectionne plusieurs candidatures en une seule requête', () async {
+      late Request capturedRequest;
+      final client = await _authenticatedClient((request) async {
+        capturedRequest = request;
+        return Response('null', 200, headers: _jsonHeaders, request: request);
+      });
+      addTearDown(client.dispose);
+
+      await ConcertVolunteerRepository(
+        client,
+      ).selectVolunteers('concert-id', ['application-1', 'application-2']);
+
+      expect(
+        capturedRequest.url.path,
+        endsWith('/rpc/select_concert_volunteers'),
+      );
+      expect(jsonDecode(capturedRequest.body), {
+        'requested_concert_id': 'concert-id',
+        'requested_application_ids': ['application-1', 'application-2'],
+      });
+    });
+
+    test('enregistre un rôle et traduit le conflit de chef d’équipe', () async {
+      var requestCount = 0;
+      final client = await _authenticatedClient((request) async {
+        requestCount++;
+        if (requestCount == 1) {
+          expect(jsonDecode(request.body), {'team_role': 'driver'});
+          return Response('', 204, request: request);
+        }
+        return Response(
+          jsonEncode({
+            'code': '23505',
+            'message': 'duplicate key value violates unique constraint',
+            'details': null,
+            'hint': null,
+          }),
+          409,
+          headers: _jsonHeaders,
+          request: request,
+        );
+      });
+      addTearDown(client.dispose);
+      final repository = ConcertVolunteerRepository(client);
+
+      await repository.setTeamRole('application-id', MaraudeRole.driver);
+
+      expect(
+        repository.setTeamRole('another-application', MaraudeRole.teamLeader),
+        throwsA(isA<TeamLeaderAlreadyAssignedException>()),
+      );
+    });
+
+    test('enregistre les trois états de présence', () async {
+      final requests = <Request>[];
+      final client = await _authenticatedClient((request) async {
+        requests.add(request);
+        return Response('', 204, request: request);
+      });
+      addTearDown(client.dispose);
+      final repository = ConcertVolunteerRepository(client);
+
+      for (final status in VolunteerAttendanceStatus.values) {
+        await repository.setAttendanceStatus('application-id', status);
+      }
+
+      expect(requests.map((request) => jsonDecode(request.body)), [
+        {'attendance_status': 'pending'},
+        {'attendance_status': 'present'},
+        {'attendance_status': 'absent'},
+      ]);
+      expect(
+        requests.every(
+          (request) => request.url.queryParameters['id'] == 'eq.application-id',
+        ),
+        isTrue,
+      );
+    });
+  });
+
+  test('le provider se recharge après invalidation', () async {
+    final repository = _FakeConcertVolunteerRepository();
+    final container = ProviderContainer(
+      overrides: [
+        concertVolunteerRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(concertVolunteerSectionProvider('concert-id').future);
+    container.invalidate(concertVolunteerSectionProvider('concert-id'));
+    await container.read(concertVolunteerSectionProvider('concert-id').future);
+
+    expect(repository.fetchCount, 2);
+  });
+
+  testWidgets('crée une candidature et rafraîchit les compteurs', (
+    tester,
+  ) async {
+    final repository = _FakeConcertVolunteerRepository();
+    await _pumpDetail(tester, repository);
+
+    expect(find.text('0 candidatures'), findsOneWidget);
+    expect(find.text('Je me propose'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Je me propose'));
+    await tester.tap(find.text('Je me propose'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 candidature'), findsOneWidget);
+    expect(find.text('En attente'), findsOneWidget);
+    expect(find.text('Je me désiste'), findsOneWidget);
+    expect(
+      find.text(
+        'Votre candidature a été enregistrée.\n\n'
+        'Vous serez informé si vous êtes sélectionné.',
+      ),
+      findsOneWidget,
+    );
+    expect(repository.fetchCount, greaterThanOrEqualTo(2));
+  });
+
+  testWidgets('conserve la ligne lors du désistement', (tester) async {
+    final repository = _FakeConcertVolunteerRepository(
+      ownApplication: _application(),
+    );
+    await _pumpDetail(tester, repository);
+
+    await tester.ensureVisible(find.text('Je me désiste'));
+    await tester.tap(find.text('Je me désiste'));
+    await tester.pumpAndSettle();
+    expect(find.text('Confirmer le désistement ?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Je me désiste'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Désisté'), findsOneWidget);
+    expect(find.text('0 candidatures'), findsOneWidget);
+    expect(repository.ownApplication, isNotNull);
+    expect(repository.ownApplication!.status, ConcertVolunteerStatus.withdrawn);
+  });
+
+  testWidgets('le bénévole ouvre son propre historique', (tester) async {
+    final repository = _FakeConcertVolunteerRepository(
+      ownApplication: _application(
+        status: ConcertVolunteerStatus.selected,
+        teamRole: MaraudeRole.teamLeader,
+        statistics: VolunteerStatistics(
+          totalApplications: 1,
+          selectedApplications: 1,
+          notSelectedApplications: 0,
+          withdrawnApplications: 0,
+          lastSelectedDate: DateTime(2026, 7, 15),
+          history: [
+            VolunteerHistoryEntry(
+              concertId: 'recent-concert',
+              concertDate: DateTime(2026, 7, 15),
+              artist: 'The Blaze',
+              venueName: 'Olympia',
+              status: ConcertVolunteerStatus.selected,
+            ),
+          ],
+        ),
+      ),
+    );
+    await _pumpDetail(tester, repository);
+
+    await tester.ensureVisible(find.text('Voir mon profil'));
+    await tester.tap(find.text('Voir mon profil'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Historique des maraudes'), findsOneWidget);
+    expect(find.text('The Blaze'), findsOneWidget);
+    expect(find.text('Olympia'), findsOneWidget);
+    expect(find.text('Rôle : Chef d’équipe'), findsOneWidget);
+    expect(find.text('Présence : En attente'), findsOneWidget);
+  });
+
+  testWidgets('affiche les compteurs et permet la sélection admin', (
+    tester,
+  ) async {
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [
+        _application(
+          id: 'pending-id',
+          userId: 'user-1',
+          profile: const VolunteerProfile(
+            userId: 'user-1',
+            firstName: 'Camille',
+            lastName: 'Martin',
+          ),
+        ),
+        _application(
+          id: 'selected-id',
+          userId: 'user-2',
+          status: ConcertVolunteerStatus.selected,
+          teamRole: MaraudeRole.volunteer,
+          profile: const VolunteerProfile(
+            userId: 'user-2',
+            firstName: 'Alex',
+            lastName: 'Durand',
+          ),
+        ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
+
+    expect(find.text('2 candidatures'), findsOneWidget);
+    expect(find.text('1 bénévole sélectionné'), findsOneWidget);
+    expect(find.text('Camille Martin'), findsOneWidget);
+    expect(find.text('Alex Durand'), findsOneWidget);
+
+    final checkbox = find.bySemanticsLabel('Sélectionner Camille Martin');
+    await tester.ensureVisible(checkbox);
+    await tester.tap(checkbox);
+    await tester.pump();
+
+    final selectButton = find.widgetWithText(
+      FilledButton,
+      'Sélectionner les bénévoles',
+    );
+    await tester.ensureVisible(selectButton);
+    await tester.tap(selectButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 bénévoles sélectionnés'), findsOneWidget);
+    expect(
+      repository.applications
+          .firstWhere((application) => application.id == 'pending-id')
+          .teamRole,
+      MaraudeRole.volunteer,
+    );
+  });
+
+  testWidgets('change le rôle d’un bénévole sélectionné', (tester) async {
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [
+        _application(
+          status: ConcertVolunteerStatus.selected,
+          teamRole: MaraudeRole.volunteer,
+          profile: const VolunteerProfile(
+            userId: 'user-id',
+            firstName: 'Camille',
+            lastName: 'Martin',
+          ),
+        ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
+
+    final dropdown = find.byKey(
+      const ValueKey('team-role-application-id-MaraudeRole.volunteer'),
+    );
+    await tester.ensureVisible(dropdown);
+    await tester.tap(dropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Chef d’équipe').last);
+    await tester.pumpAndSettle();
+
+    expect(repository.applications.single.teamRole, MaraudeRole.teamLeader);
+  });
+
+  testWidgets('affiche et met à jour la synthèse des présences', (
+    tester,
+  ) async {
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [
+        _application(
+          id: 'pending-attendance',
+          status: ConcertVolunteerStatus.selected,
+          teamRole: MaraudeRole.volunteer,
+          profile: const VolunteerProfile(
+            userId: 'user-1',
+            firstName: 'Julie',
+            lastName: 'Martin',
+          ),
+        ),
+        _application(
+          id: 'present-attendance',
+          userId: 'user-2',
+          status: ConcertVolunteerStatus.selected,
+          teamRole: MaraudeRole.driver,
+          attendanceStatus: VolunteerAttendanceStatus.present,
+        ),
+        _application(
+          id: 'absent-attendance',
+          userId: 'user-3',
+          status: ConcertVolunteerStatus.selected,
+          teamRole: MaraudeRole.volunteer,
+          attendanceStatus: VolunteerAttendanceStatus.absent,
+        ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
+
+    expect(find.text('3 sélectionnés'), findsOneWidget);
+    expect(find.text('Présents : 1'), findsOneWidget);
+    expect(find.text('Absents : 1'), findsOneWidget);
+    expect(find.text('En attente : 1'), findsOneWidget);
+
+    final dropdown = find.byKey(
+      const ValueKey(
+        'attendance-pending-attendance-'
+        'VolunteerAttendanceStatus.pending',
+      ),
+    );
+    await tester.ensureVisible(dropdown);
+    await tester.tap(dropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Présent').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Présents : 2'), findsOneWidget);
+    expect(find.text('En attente : 0'), findsOneWidget);
+    expect(
+      repository.applications
+          .firstWhere((application) => application.id == 'pending-attendance')
+          .attendanceStatus,
+      VolunteerAttendanceStatus.present,
+    );
+    expect(repository.fetchCount, greaterThanOrEqualTo(2));
+  });
+
+  testWidgets('affiche une carte bénévole complète sans contact d’urgence', (
+    tester,
+  ) async {
+    final application = _application(
+      profile: VolunteerProfile(
+        userId: 'user-id',
+        firstName: 'Camille',
+        lastName: 'Martin',
+        phone: '+33 6 00 00 00 00',
+        birthDate: DateTime(1992, 4, 12),
+        hasDrivingLicense: true,
+        canLiftHeavyLoads: true,
+        emergencyContactName: 'Sophie Martin',
+        emergencyContactPhone: '+33 6 99 99 99 99',
+      ),
+      statistics: const VolunteerStatistics(
+        totalApplications: 12,
+        selectedApplications: 8,
+        notSelectedApplications: 2,
+        withdrawnApplications: 1,
+        history: [],
+      ),
+    );
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [application],
+    );
+    await _pumpDetail(tester, repository);
+
+    expect(find.text('Camille Martin'), findsOneWidget);
+    expect(find.text('+33 6 00 00 00 00'), findsOneWidget);
+    expect(find.text('Permis : Oui'), findsOneWidget);
+    expect(find.text('12 candidatures'), findsOneWidget);
+    expect(find.text('8 maraudes sélectionnées'), findsOneWidget);
+    expect(find.text('1 désistement'), findsOneWidget);
+    expect(find.text('Sophie Martin'), findsNothing);
+    expect(find.text('+33 6 99 99 99 99'), findsNothing);
+  });
+
+  testWidgets('ouvre le profil complet en lecture seule', (tester) async {
+    final application = _application(
+      profile: VolunteerProfile(
+        userId: 'user-id',
+        firstName: 'Camille',
+        lastName: 'Martin',
+        phone: '+33 6 00 00 00 00',
+        birthDate: DateTime(1992, 4, 12),
+        hasDrivingLicense: true,
+        canLiftHeavyLoads: false,
+        emergencyContactName: 'Sophie Martin',
+        emergencyContactPhone: '+33 6 99 99 99 99',
+      ),
+      statistics: VolunteerStatistics(
+        totalApplications: 12,
+        selectedApplications: 8,
+        notSelectedApplications: 2,
+        withdrawnApplications: 1,
+        lastSelectedDate: DateTime(2026, 7, 15),
+        history: [
+          VolunteerHistoryEntry(
+            concertId: 'recent-concert',
+            concertDate: DateTime(2026, 7, 15),
+            artist: 'The Blaze',
+            venueName: 'Olympia',
+            status: ConcertVolunteerStatus.selected,
+          ),
+          VolunteerHistoryEntry(
+            concertId: 'older-concert',
+            concertDate: DateTime(2026, 7, 2),
+            artist: 'Aupinard',
+            venueName: 'Bataclan',
+            status: ConcertVolunteerStatus.withdrawn,
+          ),
+        ],
+      ),
+    );
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [application],
+    );
+    await _pumpDetail(tester, repository);
+
+    final card = find.byKey(const ValueKey('volunteer-card-application-id'));
+    await tester.ensureVisible(card);
+    await tester.tap(card);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Profil bénévole'), findsOneWidget);
+    expect(find.text('12 avril 1992'), findsOneWidget);
+    expect(find.text('Port de charges lourdes'), findsOneWidget);
+    expect(find.text('Contact d’urgence'), findsOneWidget);
+    expect(find.text('Sophie Martin'), findsOneWidget);
+    expect(find.text('+33 6 99 99 99 99'), findsOneWidget);
+    expect(find.text('2 non-sélections'), findsOneWidget);
+    expect(find.text('Dernière participation'), findsOneWidget);
+    expect(find.text('15 juillet 2026'), findsNWidgets(2));
+    expect(find.text('Taux de sélection : 67 %'), findsOneWidget);
+    expect(find.text('Taux de désistement : 8 %'), findsOneWidget);
+    expect(find.text('Historique des maraudes'), findsOneWidget);
+    expect(find.text('The Blaze'), findsOneWidget);
+    expect(find.text('Olympia'), findsOneWidget);
+    expect(find.text('Aupinard'), findsOneWidget);
+    expect(find.text('Bataclan'), findsOneWidget);
+    expect(find.text('Fermer'), findsOneWidget);
+    expect(find.text('Modifier'), findsNothing);
+  });
+
+  testWidgets('affiche les valeurs manquantes et la photo par défaut', (
+    tester,
+  ) async {
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [
+        _application(
+          profile: const VolunteerProfile(
+            userId: 'user-id',
+            firstName: 'Camille',
+            lastName: 'Martin',
+          ),
+        ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
+
+    expect(find.text('Permis : Non renseigné'), findsOneWidget);
+    expect(find.byIcon(Icons.person_outline), findsWidgets);
+
+    final card = find.byKey(const ValueKey('volunteer-card-application-id'));
+    await tester.ensureVisible(card);
+    await tester.tap(card);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Non renseignée'), findsOneWidget);
+    expect(find.text('Non renseigné'), findsWidgets);
+    expect(find.text('Aucune'), findsOneWidget);
+    expect(find.text('Aucun historique.'), findsOneWidget);
+    expect(find.textContaining('Taux de sélection'), findsNothing);
+  });
+}
+
+const _jsonHeaders = {'content-type': 'application/json'};
+
+Future<SupabaseClient> _authenticatedClient(
+  Future<Response> Function(Request request) handler,
+) async {
+  final client = SupabaseClient(
+    'http://localhost',
+    'test-key',
+    httpClient: MockClient(handler),
+    authOptions: const AuthClientOptions(autoRefreshToken: false),
+  );
+  await client.auth.recoverSession(
+    jsonEncode({
+      'access_token': 'test-token',
+      'token_type': 'bearer',
+      'user': {
+        'id': 'user-id',
+        'aud': 'authenticated',
+        'app_metadata': <String, dynamic>{},
+        'user_metadata': <String, dynamic>{},
+        'created_at': '2026-07-25T10:00:00.000Z',
+      },
+    }),
+  );
+  return client;
+}
+
+Map<String, dynamic> _applicationJson({
+  String id = 'application-id',
+  String userId = 'user-id',
+  String status = 'pending',
+}) {
+  return {
+    'id': id,
+    'concert_id': 'concert-id',
+    'user_id': userId,
+    'status': status,
+    'created_at': '2026-07-25T10:00:00.000Z',
+    'updated_at': '2026-07-25T10:00:00.000Z',
+  };
+}
+
+ConcertVolunteerApplication _application({
+  String id = 'application-id',
+  String userId = 'user-id',
+  ConcertVolunteerStatus status = ConcertVolunteerStatus.pending,
+  VolunteerProfile? profile,
+  VolunteerStatistics statistics = const VolunteerStatistics.empty(),
+  MaraudeRole? teamRole,
+  VolunteerAttendanceStatus? attendanceStatus,
+}) {
+  return ConcertVolunteerApplication(
+    id: id,
+    concertId: 'concert-id',
+    userId: userId,
+    status: status,
+    createdAt: DateTime.utc(2026, 7, 25, 10),
+    updatedAt: DateTime.utc(2026, 7, 25, 10),
+    profile: profile,
+    statistics: statistics,
+    teamRole: teamRole,
+    attendanceStatus: attendanceStatus,
+  );
+}
+
+Future<void> _pumpDetail(
+  WidgetTester tester,
+  _FakeConcertVolunteerRepository repository,
+) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        concertDetailsProvider.overrideWith(
+          (ref, concertId) async => buildConcert(),
+        ),
+        concertVolunteerRepositoryProvider.overrideWithValue(repository),
+      ],
+      child: const MaterialApp(
+        home: ConcertDetailScreen(concertId: 'concert-id'),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
+  _FakeConcertVolunteerRepository({
+    this.ownApplication,
+    this.isAdmin = false,
+    List<ConcertVolunteerApplication> applications = const [],
+  }) : applications = [...applications],
+       super(
+         SupabaseClient(
+           'http://localhost',
+           'test-key',
+           authOptions: const AuthClientOptions(autoRefreshToken: false),
+         ),
+       );
+
+  ConcertVolunteerApplication? ownApplication;
+  final bool isAdmin;
+  final List<ConcertVolunteerApplication> applications;
+  int fetchCount = 0;
+
+  @override
+  Future<ConcertVolunteerSectionData> fetchSection(String concertId) async {
+    fetchCount++;
+    final visibleApplications = isAdmin
+        ? List<ConcertVolunteerApplication>.unmodifiable(applications)
+        : const <ConcertVolunteerApplication>[];
+    final allApplications = isAdmin ? applications : [?ownApplication];
+    return ConcertVolunteerSectionData(
+      ownApplication: ownApplication,
+      counts: ConcertVolunteerCounts(
+        applicationCount: allApplications
+            .where(
+              (application) =>
+                  application.status != ConcertVolunteerStatus.withdrawn,
+            )
+            .length,
+        selectedCount: allApplications
+            .where(
+              (application) =>
+                  application.status == ConcertVolunteerStatus.selected,
+            )
+            .length,
+        presentCount: allApplications
+            .where(
+              (application) =>
+                  application.status == ConcertVolunteerStatus.selected &&
+                  application.effectiveAttendanceStatus ==
+                      VolunteerAttendanceStatus.present,
+            )
+            .length,
+        absentCount: allApplications
+            .where(
+              (application) =>
+                  application.status == ConcertVolunteerStatus.selected &&
+                  application.effectiveAttendanceStatus ==
+                      VolunteerAttendanceStatus.absent,
+            )
+            .length,
+      ),
+      isAdmin: isAdmin,
+      applications: visibleApplications,
+    );
+  }
+
+  @override
+  Future<ConcertVolunteerApplication> apply(String concertId) async {
+    if (ownApplication != null) {
+      throw StateError('Une candidature existe déjà.');
+    }
+    ownApplication = _application();
+    return ownApplication!;
+  }
+
+  @override
+  Future<void> withdraw(String applicationId) async {
+    ownApplication = ownApplication?.copyWith(
+      status: ConcertVolunteerStatus.withdrawn,
+      teamRole: null,
+      attendanceStatus: null,
+    );
+    final index = applications.indexWhere(
+      (application) => application.id == applicationId,
+    );
+    if (index >= 0) {
+      applications[index] = applications[index].copyWith(
+        status: ConcertVolunteerStatus.withdrawn,
+        teamRole: null,
+        attendanceStatus: null,
+      );
+    }
+  }
+
+  @override
+  Future<void> setStatus(
+    String applicationId,
+    ConcertVolunteerStatus status,
+  ) async {
+    final index = applications.indexWhere(
+      (application) => application.id == applicationId,
+    );
+    applications[index] = applications[index].copyWith(
+      status: status,
+      teamRole: status == ConcertVolunteerStatus.selected
+          ? applications[index].teamRole ?? MaraudeRole.volunteer
+          : null,
+      attendanceStatus: status == ConcertVolunteerStatus.selected
+          ? applications[index].attendanceStatus ??
+                VolunteerAttendanceStatus.pending
+          : null,
+    );
+  }
+
+  @override
+  Future<void> selectVolunteers(
+    String concertId,
+    Iterable<String> applicationIds,
+  ) async {
+    for (final applicationId in applicationIds) {
+      final index = applications.indexWhere(
+        (application) => application.id == applicationId,
+      );
+      applications[index] = applications[index].copyWith(
+        status: ConcertVolunteerStatus.selected,
+        teamRole: applications[index].teamRole ?? MaraudeRole.volunteer,
+        attendanceStatus:
+            applications[index].attendanceStatus ??
+            VolunteerAttendanceStatus.pending,
+      );
+    }
+  }
+
+  @override
+  Future<void> setTeamRole(String applicationId, MaraudeRole role) async {
+    if (role == MaraudeRole.teamLeader &&
+        applications.any(
+          (application) =>
+              application.id != applicationId &&
+              application.teamRole == MaraudeRole.teamLeader,
+        )) {
+      throw const TeamLeaderAlreadyAssignedException();
+    }
+    final index = applications.indexWhere(
+      (application) => application.id == applicationId,
+    );
+    applications[index] = applications[index].copyWith(teamRole: role);
+  }
+
+  @override
+  Future<void> setAttendanceStatus(
+    String applicationId,
+    VolunteerAttendanceStatus status,
+  ) async {
+    final index = applications.indexWhere(
+      (application) => application.id == applicationId,
+    );
+    if (applications[index].status != ConcertVolunteerStatus.selected) {
+      throw StateError('Le bénévole n’est pas sélectionné.');
+    }
+    applications[index] = applications[index].copyWith(
+      attendanceStatus: status,
+    );
+  }
+}

@@ -1,12 +1,11 @@
 {
-    "name": "club_sandwich",
-    "short_name": "club_sandwich",
+    "name": "Club Sandwich",
+    "short_name": "Club Sandwich",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#DDF0F6",
+    "theme_color": "#293283",
+    "description": "Gestion des opérations de récupération alimentaire de Club Sandwich.",
     "prefer_related_applications": false,
     "icons": [
         {

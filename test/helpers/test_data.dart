@@ -1,0 +1,64 @@
+import 'package:club_sandwich/features/concerts/domain/concert.dart';
+import 'package:club_sandwich/features/collections/domain/maraude_collection.dart';
+import 'package:club_sandwich/features/distributions/domain/maraude_distribution.dart';
+import 'package:club_sandwich/features/venues/domain/venue.dart';
+
+Concert buildConcert({
+  String id = 'concert-id',
+  String artist = 'Artiste',
+  DateTime? date,
+  String? title,
+  String? notes,
+  String? cateringClosesAt,
+  Venue? venue,
+  String? promoterOrganizationName,
+  String? promoterContactName,
+  String? promoterContactPhone,
+  String? promoterContactEmail,
+  String? cateringContactName,
+  String? cateringContactPhone,
+  String? cateringContactEmail,
+  MaraudeStatus maraudeStatus = MaraudeStatus.planned,
+  DateTime? actualStartAt,
+  DateTime? actualEndAt,
+  String? closingComment,
+  List<MaraudeCollection> collections = const [],
+  MaraudeDistribution? distribution,
+}) {
+  return Concert(
+    id: id,
+    organizationId: 'organization-id',
+    artist: artist,
+    date: date ?? DateTime(2026, 9, 15),
+    status: ConcertStatus.planned,
+    maraudeStatus: maraudeStatus,
+    actualStartAt: actualStartAt,
+    actualEndAt: actualEndAt,
+    closingComment: closingComment,
+    collections: collections,
+    distribution: distribution,
+    createdBy: 'profile-id',
+    createdAt: DateTime(2026, 7, 25),
+    updatedAt: DateTime(2026, 7, 25),
+    title: title,
+    notes: notes,
+    cateringClosesAt: cateringClosesAt,
+    venueId: venue?.id,
+    venue: venue,
+    promoterOrganizationName: promoterOrganizationName,
+    promoterContactName: promoterContactName,
+    promoterContactPhone: promoterContactPhone,
+    promoterContactEmail: promoterContactEmail,
+    cateringContactName: cateringContactName,
+    cateringContactPhone: cateringContactPhone,
+    cateringContactEmail: cateringContactEmail,
+  );
+}
+
+const testVenue = Venue(
+  id: 'venue-id',
+  name: 'Salle Pleyel',
+  publicAddressLine1: '252 rue du Faubourg Saint-Honoré',
+  postalCode: '75008',
+  city: 'Paris',
+);

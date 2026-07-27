@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local Netlify folder
+.netlify
+
+# Local environment files
+.env
+.env.*
+!.env.example
