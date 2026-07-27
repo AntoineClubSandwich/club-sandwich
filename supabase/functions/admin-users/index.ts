@@ -36,12 +36,13 @@ Deno.serve(async (request) => {
       return json({ error: "Session invalide." }, 401);
     }
 
-    const { data: account } = await adminClient
+    const { data: account, error: accountError } = await adminClient
       .from("user_accounts")
       .select("role, status")
       .eq("profile_id", caller.id)
       .maybeSingle();
-    if (account?.role !== "admin" || account.status !== "active") {
+
+    if (account?.role !== "admin" || account?.status !== "active") {
       return json({ error: "Accès administrateur requis." }, 403);
     }
 

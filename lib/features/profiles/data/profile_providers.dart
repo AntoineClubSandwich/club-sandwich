@@ -1,4 +1,5 @@
 import 'package:club_sandwich/core/supabase/supabase_provider.dart';
+import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/profiles/data/profile_repository.dart';
 import 'package:club_sandwich/features/profiles/domain/profile.dart';
 import 'package:club_sandwich/features/profiles/domain/volunteer_statistics.dart';
@@ -8,9 +9,10 @@ final profileRepositoryProvider = Provider<ProfileRepository>(
   (ref) => ProfileRepository(ref.watch(supabaseClientProvider)),
 );
 
-final currentProfileProvider = FutureProvider<Profile?>(
-  (ref) => ref.watch(profileRepositoryProvider).fetchCurrentProfile(),
-);
+final currentProfileProvider = FutureProvider<Profile?>((ref) {
+  ref.watch(authStateProvider);
+  return ref.watch(profileRepositoryProvider).fetchCurrentProfile();
+});
 
 final volunteerStatisticsProvider = FutureProvider<VolunteerStatistics?>((
   ref,
