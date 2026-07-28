@@ -11,6 +11,7 @@ import 'package:club_sandwich/features/volunteers/presentation/volunteers_screen
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'helpers/test_data.dart';
@@ -233,6 +234,97 @@ void main() {
     expect(find.text('Artiste own-pending'), findsOneWidget);
     expect(find.text('Disponibilité transmise'), findsOneWidget);
   });
+
+  testWidgets(
+    'le calendrier bénévole affiche et distingue open, pending et selected',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final now = DateTime.now();
+      final items = [
+        _overview(
+          id: 'open-calendar',
+          date: DateTime(now.year, now.month, 10),
+          status: MaraudeStatus.open,
+        ),
+        _overview(
+          id: 'pending-calendar',
+          date: DateTime(now.year, now.month, 11),
+          status: MaraudeStatus.open,
+          ownStatus: ConcertVolunteerStatus.pending,
+        ),
+        _overview(
+          id: 'selected-calendar',
+          date: DateTime(now.year, now.month, 12),
+          status: MaraudeStatus.teamReady,
+          ownStatus: ConcertVolunteerStatus.selected,
+        ),
+      ];
+      final router = GoRouter(
+        initialLocation: '/maraudes',
+        routes: [
+          GoRoute(
+            path: '/maraudes',
+            builder: (_, _) => const VolunteersScreen(),
+          ),
+          GoRoute(
+            path: '/maraudes/:id',
+            builder: (_, state) => Text('Détail ${state.pathParameters['id']}'),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            maraudeOverviewProvider.overrideWith((ref) async => items),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('volunteer-view-selector')),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Calendrier'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('month-agenda')), findsOneWidget);
+      expect(find.text('Artiste open-calendar'), findsOneWidget);
+      expect(find.text('Artiste pending-calendar'), findsOneWidget);
+      expect(find.text('Artiste selected-calendar'), findsOneWidget);
+      expect(find.text('Ouverte'), findsOneWidget);
+      expect(find.text('En attente'), findsOneWidget);
+      expect(find.text('Sélectionné'), findsOneWidget);
+      expect(
+        _calendarItemColor(tester, 'open-calendar'),
+        Colors.blue.withValues(alpha: 0.12),
+      );
+      expect(
+        _calendarItemColor(tester, 'pending-calendar'),
+        Colors.orange.withValues(alpha: 0.12),
+      );
+      expect(
+        _calendarItemColor(tester, 'selected-calendar'),
+        Colors.green.withValues(alpha: 0.12),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('agenda-concert-selected-calendar')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Détail selected-calendar'), findsOneWidget);
+    },
+  );
+}
+
+Color? _calendarItemColor(WidgetTester tester, String id) {
+  return tester
+      .widget<Material>(find.byKey(ValueKey('calendar-item-surface-$id')))
+      .color;
 }
 
 Future<void> _pumpReport(

@@ -376,7 +376,7 @@ void main() {
       ),
     ]);
 
-    await tester.tap(find.text('Agenda'));
+    await tester.tap(find.text('Calendrier'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('month-agenda')), findsOneWidget);
@@ -392,7 +392,7 @@ void main() {
     tester,
   ) async {
     await pumpConcerts(tester, [buildConcert()]);
-    await tester.tap(find.text('Agenda'));
+    await tester.tap(find.text('Calendrier'));
     await tester.pumpAndSettle();
     final initialHeading = _agendaHeading(tester);
 
@@ -424,7 +424,7 @@ void main() {
       ),
     ], size: const Size(390, 844));
 
-    await tester.tap(find.text('Agenda'));
+    await tester.tap(find.text('Calendrier'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('mobile-agenda')), findsOneWidget);
@@ -442,7 +442,7 @@ void main() {
       buildConcert(id: 'remembered', date: DateTime(now.year, now.month)),
     ]);
 
-    await tester.tap(find.text('Agenda'));
+    await tester.tap(find.text('Calendrier'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('agenda-concert-remembered')));
     await tester.pumpAndSettle();
@@ -487,7 +487,7 @@ void main() {
     expect(find.text('VICTOR'), findsOneWidget);
     expect(find.text('Autre artiste'), findsNothing);
 
-    await tester.tap(find.text('Agenda'));
+    await tester.tap(find.text('Calendrier'));
     await tester.pumpAndSettle();
     expect(find.text('VICTOR'), findsOneWidget);
     expect(find.text('Autre artiste'), findsNothing);

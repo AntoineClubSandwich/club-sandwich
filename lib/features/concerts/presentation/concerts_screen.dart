@@ -2,6 +2,7 @@ import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_form.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
+import 'package:club_sandwich/features/concerts/presentation/maraude_calendar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -47,10 +48,12 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
       backgroundColor: Colors.transparent,
       body: Column(
         children: [
-          _PageToolbar(
+          MaraudeViewToolbar(
+            title: 'Maraudes',
             viewMode: viewMode,
             onViewChanged: (mode) =>
                 ref.read(concertViewModeProvider.notifier).select(mode),
+            selectorKey: const ValueKey('concert-view-selector'),
           ),
           Expanded(
             child: asyncConcerts.when(
@@ -105,21 +108,15 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
                         SliverPadding(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
                           sliver: SliverToBoxAdapter(
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                if (constraints.maxWidth < 700) {
-                                  return _MobileAgenda(
-                                    concerts: _sortChronologically(filtered),
-                                  );
-                                }
-                                return _MonthAgenda(
-                                  month: _displayedMonth,
-                                  concerts: filtered,
-                                  onPreviousMonth: () => _changeMonth(-1),
-                                  onNextMonth: () => _changeMonth(1),
-                                  onToday: _goToCurrentMonth,
-                                );
-                              },
+                            child: MaraudeCalendar(
+                              month: _displayedMonth,
+                              items: filtered
+                                  .map(_concertCalendarItem)
+                                  .toList(growable: false),
+                              onPreviousMonth: () => _changeMonth(-1),
+                              onNextMonth: () => _changeMonth(1),
+                              onToday: _goToCurrentMonth,
+                              onOpen: (id) => context.go('/maraudes/$id'),
                             ),
                           ),
                         ),
@@ -201,49 +198,6 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Concert créé.')));
-  }
-}
-
-class _PageToolbar extends StatelessWidget {
-  const _PageToolbar({required this.viewMode, required this.onViewChanged});
-
-  final ConcertViewMode viewMode;
-  final ValueChanged<ConcertViewMode> onViewChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              'Maraudes',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ),
-          SegmentedButton<ConcertViewMode>(
-            key: const ValueKey('concert-view-selector'),
-            segments: const [
-              ButtonSegment(
-                value: ConcertViewMode.list,
-                icon: Icon(Icons.view_list_outlined),
-                label: Text('Liste'),
-              ),
-              ButtonSegment(
-                value: ConcertViewMode.agenda,
-                icon: Icon(Icons.calendar_month_outlined),
-                label: Text('Agenda'),
-              ),
-            ],
-            selected: {viewMode},
-            onSelectionChanged: (selection) => onViewChanged(selection.single),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -576,357 +530,6 @@ class _ConcertCard extends ConsumerWidget {
   }
 }
 
-class _MonthAgenda extends StatelessWidget {
-  const _MonthAgenda({
-    required this.month,
-    required this.concerts,
-    required this.onPreviousMonth,
-    required this.onNextMonth,
-    required this.onToday,
-  });
-
-  final DateTime month;
-  final List<Concert> concerts;
-  final VoidCallback onPreviousMonth;
-  final VoidCallback onNextMonth;
-  final VoidCallback onToday;
-
-  @override
-  Widget build(BuildContext context) {
-    final firstDay = DateTime(month.year, month.month);
-    final gridStart = firstDay.subtract(Duration(days: firstDay.weekday - 1));
-    final concertsByDay = <DateTime, List<Concert>>{};
-    for (final concert in concerts) {
-      final day = _dateOnly(concert.date);
-      concertsByDay.putIfAbsent(day, () => []).add(concert);
-    }
-    for (final values in concertsByDay.values) {
-      values.sort(_compareConcertTime);
-    }
-
-    return Column(
-      key: const ValueKey('month-agenda'),
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                IconButton(
-                  key: const ValueKey('agenda-previous-month'),
-                  tooltip: 'Mois précédent',
-                  onPressed: onPreviousMonth,
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                Expanded(
-                  child: Text(
-                    _monthLabel(month),
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: onToday,
-                  child: const Text('Aujourd’hui'),
-                ),
-                IconButton(
-                  key: const ValueKey('agenda-next-month'),
-                  tooltip: 'Mois suivant',
-                  onPressed: onNextMonth,
-                  icon: const Icon(Icons.chevron_right),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            for (final label in [
-              'Lun',
-              'Mar',
-              'Mer',
-              'Jeu',
-              'Ven',
-              'Sam',
-              'Dim',
-            ])
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-          ],
-        ),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 7,
-            crossAxisSpacing: 4,
-            mainAxisSpacing: 4,
-            mainAxisExtent: 182,
-          ),
-          itemCount: 42,
-          itemBuilder: (context, index) {
-            final day = gridStart.add(Duration(days: index));
-            return _AgendaDay(
-              day: day,
-              isCurrentMonth: day.month == month.month,
-              concerts: concertsByDay[_dateOnly(day)] ?? const [],
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _AgendaDay extends StatelessWidget {
-  const _AgendaDay({
-    required this.day,
-    required this.isCurrentMonth,
-    required this.concerts,
-  });
-
-  final DateTime day;
-  final bool isCurrentMonth;
-  final List<Concert> concerts;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final isToday = _isSameDay(day, DateTime.now());
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: isCurrentMonth
-            ? colors.surfaceContainerLowest
-            : colors.surfaceContainerLow,
-        border: Border.all(
-          color: isToday ? colors.primary : colors.outlineVariant,
-          width: isToday ? 2 : 1,
-        ),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(5),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${day.day}',
-              style: TextStyle(
-                fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                color: isCurrentMonth
-                    ? colors.onSurface
-                    : colors.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Expanded(
-              child: ListView.separated(
-                padding: EdgeInsets.zero,
-                itemCount: concerts.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 4),
-                itemBuilder: (context, index) =>
-                    _AgendaConcertTile(concert: concerts[index]),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AgendaConcertTile extends StatelessWidget {
-  const _AgendaConcertTile({required this.concert});
-
-  final Concert concert;
-
-  @override
-  Widget build(BuildContext context) {
-    final indicator = _agendaIndicator(context, concert);
-    final details = [
-      concert.artist,
-      concert.venueName ?? 'Salle non renseignée',
-      formatLongFrenchDate(concert.date),
-      if (concert.time != null) formatDatabaseTime(concert.time!),
-      '${concert.selectedVolunteerCount} bénévoles',
-      indicator.label,
-    ].join('\n');
-    return Tooltip(
-      message: details,
-      waitDuration: const Duration(milliseconds: 350),
-      child: Material(
-        color: indicator.color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          key: ValueKey('agenda-concert-${concert.id}'),
-          onTap: () => context.go('/maraudes/${concert.id}'),
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  concert.artist,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  concert.venueName ?? '—',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11),
-                ),
-                Text(
-                  concert.time == null
-                      ? 'Heure non renseignée'
-                      : formatDatabaseTime(concert.time!),
-                  style: const TextStyle(fontSize: 11),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: indicator.color,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        indicator.label,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 10),
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  '${concert.selectedVolunteerCount}/4 bénévoles',
-                  style: const TextStyle(fontSize: 10),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MobileAgenda extends StatelessWidget {
-  const _MobileAgenda({required this.concerts});
-
-  final List<Concert> concerts;
-
-  @override
-  Widget build(BuildContext context) {
-    final grouped = <DateTime, List<Concert>>{};
-    for (final concert in concerts) {
-      grouped.putIfAbsent(_dateOnly(concert.date), () => []).add(concert);
-    }
-    return Column(
-      key: const ValueKey('mobile-agenda'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final entry in grouped.entries) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
-            child: Text(
-              _relativeDateLabel(entry.key),
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ),
-          for (final concert in entry.value)
-            _MobileAgendaCard(concert: concert),
-        ],
-      ],
-    );
-  }
-}
-
-class _MobileAgendaCard extends StatelessWidget {
-  const _MobileAgendaCard({required this.concert});
-
-  final Concert concert;
-
-  @override
-  Widget build(BuildContext context) {
-    final indicator = _agendaIndicator(context, concert);
-    return Card(
-      child: InkWell(
-        key: ValueKey('mobile-agenda-concert-${concert.id}'),
-        onTap: () => context.go('/maraudes/${concert.id}'),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: indicator.color,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      concert.artist,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(concert.venueName ?? '—'),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${concert.time == null ? 'Heure non renseignée' : formatDatabaseTime(concert.time!)}'
-                      ' · ${concert.selectedVolunteerCount}/4 bénévoles',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    Text(
-                      indicator.label,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.labelMedium?.copyWith(color: indicator.color),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _EmptyConcerts extends StatelessWidget {
   const _EmptyConcerts({required this.onCreate});
 
@@ -1115,29 +718,35 @@ class _Metadata extends StatelessWidget {
 
 enum _ConcertAction { edit, delete }
 
-class _AgendaIndicator {
-  const _AgendaIndicator(this.label, this.color);
-
-  final String label;
-  final Color color;
+MaraudeCalendarItem _concertCalendarItem(Concert concert) {
+  final (label, tone) = _concertCalendarStatus(concert);
+  return MaraudeCalendarItem(
+    id: concert.id,
+    artist: concert.artist,
+    date: concert.date,
+    time: concert.time,
+    venueName: concert.venueName ?? 'Salle non renseignée',
+    selectedVolunteerCount: concert.selectedVolunteerCount,
+    statusLabel: label,
+    tone: tone,
+  );
 }
 
-_AgendaIndicator _agendaIndicator(BuildContext context, Concert concert) {
-  final colors = Theme.of(context).colorScheme;
+(String, MaraudeCalendarTone) _concertCalendarStatus(Concert concert) {
   if (concert.status == ConcertStatus.cancelled) {
-    return _AgendaIndicator('Annulé', colors.error);
+    return ('Annulé', MaraudeCalendarTone.error);
   }
   if (concert.maraudeStatus == MaraudeStatus.completed ||
       concert.status == ConcertStatus.completed) {
-    return _AgendaIndicator('Terminé', colors.onSurface);
+    return ('Terminé', MaraudeCalendarTone.neutral);
   }
   if (concert.maraudeStatus == MaraudeStatus.inProgress) {
-    return _AgendaIndicator('En cours', colors.primary);
+    return ('En cours', MaraudeCalendarTone.primary);
   }
   if (concert.selectedVolunteerCount >= 4) {
-    return _AgendaIndicator('Préparation · Équipe complète', Colors.green);
+    return ('Préparation · Équipe complète', MaraudeCalendarTone.green);
   }
-  return _AgendaIndicator('Préparation · Équipe incomplète', colors.tertiary);
+  return ('Préparation · Équipe incomplète', MaraudeCalendarTone.tertiary);
 }
 
 List<Concert> _sortForDashboard(List<Concert> concerts) {
@@ -1153,54 +762,6 @@ List<Concert> _sortForDashboard(List<Concert> concerts) {
         : left.date.compareTo(right.date);
   });
   return sorted;
-}
-
-List<Concert> _sortChronologically(List<Concert> concerts) {
-  final sorted = List<Concert>.of(concerts);
-  sorted.sort((left, right) {
-    final date = left.date.compareTo(right.date);
-    return date == 0 ? _compareConcertTime(left, right) : date;
-  });
-  return sorted;
-}
-
-int _compareConcertTime(Concert left, Concert right) {
-  return (left.time ?? '').compareTo(right.time ?? '');
-}
-
-DateTime _dateOnly(DateTime value) {
-  return DateTime(value.year, value.month, value.day);
-}
-
-bool _isSameDay(DateTime left, DateTime right) {
-  return left.year == right.year &&
-      left.month == right.month &&
-      left.day == right.day;
-}
-
-String _relativeDateLabel(DateTime date) {
-  final today = _dateOnly(DateTime.now());
-  if (_isSameDay(date, today)) return 'Aujourd’hui';
-  if (_isSameDay(date, today.add(const Duration(days: 1)))) return 'Demain';
-  return formatLongFrenchDate(date);
-}
-
-String _monthLabel(DateTime month) {
-  const months = [
-    'janvier',
-    'février',
-    'mars',
-    'avril',
-    'mai',
-    'juin',
-    'juillet',
-    'août',
-    'septembre',
-    'octobre',
-    'novembre',
-    'décembre',
-  ];
-  return '${months[month.month - 1]} ${month.year}';
 }
 
 String _concertStatusLabel(ConcertStatus status) {

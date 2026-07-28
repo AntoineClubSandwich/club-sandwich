@@ -3,35 +3,93 @@ import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
+import 'package:club_sandwich/features/concerts/presentation/maraude_calendar.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_overview_card.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-class VolunteersScreen extends ConsumerWidget {
+class VolunteersScreen extends ConsumerStatefulWidget {
   const VolunteersScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<VolunteersScreen> createState() => _VolunteersScreenState();
+}
+
+class _VolunteersScreenState extends ConsumerState<VolunteersScreen> {
+  late DateTime _displayedMonth;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _displayedMonth = DateTime(now.year, now.month);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final role = ref.watch(currentUserContextProvider).value?.role;
     if (role == AppUserRole.admin) {
       return _VolunteerDirectory(users: ref.watch(managedUsersProvider));
     }
     final overview = ref.watch(maraudeOverviewProvider);
+    final viewMode = ref.watch(concertViewModeProvider);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: overview.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => Center(
-          child: FilledButton.icon(
-            onPressed: () => ref.invalidate(maraudeOverviewProvider),
-            icon: const Icon(Icons.refresh),
-            label: const Text('Réessayer'),
+      body: Column(
+        children: [
+          MaraudeViewToolbar(
+            title: 'Mes maraudes',
+            viewMode: viewMode,
+            onViewChanged: (mode) =>
+                ref.read(concertViewModeProvider.notifier).select(mode),
+            selectorKey: const ValueKey('volunteer-view-selector'),
           ),
-        ),
-        data: (items) => _VolunteerMaraudes(items: items),
+          Expanded(
+            child: overview.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, _) => Center(
+                child: FilledButton.icon(
+                  onPressed: () => ref.invalidate(maraudeOverviewProvider),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Réessayer'),
+                ),
+              ),
+              data: (items) => viewMode == ConcertViewMode.list
+                  ? _VolunteerMaraudes(items: items)
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 48),
+                      child: MaraudeCalendar(
+                        month: _displayedMonth,
+                        items: items
+                            .map(_volunteerCalendarItem)
+                            .toList(growable: false),
+                        onPreviousMonth: () => _changeMonth(-1),
+                        onNextMonth: () => _changeMonth(1),
+                        onToday: _goToCurrentMonth,
+                        onOpen: (id) => context.go('/maraudes/$id'),
+                      ),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  void _changeMonth(int delta) {
+    setState(() {
+      _displayedMonth = DateTime(
+        _displayedMonth.year,
+        _displayedMonth.month + delta,
+      );
+    });
+  }
+
+  void _goToCurrentMonth() {
+    final now = DateTime.now();
+    setState(() => _displayedMonth = DateTime(now.year, now.month));
   }
 }
 
@@ -131,8 +189,6 @@ class _VolunteerMaraudes extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 48),
       children: [
-        Text('Mes maraudes', style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 20),
         if (open.isEmpty && upcoming.isEmpty)
           const Text('Aucune maraude à venir.')
         else if (open.isNotEmpty) ...[
@@ -179,4 +235,36 @@ String _availabilityLabel(ConcertVolunteerStatus status) {
     ConcertVolunteerStatus.notSelected => 'Non sélectionné',
     ConcertVolunteerStatus.withdrawn => 'Désisté — repositionnement possible',
   };
+}
+
+MaraudeCalendarItem _volunteerCalendarItem(MaraudeOverview maraude) {
+  final (label, tone) = switch (maraude.ownStatus) {
+    ConcertVolunteerStatus.pending => (
+      'En attente',
+      MaraudeCalendarTone.orange,
+    ),
+    ConcertVolunteerStatus.selected => (
+      'Sélectionné',
+      MaraudeCalendarTone.green,
+    ),
+    ConcertVolunteerStatus.notSelected => (
+      'Non sélectionné',
+      MaraudeCalendarTone.neutral,
+    ),
+    ConcertVolunteerStatus.withdrawn => (
+      'Désisté',
+      MaraudeCalendarTone.neutral,
+    ),
+    null => ('Ouverte', MaraudeCalendarTone.blue),
+  };
+  return MaraudeCalendarItem(
+    id: maraude.concertId,
+    artist: maraude.artist,
+    date: maraude.date,
+    time: maraude.time,
+    venueName: maraude.venueName,
+    selectedVolunteerCount: maraude.selectedCount,
+    statusLabel: label,
+    tone: tone,
+  );
 }
