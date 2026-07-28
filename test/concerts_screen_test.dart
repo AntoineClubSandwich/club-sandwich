@@ -57,9 +57,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          currentUserContextProvider.overrideWith(
-            (ref) async => userContext,
-          ),
+          currentUserContextProvider.overrideWith((ref) async => userContext),
           organizationsProvider.overrideWith((ref) async => organizations),
           concertsProvider.overrideWith((ref) async => concerts),
           if (concertRepository != null)
@@ -213,7 +211,11 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Alex'), findsOneWidget);
+    expect(find.text('Contact catering'), findsNothing);
+    expect(find.byKey(const ValueKey('catering-contact-name')), findsNothing);
+    expect(find.byKey(const ValueKey('catering-contact-phone')), findsNothing);
+    expect(find.byKey(const ValueKey('catering-contact-email')), findsNothing);
+    expect(find.text('Alex'), findsNothing);
   });
 
   testWidgets('valide uniquement les champs obligatoires du formulaire', (
@@ -234,27 +236,47 @@ void main() {
     expect(find.text('Titre'), findsNothing);
   });
 
-  testWidgets('refuse un e-mail invalide', (tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          home: Scaffold(
-            body: ConcertForm(
-              initialConcert: buildConcert(venue: testVenue),
-              onSubmit: (_) async {},
-            ),
-          ),
-        ),
+  testWidgets('le formulaire admin ne contient aucun contact catering', (
+    tester,
+  ) async {
+    final organization = Organization(
+      id: 'promoter-organization-id',
+      name: 'Tourneur Exemple',
+      slug: 'tourneur-exemple',
+      createdAt: DateTime.utc(2026, 7, 28),
+    );
+    await pumpConcerts(
+      tester,
+      const [],
+      userContext: const CurrentUserContext(
+        profileId: 'admin-profile-id',
+        role: AppUserRole.admin,
+        status: UserAccountStatus.active,
       ),
+      organizations: [organization],
     );
 
-    final emailField = find.widgetWithText(TextFormField, 'E-mail').first;
-    await tester.enterText(emailField, 'adresse-invalide');
-    await tester.ensureVisible(find.text('Enregistrer les modifications'));
-    await tester.tap(find.text('Enregistrer les modifications'));
-    await tester.pump();
+    await tester.tap(find.text('Ouvrir une maraude'));
+    await tester.pumpAndSettle();
 
-    expect(find.text('Saisissez une adresse e-mail valide.'), findsOneWidget);
+    expect(find.text('Contact catering'), findsNothing);
+    expect(find.byKey(const ValueKey('catering-contact-name')), findsNothing);
+    expect(find.byKey(const ValueKey('catering-contact-phone')), findsNothing);
+    expect(find.byKey(const ValueKey('catering-contact-email')), findsNothing);
+  });
+
+  testWidgets('le formulaire tourneur ne contient aucun contact catering', (
+    tester,
+  ) async {
+    await pumpConcerts(tester, const []);
+
+    await tester.tap(find.text('Ouvrir une maraude'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Contact catering'), findsNothing);
+    expect(find.byKey(const ValueKey('catering-contact-name')), findsNothing);
+    expect(find.byKey(const ValueKey('catering-contact-phone')), findsNothing);
+    expect(find.byKey(const ValueKey('catering-contact-email')), findsNothing);
   });
 
   testWidgets('désactive l’enregistrement pendant la requête', (tester) async {

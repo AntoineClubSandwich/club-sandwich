@@ -112,15 +112,15 @@ void main() {
       'notes': null,
       'promoter_contact_name': null,
       'promoter_contact_phone': null,
-      'catering_contact_name': null,
-      'catering_contact_phone': null,
-      'catering_contact_email': null,
     });
     expect(draft.toJson(), isNot(contains('title')));
     expect(draft.toJson(), isNot(contains('tour')));
     expect(draft.toJson(), isNot(contains('concert_time')));
     expect(draft.toJson(), isNot(contains('status')));
     expect(draft.toJson(), isNot(contains('promoter_contact_email')));
+    expect(draft.toJson(), isNot(contains('catering_contact_name')));
+    expect(draft.toJson(), isNot(contains('catering_contact_phone')));
+    expect(draft.toJson(), isNot(contains('catering_contact_email')));
   });
 
   test('Concert lit les noms de salle et de producteur préchargés', () {
@@ -193,12 +193,10 @@ void main() {
       venueId: 'venue-id',
       promoterContactName: '   ',
       promoterContactPhone: ' +33 6 00 00 00 00 ',
-      cateringContactEmail: '',
     );
 
     expect(draft.toJson()['promoter_contact_name'], isNull);
     expect(draft.toJson()['promoter_contact_phone'], '+33 6 00 00 00 00');
-    expect(draft.toJson()['catering_contact_email'], isNull);
   });
 
   test('Concert accepte l’absence de tous les champs optionnels', () {

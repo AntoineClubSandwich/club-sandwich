@@ -255,9 +255,6 @@ class ConcertDraft {
     this.notes,
     this.promoterContactName,
     this.promoterContactPhone,
-    this.cateringContactName,
-    this.cateringContactPhone,
-    this.cateringContactEmail,
   });
 
   final String artist;
@@ -268,9 +265,6 @@ class ConcertDraft {
   final String? notes;
   final String? promoterContactName;
   final String? promoterContactPhone;
-  final String? cateringContactName;
-  final String? cateringContactPhone;
-  final String? cateringContactEmail;
 
   Map<String, dynamic> toJson() {
     return {
@@ -281,9 +275,6 @@ class ConcertDraft {
       'notes': notes,
       'promoter_contact_name': _nullIfBlank(promoterContactName),
       'promoter_contact_phone': _nullIfBlank(promoterContactPhone),
-      'catering_contact_name': _nullIfBlank(cateringContactName),
-      'catering_contact_phone': _nullIfBlank(cateringContactPhone),
-      'catering_contact_email': _nullIfBlank(cateringContactEmail),
     };
   }
 }

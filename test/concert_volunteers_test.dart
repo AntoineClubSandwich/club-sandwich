@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
@@ -196,10 +197,20 @@ void main() {
                 {
                   'is_admin': true,
                   'is_promoter': false,
-                  'can_view_applications': true,
-                  'can_manage_concert': true,
-                  'can_apply': false,
+                  'can_view_applications': false,
+                  'can_manage_concert': false,
+                  'can_apply': true,
                 },
+              ]),
+              200,
+              headers: _jsonHeaders,
+              request: request,
+            );
+          }
+          if (path.endsWith('/get_current_user_context')) {
+            return Response(
+              jsonEncode([
+                {'profile_id': 'user-id', 'role': 'admin', 'status': 'active'},
               ]),
               200,
               headers: _jsonHeaders,
@@ -246,13 +257,17 @@ void main() {
         ).fetchSection('concert-id');
 
         expect(section.applications, hasLength(1));
+        expect(section.isAdmin, isTrue);
+        expect(section.activeRole, AppUserRole.admin);
+        expect(section.canApply, isFalse);
+        expect(section.ownApplication, isNull);
         expect(section.applications.single.displayName, 'Camille Martin');
         expect(section.applications.single.statistics.totalApplications, 12);
         expect(
           section.applications.single.attendanceStatus,
           VolunteerAttendanceStatus.present,
         );
-        expect(requests, hasLength(3));
+        expect(requests, hasLength(4));
         expect(
           requests
               .where(
@@ -297,6 +312,20 @@ void main() {
                   'can_view_applications': true,
                   'can_manage_concert': true,
                   'can_apply': false,
+                },
+              ]),
+              200,
+              headers: _jsonHeaders,
+              request: request,
+            );
+          }
+          if (path.endsWith('/get_current_user_context')) {
+            return Response(
+              jsonEncode([
+                {
+                  'profile_id': 'user-id',
+                  'role': 'promoter',
+                  'status': 'active',
                 },
               ]),
               200,
@@ -684,6 +713,28 @@ void main() {
       expect(find.text('Refuser'), findsOneWidget);
       expect(find.text('Voir mon profil'), findsNothing);
       expect(find.text('Je me désiste'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'un bénévole ne reçoit aucune action personnelle sur la candidature d’un autre',
+    (tester) async {
+      final repository = _FakeConcertVolunteerRepository(
+        ownApplication: _application(
+          userId: 'volunteer-a',
+          profile: const VolunteerProfile(
+            userId: 'volunteer-a',
+            firstName: 'Bénévole A',
+          ),
+        ),
+        activeRole: AppUserRole.volunteer,
+        currentUserId: 'volunteer-b',
+      );
+      await _pumpDetail(tester, repository);
+
+      expect(find.text('Je me désiste'), findsNothing);
+      expect(find.text('Voir mon profil'), findsNothing);
+      expect(find.text('Je me propose'), findsOneWidget);
     },
   );
 
@@ -1547,6 +1598,8 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
   _FakeConcertVolunteerRepository({
     this.ownApplication,
     this.isAdmin = false,
+    this.activeRole,
+    this.currentUserId = 'user-id',
     List<ConcertVolunteerApplication> applications = const [],
   }) : applications = [...applications],
        super(
@@ -1559,6 +1612,8 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
 
   ConcertVolunteerApplication? ownApplication;
   final bool isAdmin;
+  final AppUserRole? activeRole;
+  final String currentUserId;
   final List<ConcertVolunteerApplication> applications;
   int fetchCount = 0;
   int saveTeamCount = 0;
@@ -1604,6 +1659,9 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
             .length,
       ),
       isAdmin: isAdmin,
+      activeRole:
+          activeRole ?? (isAdmin ? AppUserRole.admin : AppUserRole.volunteer),
+      currentUserId: currentUserId,
       applications: visibleApplications,
     );
   }

@@ -1,3 +1,4 @@
+import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -26,30 +27,46 @@ class ConcertVolunteerRepository {
     final results = await Future.wait<Object?>([
       _fetchCounts(concertId),
       _fetchAccess(concertId),
+      _fetchCurrentAccount(),
     ]);
 
     final counts = results[0]! as ConcertVolunteerCounts;
     final access = results[1]! as _ConcertAccess;
-    final details = access.canViewApplications || access.canApply
-        ? await _fetchDetails(concertId, isPromoter: access.isPromoter)
+    final account = results[2]! as _CurrentAccount;
+    if (account.profileId != userId ||
+        account.status != UserAccountStatus.active) {
+      throw const AuthException('Compte utilisateur inactif.');
+    }
+
+    final isAdmin = account.role == AppUserRole.admin;
+    final isPromoter = account.role == AppUserRole.promoter;
+    final isVolunteer = account.role == AppUserRole.volunteer;
+    final canViewApplications =
+        isAdmin || (isPromoter && access.canViewApplications);
+    final canApply = isVolunteer && access.canApply;
+    final details = canViewApplications || canApply
+        ? await _fetchDetails(concertId, isPromoter: isPromoter)
         : const <ConcertVolunteerApplication>[];
-    final ownApplication = access.canApply && !access.canViewApplications
+    final ownApplication = canApply
         ? details
               .where((application) => application.userId == userId)
               .firstOrNull
         : null;
-    final applications = access.canViewApplications
+    final applications = canViewApplications
         ? details
         : const <ConcertVolunteerApplication>[];
 
     return ConcertVolunteerSectionData(
       ownApplication: ownApplication,
       counts: counts,
-      isAdmin: access.isAdmin,
-      isPromoter: access.isPromoter,
-      canViewApplications: access.canViewApplications,
-      canManageConcert: access.canManageConcert,
-      canApply: access.canApply,
+      isAdmin: isAdmin,
+      isPromoter: isPromoter,
+      activeRole: account.role,
+      currentUserId: userId,
+      canViewApplications: canViewApplications,
+      canManageConcert:
+          isAdmin || (isPromoter && access.canManageConcert),
+      canApply: canApply,
       applications: applications,
     );
   }
@@ -181,6 +198,14 @@ class ConcertVolunteerRepository {
     return _ConcertAccess.fromJson(rows.first! as Map<String, dynamic>);
   }
 
+  Future<_CurrentAccount> _fetchCurrentAccount() async {
+    final rows = await client.rpc<List<dynamic>>('get_current_user_context');
+    if (rows.isEmpty) {
+      throw const AuthException('Compte utilisateur introuvable.');
+    }
+    return _CurrentAccount.fromJson(rows.first! as Map<String, dynamic>);
+  }
+
   Future<List<ConcertVolunteerApplication>> _fetchDetails(
     String concertId, {
     required bool isPromoter,
@@ -204,8 +229,6 @@ class ConcertVolunteerRepository {
 
 class _ConcertAccess {
   const _ConcertAccess({
-    this.isAdmin = false,
-    this.isPromoter = false,
     this.canViewApplications = false,
     this.canManageConcert = false,
     this.canApply = false,
@@ -213,17 +236,33 @@ class _ConcertAccess {
 
   factory _ConcertAccess.fromJson(Map<String, dynamic> json) {
     return _ConcertAccess(
-      isAdmin: json['is_admin'] as bool? ?? false,
-      isPromoter: json['is_promoter'] as bool? ?? false,
       canViewApplications: json['can_view_applications'] as bool? ?? false,
       canManageConcert: json['can_manage_concert'] as bool? ?? false,
       canApply: json['can_apply'] as bool? ?? false,
     );
   }
 
-  final bool isAdmin;
-  final bool isPromoter;
   final bool canViewApplications;
   final bool canManageConcert;
   final bool canApply;
+}
+
+class _CurrentAccount {
+  const _CurrentAccount({
+    required this.profileId,
+    required this.role,
+    required this.status,
+  });
+
+  factory _CurrentAccount.fromJson(Map<String, dynamic> json) {
+    return _CurrentAccount(
+      profileId: json['profile_id'] as String,
+      role: AppUserRole.fromJson(json['role'] as String),
+      status: UserAccountStatus.fromJson(json['status'] as String),
+    );
+  }
+
+  final String profileId;
+  final AppUserRole role;
+  final UserAccountStatus status;
 }

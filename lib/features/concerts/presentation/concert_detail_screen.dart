@@ -1,6 +1,7 @@
 import 'package:club_sandwich/features/collections/data/maraude_collection_providers.dart';
 import 'package:club_sandwich/features/collections/domain/maraude_collection.dart';
 import 'package:club_sandwich/features/collections/presentation/maraude_collection_form_dialog.dart';
+import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_report.dart';
@@ -1319,6 +1320,12 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
   Widget _buildContent(ConcertVolunteerSectionData data) {
     _synchronizeTeamDraft(data.applications);
     final visibleApplications = _visibleApplications(data.applications);
+    final ownApplication =
+        data.activeRole == AppUserRole.volunteer &&
+            data.currentUserId != null &&
+            data.ownApplication?.userId == data.currentUserId
+        ? data.ownApplication
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1330,8 +1337,8 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
         const SizedBox(height: 4),
         Text(_selectedCountLabel(data.counts.selectedCount)),
         const SizedBox(height: 20),
-        if (data.canApply && !data.isAdmin && !data.isPromoter) ...[
-          if (data.ownApplication == null)
+        if (data.activeRole == AppUserRole.volunteer && data.canApply) ...[
+          if (ownApplication == null)
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton(
@@ -1346,16 +1353,13 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
             )
           else
             _OwnApplication(
-              application: data.ownApplication!,
+              application: ownApplication,
               isSubmitting: _isSubmitting,
-              onWithdraw:
-                  data.ownApplication!.status ==
-                      ConcertVolunteerStatus.withdrawn
-                  ? null
-                  : _withdraw,
+              onWithdraw: _canWithdraw(ownApplication.status)
+                  ? _withdraw
+                  : null,
               onReapply:
-                  data.ownApplication!.status ==
-                      ConcertVolunteerStatus.withdrawn
+                  ownApplication.status == ConcertVolunteerStatus.withdrawn
                   ? _reapply
                   : null,
             ),
@@ -1610,11 +1614,18 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
   }
 
   Future<void> _withdraw() async {
-    final application = ref
+    final section = ref
         .read(concertVolunteerSectionProvider(widget.concertId))
-        .value
-        ?.ownApplication;
-    if (application == null) return;
+        .value;
+    final application = section?.ownApplication;
+    if (section == null ||
+        application == null ||
+        section.activeRole != AppUserRole.volunteer ||
+        section.currentUserId == null ||
+        application.userId != section.currentUserId ||
+        !_canWithdraw(application.status)) {
+      return;
+    }
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1808,6 +1819,11 @@ class _PromoterApplications extends StatelessWidget {
       ],
     );
   }
+}
+
+bool _canWithdraw(ConcertVolunteerStatus status) {
+  return status == ConcertVolunteerStatus.pending ||
+      status == ConcertVolunteerStatus.selected;
 }
 
 class _OwnApplication extends StatelessWidget {

@@ -33,9 +33,6 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
   late final TextEditingController _notesController;
   late final TextEditingController _promoterContactNameController;
   late final TextEditingController _promoterContactPhoneController;
-  late final TextEditingController _cateringContactNameController;
-  late final TextEditingController _cateringContactPhoneController;
-  late final TextEditingController _cateringContactEmailController;
   Timer? _searchDebounce;
   late DateTime _date;
   TimeOfDay? _cateringClosesAt;
@@ -59,15 +56,6 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
     _promoterContactPhoneController = TextEditingController(
       text: concert?.promoterContactPhone,
     );
-    _cateringContactNameController = TextEditingController(
-      text: concert?.cateringContactName,
-    );
-    _cateringContactPhoneController = TextEditingController(
-      text: concert?.cateringContactPhone,
-    );
-    _cateringContactEmailController = TextEditingController(
-      text: concert?.cateringContactEmail,
-    );
     _date = concert?.date ?? DateTime.now();
     _cateringClosesAt = _optionalTimeFromDatabase(concert?.cateringClosesAt);
     _selectedVenue = concert?.venue;
@@ -82,9 +70,6 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
     _notesController.dispose();
     _promoterContactNameController.dispose();
     _promoterContactPhoneController.dispose();
-    _cateringContactNameController.dispose();
-    _cateringContactPhoneController.dispose();
-    _cateringContactEmailController.dispose();
     super.dispose();
   }
 
@@ -243,16 +228,6 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
                   minLines: 3,
                   maxLines: 3,
                 ),
-                const SizedBox(height: 24),
-                const Divider(),
-                const SizedBox(height: 16),
-                _ContactFields(
-                  fieldKeyPrefix: 'catering-contact',
-                  title: 'Contact catering',
-                  nameController: _cateringContactNameController,
-                  phoneController: _cateringContactPhoneController,
-                  emailController: _cateringContactEmailController,
-                ),
               ],
             ),
           ),
@@ -389,15 +364,6 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
           ),
           promoterContactPhone: _optionalValue(
             _promoterContactPhoneController.text,
-          ),
-          cateringContactName: _optionalValue(
-            _cateringContactNameController.text,
-          ),
-          cateringContactPhone: _optionalValue(
-            _cateringContactPhoneController.text,
-          ),
-          cateringContactEmail: _optionalValue(
-            _cateringContactEmailController.text,
           ),
         ),
       );
@@ -551,7 +517,6 @@ class _ContactFields extends StatelessWidget {
     required this.phoneController,
     this.helper,
     this.nameLabel = 'Nom',
-    this.emailController,
   });
 
   final String fieldKeyPrefix;
@@ -560,7 +525,6 @@ class _ContactFields extends StatelessWidget {
   final String nameLabel;
   final TextEditingController nameController;
   final TextEditingController phoneController;
-  final TextEditingController? emailController;
 
   @override
   Widget build(BuildContext context) {
@@ -587,17 +551,6 @@ class _ContactFields extends StatelessWidget {
           keyboardType: TextInputType.phone,
           textInputAction: TextInputAction.next,
         ),
-        if (emailController != null) ...[
-          const SizedBox(height: 12),
-          TextFormField(
-            key: ValueKey('$fieldKeyPrefix-email'),
-            controller: emailController,
-            decoration: const InputDecoration(labelText: 'E-mail'),
-            keyboardType: TextInputType.emailAddress,
-            validator: _validateOptionalEmail,
-            textInputAction: TextInputAction.next,
-          ),
-        ],
       ],
     );
   }
@@ -605,19 +558,6 @@ class _ContactFields extends StatelessWidget {
 
 String? _requiredValidator(String? value) {
   return value == null || value.trim().isEmpty ? 'Ce champ est requis.' : null;
-}
-
-String? _validateOptionalEmail(String? value) {
-  final normalized = value?.trim() ?? '';
-  if (normalized.isEmpty) return null;
-  final atIndex = normalized.indexOf('@');
-  final dotIndex = normalized.lastIndexOf('.');
-  if (atIndex <= 0 ||
-      dotIndex <= atIndex + 1 ||
-      dotIndex == normalized.length - 1) {
-    return 'Saisissez une adresse e-mail valide.';
-  }
-  return null;
 }
 
 String? _optionalValue(String value) {

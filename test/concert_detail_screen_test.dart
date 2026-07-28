@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/data/concert_repository.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
@@ -49,6 +50,8 @@ void main() {
             (ref, concertId) async => const ConcertVolunteerSectionData(
               counts: ConcertVolunteerCounts.empty(),
               isAdmin: false,
+              activeRole: AppUserRole.volunteer,
+              currentUserId: 'volunteer-id',
               applications: [],
             ),
           ),

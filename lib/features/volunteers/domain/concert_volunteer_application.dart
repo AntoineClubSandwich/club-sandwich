@@ -1,3 +1,4 @@
+import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/volunteers/domain/volunteer_profile.dart';
 
 const _unset = Object();
@@ -406,6 +407,8 @@ class ConcertVolunteerSectionData {
     required this.applications,
     this.ownApplication,
     this.isPromoter = false,
+    this.activeRole,
+    this.currentUserId,
     bool? canViewApplications,
     bool? canManageConcert,
     bool? canApply,
@@ -417,6 +420,8 @@ class ConcertVolunteerSectionData {
   final ConcertVolunteerCounts counts;
   final bool isAdmin;
   final bool isPromoter;
+  final AppUserRole? activeRole;
+  final String? currentUserId;
   final bool canViewApplications;
   final bool canManageConcert;
   final bool canApply;
