@@ -1,10 +1,14 @@
 import 'dart:async';
 
+import 'package:club_sandwich/features/auth/application/auth_providers.dart';
+import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/data/concert_repository.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_form.dart';
 import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dart';
+import 'package:club_sandwich/features/organizations/data/organization_providers.dart';
+import 'package:club_sandwich/features/organizations/domain/organization.dart';
 import 'package:club_sandwich/features/venues/data/venue_providers.dart';
 import 'package:club_sandwich/features/venues/data/venue_repository.dart';
 import 'package:club_sandwich/features/venues/domain/venue.dart';
@@ -22,6 +26,14 @@ void main() {
     List<Concert> concerts, {
     ConcertRepository? concertRepository,
     VenueRepository? venueRepository,
+    CurrentUserContext userContext = const CurrentUserContext(
+      profileId: 'promoter-profile-id',
+      role: AppUserRole.promoter,
+      organizationId: 'promoter-organization-id',
+      organizationName: 'Tourneur Exemple',
+      status: UserAccountStatus.active,
+    ),
+    List<Organization> organizations = const [],
     Size size = const Size(1200, 900),
   }) async {
     await tester.binding.setSurfaceSize(size);
@@ -45,6 +57,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          currentUserContextProvider.overrideWith(
+            (ref) async => userContext,
+          ),
+          organizationsProvider.overrideWith((ref) async => organizations),
           concertsProvider.overrideWith((ref) async => concerts),
           if (concertRepository != null)
             concertRepositoryProvider.overrideWithValue(concertRepository),
@@ -315,6 +331,58 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets(
+    'une création admin transmet l’organisation tourneur sélectionnée',
+    (tester) async {
+      final repository = _FakeConcertRepository();
+      final organization = Organization(
+        id: 'promoter-organization-id',
+        name: 'Tourneur Exemple',
+        slug: 'tourneur-exemple',
+        createdAt: DateTime.utc(2026, 7, 28),
+      );
+      await pumpConcerts(
+        tester,
+        const [],
+        concertRepository: repository,
+        venueRepository: _FakeVenueRepository(),
+        userContext: const CurrentUserContext(
+          profileId: 'admin-profile-id',
+          role: AppUserRole.admin,
+          status: UserAccountStatus.active,
+        ),
+        organizations: [organization],
+      );
+
+      await tester.tap(find.text('Ouvrir une maraude'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('concert-artist-field')),
+        'Artiste admin',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('concert-promoter-organization-field')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tourneur Exemple').last);
+      await tester.enterText(
+        find.byKey(const ValueKey('concert-venue-field')),
+        'Pl',
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Salle Pleyel'));
+      await tester.ensureVisible(find.text('Ouvrir la maraude'));
+      await tester.tap(find.text('Ouvrir la maraude'));
+      await tester.pumpAndSettle();
+
+      expect(
+        repository.createdDraft?.promoterOrganizationId,
+        'promoter-organization-id',
+      );
+    },
+  );
 
   testWidgets('le parcours d’édition enregistre les champs unifiés', (
     tester,

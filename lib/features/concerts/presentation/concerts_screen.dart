@@ -1,8 +1,12 @@
+import 'package:club_sandwich/features/auth/application/auth_providers.dart';
+import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_form.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_calendar.dart';
+import 'package:club_sandwich/features/organizations/data/organization_providers.dart';
+import 'package:club_sandwich/features/organizations/domain/organization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -181,9 +185,49 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
   }
 
   Future<void> _createConcert(BuildContext context) async {
+    var promoterOrganizations = const <Organization>[];
+    CurrentUserContext? account;
+    try {
+      account = await ref.read(currentUserContextProvider.future);
+    } on Exception {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de vérifier votre compte utilisateur.'),
+        ),
+      );
+      return;
+    }
+    if (account == null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Votre session n’est plus disponible.')),
+      );
+      return;
+    }
+    if (account.role == AppUserRole.admin) {
+      try {
+        promoterOrganizations = (await ref.read(organizationsProvider.future))
+            .where(
+              (organization) => organization.kind == OrganizationKind.promoter,
+            )
+            .toList(growable: false);
+      } on Exception {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Impossible de charger les organisations tourneurs.'),
+          ),
+        );
+        return;
+      }
+    }
+
+    if (!context.mounted) return;
     final created = await showDialog<bool>(
       context: context,
       builder: (context) => ConcertForm(
+        promoterOrganizations: promoterOrganizations,
         onSubmit: (draft) =>
             ref.read(concertRepositoryProvider).createConcert(draft),
       ),

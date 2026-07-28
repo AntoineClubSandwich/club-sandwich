@@ -411,7 +411,7 @@ class ConcertVolunteerSectionData {
     bool? canApply,
   }) : canViewApplications = canViewApplications ?? isAdmin,
        canManageConcert = canManageConcert ?? isAdmin,
-       canApply = canApply ?? !isAdmin;
+       canApply = canApply ?? (!isAdmin && !isPromoter);
 
   final ConcertVolunteerApplication? ownApplication;
   final ConcertVolunteerCounts counts;

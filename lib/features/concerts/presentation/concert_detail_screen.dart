@@ -1330,7 +1330,7 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
         const SizedBox(height: 4),
         Text(_selectedCountLabel(data.counts.selectedCount)),
         const SizedBox(height: 20),
-        if (data.canApply) ...[
+        if (data.canApply && !data.isAdmin && !data.isPromoter) ...[
           if (data.ownApplication == null)
             Align(
               alignment: Alignment.centerLeft,
@@ -1432,6 +1432,7 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
               isUpdating: _updatingApplications.contains(application.id),
               isRoleAvailable: (role) => _isRoleAvailable(role, application.id),
               onSelect: () => _selectInDraft(application.id),
+              onReject: () => _rejectApplication(application.id),
               onRemove: () => _removeFromDraft(application.id),
               onRoleChanged: (role) => _assignDraftRole(application.id, role),
               onAttendanceChanged:
@@ -1724,6 +1725,29 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
     } catch (error) {
       if (!mounted) return;
       _showError('Impossible de modifier cette présence.');
+    } finally {
+      if (mounted) {
+        setState(() => _updatingApplications.remove(applicationId));
+      }
+    }
+  }
+
+  Future<void> _rejectApplication(String applicationId) async {
+    setState(() => _updatingApplications.add(applicationId));
+    try {
+      await ref
+          .read(concertVolunteerRepositoryProvider)
+          .setStatus(applicationId, ConcertVolunteerStatus.notSelected);
+      _draftTeamRoles.remove(applicationId);
+      _serverTeamSignature = null;
+      ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Candidature refusée.')));
+    } catch (error) {
+      if (!mounted) return;
+      _showError('Impossible de refuser cette candidature.');
     } finally {
       if (mounted) {
         setState(() => _updatingApplications.remove(applicationId));
@@ -2052,6 +2076,7 @@ class _TeamCandidateCard extends StatelessWidget {
     required this.isUpdating,
     required this.isRoleAvailable,
     required this.onSelect,
+    required this.onReject,
     required this.onRemove,
     required this.onRoleChanged,
     required this.onAttendanceChanged,
@@ -2062,6 +2087,7 @@ class _TeamCandidateCard extends StatelessWidget {
   final bool isUpdating;
   final bool Function(MaraudeRole role) isRoleAvailable;
   final VoidCallback onSelect;
+  final VoidCallback onReject;
   final VoidCallback onRemove;
   final ValueChanged<MaraudeRole> onRoleChanged;
   final ValueChanged<VolunteerAttendanceStatus>? onAttendanceChanged;
@@ -2157,19 +2183,40 @@ class _TeamCandidateCard extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: ValueKey('view-volunteer-profile-${application.id}'),
+                onPressed: () =>
+                    _showVolunteerProfileDialog(context, application),
+                icon: const Icon(Icons.person_outline),
+                label: const Text('Voir le profil'),
+              ),
+            ),
             const Divider(height: 28),
             if (!isSelected)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton(
-                  key: ValueKey('select-volunteer-${application.id}'),
-                  onPressed:
-                      isUpdating ||
-                          application.status == ConcertVolunteerStatus.withdrawn
-                      ? null
-                      : onSelect,
-                  child: const Text('Sélectionner'),
-                ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton(
+                    key: ValueKey('select-volunteer-${application.id}'),
+                    onPressed:
+                        isUpdating ||
+                            application.status ==
+                                ConcertVolunteerStatus.withdrawn
+                        ? null
+                        : onSelect,
+                    child: const Text('Sélectionner'),
+                  ),
+                  if (application.status == ConcertVolunteerStatus.pending)
+                    OutlinedButton(
+                      key: ValueKey('reject-volunteer-${application.id}'),
+                      onPressed: isUpdating ? null : onReject,
+                      child: const Text('Refuser'),
+                    ),
+                ],
               )
             else ...[
               Text(
@@ -2241,7 +2288,7 @@ class _TeamCandidateCard extends StatelessWidget {
                   key: ValueKey('remove-volunteer-${application.id}'),
                   onPressed: isUpdating ? null : onRemove,
                   icon: const Icon(Icons.person_remove_outlined),
-                  label: const Text('Retirer'),
+                  label: const Text('Retirer de l’équipe'),
                 ),
               ),
             ],

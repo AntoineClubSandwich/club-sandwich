@@ -250,6 +250,7 @@ class ConcertDraft {
     required this.artist,
     required this.date,
     required this.venueId,
+    this.promoterOrganizationId,
     this.cateringClosesAt,
     this.notes,
     this.promoterContactName,
@@ -262,6 +263,7 @@ class ConcertDraft {
   final String artist;
   final DateTime date;
   final String venueId;
+  final String? promoterOrganizationId;
   final String? cateringClosesAt;
   final String? notes;
   final String? promoterContactName;

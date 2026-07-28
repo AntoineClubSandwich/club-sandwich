@@ -1,15 +1,22 @@
 import 'dart:async';
 
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
+import 'package:club_sandwich/features/organizations/domain/organization.dart';
 import 'package:club_sandwich/features/venues/data/venue_providers.dart';
 import 'package:club_sandwich/features/venues/domain/venue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ConcertForm extends ConsumerStatefulWidget {
-  const ConcertForm({required this.onSubmit, this.initialConcert, super.key});
+  const ConcertForm({
+    required this.onSubmit,
+    this.initialConcert,
+    this.promoterOrganizations = const [],
+    super.key,
+  });
 
   final Concert? initialConcert;
+  final List<Organization> promoterOrganizations;
   final Future<void> Function(ConcertDraft draft) onSubmit;
 
   bool get isEditing => initialConcert != null;
@@ -33,6 +40,7 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
   late DateTime _date;
   TimeOfDay? _cateringClosesAt;
   Venue? _selectedVenue;
+  String? _promoterOrganizationId;
   List<Venue> _venueResults = const [];
   bool _isSearchingVenues = false;
   bool _isSubmitting = false;
@@ -63,6 +71,7 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
     _date = concert?.date ?? DateTime.now();
     _cateringClosesAt = _optionalTimeFromDatabase(concert?.cateringClosesAt);
     _selectedVenue = concert?.venue;
+    _promoterOrganizationId = concert?.promoterOrganizationId;
   }
 
   @override
@@ -113,6 +122,36 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
                   validator: _requiredValidator,
                   textInputAction: TextInputAction.next,
                 ),
+                if (widget.promoterOrganizations.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    key: const ValueKey('concert-promoter-organization-field'),
+                    initialValue: _promoterOrganizationId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Organisation tourneur',
+                      helperText:
+                          'La maraude sera visible par les comptes de cette '
+                          'organisation.',
+                    ),
+                    items: [
+                      for (final organization in widget.promoterOrganizations)
+                        DropdownMenuItem(
+                          value: organization.id,
+                          child: Text(
+                            organization.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    validator: (value) =>
+                        value == null ? 'Ce champ est requis.' : null,
+                    onChanged: _isSubmitting
+                        ? null
+                        : (value) =>
+                              setState(() => _promoterOrganizationId = value),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 _VenueField(
                   fieldKey: _venueFieldKey,
@@ -340,6 +379,7 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
           artist: _artistController.text.trim(),
           date: _date,
           venueId: venue.id,
+          promoterOrganizationId: _promoterOrganizationId,
           cateringClosesAt: _cateringClosesAt == null
               ? null
               : _timeToDatabase(_cateringClosesAt!),

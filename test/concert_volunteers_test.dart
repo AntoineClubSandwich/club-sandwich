@@ -660,6 +660,90 @@ void main() {
     expect(find.text('Présence : En attente'), findsOneWidget);
   });
 
+  testWidgets(
+    'un admin voit les actions de gestion et jamais le désistement personnel',
+    (tester) async {
+      final pendingApplication = _application(
+        id: 'pending-id',
+        userId: 'volunteer-id',
+        profile: const VolunteerProfile(
+          userId: 'volunteer-id',
+          firstName: 'Camille',
+          lastName: 'Martin',
+        ),
+      );
+      final repository = _FakeConcertVolunteerRepository(
+        isAdmin: true,
+        ownApplication: pendingApplication,
+        applications: [pendingApplication],
+      );
+      await _pumpDetail(tester, repository);
+
+      expect(find.text('Voir le profil'), findsOneWidget);
+      expect(find.text('Sélectionner'), findsOneWidget);
+      expect(find.text('Refuser'), findsOneWidget);
+      expect(find.text('Voir mon profil'), findsNothing);
+      expect(find.text('Je me désiste'), findsNothing);
+    },
+  );
+
+  testWidgets('sélection et refus actualisent immédiatement les cartes admin', (
+    tester,
+  ) async {
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [
+        _application(
+          id: 'selected-locally',
+          userId: 'first-volunteer',
+          profile: const VolunteerProfile(
+            userId: 'first-volunteer',
+            firstName: 'Alex',
+          ),
+        ),
+        _application(
+          id: 'rejected',
+          userId: 'second-volunteer',
+          profile: const VolunteerProfile(
+            userId: 'second-volunteer',
+            firstName: 'Camille',
+          ),
+        ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
+
+    final select = find.byKey(
+      const ValueKey('select-volunteer-selected-locally'),
+    );
+    await tester.ensureVisible(select);
+    await tester.tap(select);
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('remove-volunteer-selected-locally')),
+      findsOneWidget,
+    );
+    expect(find.text('Retirer de l’équipe'), findsOneWidget);
+
+    final reject = find.byKey(const ValueKey('reject-volunteer-rejected'));
+    await tester.ensureVisible(reject);
+    await tester.tap(reject);
+    await tester.pumpAndSettle();
+
+    expect(
+      repository.applications
+          .firstWhere((application) => application.id == 'rejected')
+          .status,
+      ConcertVolunteerStatus.notSelected,
+    );
+    expect(find.text('Candidature refusée.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('reject-volunteer-rejected')),
+      findsNothing,
+    );
+  });
+
   testWidgets('sélectionne en un clic et met le résumé à jour sans requête', (
     tester,
   ) async {

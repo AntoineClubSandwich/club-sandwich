@@ -49,6 +49,8 @@ class ConcertRepository {
 
   Future<Concert> createConcert(ConcertDraft draft) async {
     final context = await _currentContext();
+    final promoterOrganizationId =
+        context.promoterOrganizationId ?? draft.promoterOrganizationId;
     final row = await _client
         .from('concerts')
         .insert({
@@ -56,8 +58,7 @@ class ConcertRepository {
           'status': ConcertStatus.planned.jsonValue,
           'organization_id': context.organizationId,
           'created_by': context.userId,
-          if (context.promoterOrganizationId != null)
-            'promoter_organization_id': context.promoterOrganizationId,
+          'promoter_organization_id': ?promoterOrganizationId,
         })
         .select()
         .single();

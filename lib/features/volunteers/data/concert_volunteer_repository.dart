@@ -33,7 +33,7 @@ class ConcertVolunteerRepository {
     final details = access.canViewApplications || access.canApply
         ? await _fetchDetails(concertId, isPromoter: access.isPromoter)
         : const <ConcertVolunteerApplication>[];
-    final ownApplication = access.canApply
+    final ownApplication = access.canApply && !access.canViewApplications
         ? details
               .where((application) => application.userId == userId)
               .firstOrNull

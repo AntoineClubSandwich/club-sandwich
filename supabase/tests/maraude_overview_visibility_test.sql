@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(9);
+select plan(10);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -164,9 +164,41 @@ select set_config(
   true
 );
 
+select lives_ok(
+  $$
+    insert into public.concerts (
+      id,
+      organization_id,
+      promoter_organization_id,
+      artist,
+      concert_date,
+      venue_id,
+      created_by
+    )
+    select
+      '83000000-0000-0000-0000-000000000004',
+      club.id,
+      '82000000-0000-0000-0000-000000000001',
+      'Créée par admin pour A',
+      '2026-10-04',
+      venue.id,
+      '81000000-0000-0000-0000-000000000001'
+    from public.organizations club
+    cross join lateral (
+      select id
+      from public.venues
+      where is_active
+      order by name
+      limit 1
+    ) venue
+    where club.slug = 'club-sandwich'
+  $$,
+  'Un admin rattache une nouvelle maraude à une organisation tourneur'
+);
+
 select is(
   (select count(*) from public.get_maraude_overview(100)),
-  3::bigint,
+  4::bigint,
   'L’administrateur voit toutes les maraudes'
 );
 
@@ -176,7 +208,7 @@ select is(
     from public.get_maraude_overview(100)
     where is_admin
   ),
-  3::bigint,
+  4::bigint,
   'La vue identifie correctement l’administrateur'
 );
 
@@ -192,8 +224,13 @@ select results_eq(
     from public.get_maraude_overview(100)
     order by artist
   $$,
-  $$ values ('Brouillon A'::text), ('Ouverte A'::text) $$,
-  'Le tourneur voit uniquement les maraudes de son organisation'
+  $$
+    values
+      ('Brouillon A'::text),
+      ('Créée par admin pour A'::text),
+      ('Ouverte A'::text)
+  $$,
+  'Le tourneur voit aussi la maraude admin rattachée à son organisation'
 );
 
 select set_config(
@@ -219,7 +256,7 @@ select set_config(
 
 select is(
   (select count(*) from public.get_maraude_overview(100)),
-  3::bigint,
+  4::bigint,
   'Le bénévole voit toutes les maraudes ouvertes et son historique'
 );
 
@@ -230,7 +267,12 @@ select results_eq(
     where maraude_status = 'open'
     order by artist
   $$,
-  $$ values ('Ouverte A'::text), ('Ouverte B'::text) $$,
+  $$
+    values
+      ('Créée par admin pour A'::text),
+      ('Ouverte A'::text),
+      ('Ouverte B'::text)
+  $$,
   'Le bénévole voit les maraudes ouvertes sans candidature'
 );
 
