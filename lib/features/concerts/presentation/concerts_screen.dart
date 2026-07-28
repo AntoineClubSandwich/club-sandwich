@@ -194,6 +194,7 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
     if (created != true || !context.mounted) return;
 
     ref.invalidate(concertsProvider);
+    ref.invalidate(maraudeOverviewProvider);
     await ref.read(concertsProvider.future);
     if (!context.mounted) return;
 

@@ -7,6 +7,7 @@ import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_operational_report_card.dart';
 import 'package:club_sandwich/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
+import 'package:club_sandwich/features/volunteers/presentation/volunteers_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -165,6 +166,11 @@ void main() {
   ) async {
     final items = [
       _overview(
+        id: 'open',
+        date: DateTime.now().subtract(const Duration(days: 1)),
+        status: MaraudeStatus.open,
+      ),
+      _overview(
         id: 'selected',
         date: DateTime.now().add(const Duration(days: 1)),
         status: MaraudeStatus.teamReady,
@@ -187,10 +193,45 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('Maraudes ouvertes'), findsOneWidget);
+    expect(find.text('Artiste open'), findsOneWidget);
+    expect(find.text('Je me propose'), findsOneWidget);
     expect(find.text('Prochaine mission'), findsOneWidget);
     expect(find.text('Disponibilités en attente'), findsOneWidget);
     expect(find.text('Rôle : Chargé.e de logistique'), findsOneWidget);
     expect(find.text('Candidatures à examiner'), findsNothing);
+  });
+
+  testWidgets('la page bénévole affiche une maraude ouverte sans candidature', (
+    tester,
+  ) async {
+    final items = [
+      _overview(
+        id: 'without-application',
+        date: DateTime.now().subtract(const Duration(days: 1)),
+        status: MaraudeStatus.open,
+      ),
+      _overview(
+        id: 'own-pending',
+        date: DateTime.now().add(const Duration(days: 1)),
+        status: MaraudeStatus.open,
+        ownStatus: ConcertVolunteerStatus.pending,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [maraudeOverviewProvider.overrideWith((ref) async => items)],
+        child: const MaterialApp(home: VolunteersScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Maraudes ouvertes'), findsOneWidget);
+    expect(find.text('Artiste without-application'), findsOneWidget);
+    expect(find.text('Je me propose'), findsOneWidget);
+    expect(find.text('Artiste own-pending'), findsOneWidget);
+    expect(find.text('Disponibilité transmise'), findsOneWidget);
   });
 }
 

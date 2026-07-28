@@ -46,6 +46,7 @@ class AppShell extends ConsumerWidget {
         ref.invalidate(membershipsProvider);
         ref.invalidate(concertsProvider);
         ref.invalidate(concertDetailsProvider);
+        ref.invalidate(maraudeOverviewProvider);
         ref.invalidate(concertVolunteerSectionProvider);
         ref.invalidate(invitationCampaignsProvider);
         ref.invalidate(currentUserContextProvider);

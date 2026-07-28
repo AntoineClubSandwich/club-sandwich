@@ -252,6 +252,15 @@ class _VolunteerDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final today = _day(DateTime.now());
+    final open =
+        items
+            .where(
+              (item) =>
+                  item.maraudeStatus == MaraudeStatus.open &&
+                  item.ownStatus == null,
+            )
+            .toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
     final selected =
         items
             .where(
@@ -271,6 +280,11 @@ class _VolunteerDashboard extends StatelessWidget {
 
     return Column(
       children: [
+        _DashboardSection(
+          title: 'Maraudes ouvertes',
+          items: open,
+          actionLabel: 'Je me propose',
+        ),
         _DashboardSection(
           title: 'Prochaine mission',
           items: selected.take(1).toList(),

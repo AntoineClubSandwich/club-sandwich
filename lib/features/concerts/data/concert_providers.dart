@@ -20,9 +20,10 @@ final concertDetailsProvider = FutureProvider.family<Concert?, String>(
       ref.watch(concertRepositoryProvider).fetchConcert(concertId),
 );
 
-final maraudeOverviewProvider = FutureProvider<List<MaraudeOverview>>(
-  (ref) => ref.watch(concertRepositoryProvider).fetchMaraudeOverview(),
-);
+final maraudeOverviewProvider =
+    FutureProvider.autoDispose<List<MaraudeOverview>>(
+      (ref) => ref.watch(concertRepositoryProvider).fetchMaraudeOverview(),
+    );
 
 enum ConcertViewMode { list, agenda }
 

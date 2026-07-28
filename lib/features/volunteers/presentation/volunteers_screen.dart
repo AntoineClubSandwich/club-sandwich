@@ -95,6 +95,15 @@ class _VolunteerMaraudes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final open =
+        items
+            .where(
+              (item) =>
+                  item.maraudeStatus == MaraudeStatus.open &&
+                  item.ownStatus == null,
+            )
+            .toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
     final ownItems = items
         .where((item) => item.ownStatus != null)
         .toList(growable: false);
@@ -124,9 +133,19 @@ class _VolunteerMaraudes extends StatelessWidget {
       children: [
         Text('Mes maraudes', style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 20),
-        if (upcoming.isEmpty)
+        if (open.isEmpty && upcoming.isEmpty)
           const Text('Aucune maraude à venir.')
-        else ...[
+        else if (open.isNotEmpty) ...[
+          Text(
+            'Maraudes ouvertes',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          for (final item in open)
+            MaraudeOverviewCard(maraude: item, actionLabel: 'Je me propose'),
+        ],
+        if (upcoming.isNotEmpty) ...[
+          if (open.isNotEmpty) const SizedBox(height: 24),
           Text('À venir', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           for (final item in upcoming)
