@@ -22,20 +22,16 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
   final _formKey = GlobalKey<FormState>();
   final _venueFieldKey = GlobalKey<FormFieldState<Venue>>();
   late final TextEditingController _artistController;
-  late final TextEditingController _tourController;
   late final TextEditingController _venueController;
   late final TextEditingController _notesController;
   late final TextEditingController _promoterContactNameController;
   late final TextEditingController _promoterContactPhoneController;
-  late final TextEditingController _promoterContactEmailController;
   late final TextEditingController _cateringContactNameController;
   late final TextEditingController _cateringContactPhoneController;
   late final TextEditingController _cateringContactEmailController;
   Timer? _searchDebounce;
   late DateTime _date;
-  TimeOfDay? _concertTime;
   TimeOfDay? _cateringClosesAt;
-  late ConcertStatus _status;
   Venue? _selectedVenue;
   List<Venue> _venueResults = const [];
   bool _isSearchingVenues = false;
@@ -47,7 +43,6 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
     super.initState();
     final concert = widget.initialConcert;
     _artistController = TextEditingController(text: concert?.artist);
-    _tourController = TextEditingController(text: concert?.tour);
     _venueController = TextEditingController(text: concert?.venueName);
     _notesController = TextEditingController(text: concert?.notes);
     _promoterContactNameController = TextEditingController(
@@ -55,9 +50,6 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
     );
     _promoterContactPhoneController = TextEditingController(
       text: concert?.promoterContactPhone,
-    );
-    _promoterContactEmailController = TextEditingController(
-      text: concert?.promoterContactEmail,
     );
     _cateringContactNameController = TextEditingController(
       text: concert?.cateringContactName,
@@ -69,9 +61,7 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
       text: concert?.cateringContactEmail,
     );
     _date = concert?.date ?? DateTime.now();
-    _concertTime = _optionalTimeFromDatabase(concert?.time);
     _cateringClosesAt = _optionalTimeFromDatabase(concert?.cateringClosesAt);
-    _status = concert?.status ?? ConcertStatus.planned;
     _selectedVenue = concert?.venue;
   }
 
@@ -79,12 +69,10 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
   void dispose() {
     _searchDebounce?.cancel();
     _artistController.dispose();
-    _tourController.dispose();
     _venueController.dispose();
     _notesController.dispose();
     _promoterContactNameController.dispose();
     _promoterContactPhoneController.dispose();
-    _promoterContactEmailController.dispose();
     _cateringContactNameController.dispose();
     _cateringContactPhoneController.dispose();
     _cateringContactEmailController.dispose();
@@ -126,15 +114,6 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
                   textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  key: const ValueKey('concert-tour-field'),
-                  controller: _tourController,
-                  decoration: const InputDecoration(
-                    labelText: 'Tournée (optionnel)',
-                  ),
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: 16),
                 _VenueField(
                   fieldKey: _venueFieldKey,
                   controller: _venueController,
@@ -156,72 +135,22 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
                   ),
                 ],
                 const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    SizedBox(
-                      width: 260,
-                      child: OutlinedButton.icon(
-                        key: const ValueKey('concert-date-field'),
-                        onPressed: _selectDate,
-                        icon: const Icon(Icons.calendar_today_outlined),
-                        label: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(_formatDate(_date)),
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 260,
-                      child: OutlinedButton.icon(
-                        key: const ValueKey('concert-time-field'),
-                        onPressed: _selectConcertTime,
-                        icon: const Icon(Icons.schedule_outlined),
-                        label: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            _concertTime == null
-                                ? 'Heure (optionnelle)'
-                                : _displayTime(_concertTime!),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (_concertTime != null)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => setState(() => _concertTime = null),
-                      child: const Text('Effacer l’heure'),
-                    ),
+                OutlinedButton.icon(
+                  key: const ValueKey('concert-date-field'),
+                  onPressed: _selectDate,
+                  icon: const Icon(Icons.calendar_today_outlined),
+                  label: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(_formatDate(_date)),
                   ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<ConcertStatus>(
-                  key: const ValueKey('concert-status-field'),
-                  initialValue: _status,
-                  decoration: InputDecoration(
-                    labelText: 'Statut',
-                    helperText: widget.isEditing
-                        ? null
-                        : 'Une nouvelle maraude est publiée immédiatement.',
-                  ),
-                  items: [
-                    for (final status in ConcertStatus.values)
-                      DropdownMenuItem(
-                        value: status,
-                        child: Text(_statusLabel(status)),
-                      ),
-                  ],
-                  onChanged: widget.isEditing
-                      ? (value) {
-                          if (value != null) setState(() => _status = value);
-                        }
-                      : null,
                 ),
                 const SizedBox(height: 16),
+                Text(
+                  'Fermeture du catering '
+                  '(à renseigner quand transmise par le catering)',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 8),
                 OutlinedButton.icon(
                   key: const ValueKey('catering-closes-field'),
                   onPressed: _selectCateringTime,
@@ -230,9 +159,8 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       _cateringClosesAt == null
-                          ? 'Fermeture du catering (optionnelle)'
-                          : 'Fermeture du catering : '
-                                '${_displayTime(_cateringClosesAt!)}',
+                          ? 'Choisir une heure'
+                          : _displayTime(_cateringClosesAt!),
                     ),
                   ),
                 ),
@@ -251,11 +179,15 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
                   ),
                 ],
                 const SizedBox(height: 16),
-                _ReadOnlyInformation(
-                  label: 'Producteur',
-                  value:
-                      widget.initialConcert?.promoterOrganizationName ??
-                      'Déterminé automatiquement selon le compte connecté',
+                _ContactFields(
+                  fieldKeyPrefix: 'promoter-contact',
+                  title: 'Contact tourneur',
+                  helper:
+                      'Personne à contacter pour toute question relative à '
+                      'cette maraude.',
+                  nameLabel: 'Nom et prénom',
+                  nameController: _promoterContactNameController,
+                  phoneController: _promoterContactPhoneController,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -265,6 +197,9 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
                   textInputAction: TextInputAction.newline,
                   decoration: const InputDecoration(
                     labelText: 'Notes (optionnel)',
+                    hintText:
+                        'Ex. : Accès, code porte, consignes particulières, '
+                        'etc.',
                   ),
                   minLines: 3,
                   maxLines: 3,
@@ -272,19 +207,8 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
                 const SizedBox(height: 24),
                 const Divider(),
                 const SizedBox(height: 16),
-                Text(
-                  'Contacts sur place',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 16),
                 _ContactFields(
-                  title: 'Contact tourneur',
-                  nameController: _promoterContactNameController,
-                  phoneController: _promoterContactPhoneController,
-                  emailController: _promoterContactEmailController,
-                ),
-                const SizedBox(height: 20),
-                _ContactFields(
+                  fieldKeyPrefix: 'catering-contact',
                   title: 'Contact catering',
                   nameController: _cateringContactNameController,
                   phoneController: _cateringContactPhoneController,
@@ -393,14 +317,6 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
     if (selected != null) setState(() => _date = selected);
   }
 
-  Future<void> _selectConcertTime() async {
-    final selected = await showTimePicker(
-      context: context,
-      initialTime: _concertTime ?? TimeOfDay.now(),
-    );
-    if (selected != null) setState(() => _concertTime = selected);
-  }
-
   Future<void> _selectCateringTime() async {
     final selected = await showTimePicker(
       context: context,
@@ -422,10 +338,7 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
       await widget.onSubmit(
         ConcertDraft(
           artist: _artistController.text.trim(),
-          tour: _optionalValue(_tourController.text),
           date: _date,
-          time: _concertTime == null ? null : _timeToDatabase(_concertTime!),
-          status: _status,
           venueId: venue.id,
           cateringClosesAt: _cateringClosesAt == null
               ? null
@@ -436,9 +349,6 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
           ),
           promoterContactPhone: _optionalValue(
             _promoterContactPhoneController.text,
-          ),
-          promoterContactEmail: _optionalValue(
-            _promoterContactEmailController.text,
           ),
           cateringContactName: _optionalValue(
             _cateringContactNameController.text,
@@ -595,16 +505,22 @@ class _ReadOnlyInformation extends StatelessWidget {
 
 class _ContactFields extends StatelessWidget {
   const _ContactFields({
+    required this.fieldKeyPrefix,
     required this.title,
     required this.nameController,
     required this.phoneController,
-    required this.emailController,
+    this.helper,
+    this.nameLabel = 'Nom',
+    this.emailController,
   });
 
+  final String fieldKeyPrefix;
   final String title;
+  final String? helper;
+  final String nameLabel;
   final TextEditingController nameController;
   final TextEditingController phoneController;
-  final TextEditingController emailController;
+  final TextEditingController? emailController;
 
   @override
   Widget build(BuildContext context) {
@@ -612,27 +528,36 @@ class _ContactFields extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title, style: Theme.of(context).textTheme.labelLarge),
+        if (helper != null) ...[
+          const SizedBox(height: 4),
+          Text(helper!, style: Theme.of(context).textTheme.bodySmall),
+        ],
         const SizedBox(height: 12),
         TextFormField(
+          key: ValueKey('$fieldKeyPrefix-name'),
           controller: nameController,
-          decoration: const InputDecoration(labelText: 'Nom'),
+          decoration: InputDecoration(labelText: nameLabel),
           textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 12),
         TextFormField(
+          key: ValueKey('$fieldKeyPrefix-phone'),
           controller: phoneController,
           decoration: const InputDecoration(labelText: 'Téléphone'),
           keyboardType: TextInputType.phone,
           textInputAction: TextInputAction.next,
         ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: emailController,
-          decoration: const InputDecoration(labelText: 'E-mail'),
-          keyboardType: TextInputType.emailAddress,
-          validator: _validateOptionalEmail,
-          textInputAction: TextInputAction.next,
-        ),
+        if (emailController != null) ...[
+          const SizedBox(height: 12),
+          TextFormField(
+            key: ValueKey('$fieldKeyPrefix-email'),
+            controller: emailController,
+            decoration: const InputDecoration(labelText: 'E-mail'),
+            keyboardType: TextInputType.emailAddress,
+            validator: _validateOptionalEmail,
+            textInputAction: TextInputAction.next,
+          ),
+        ],
       ],
     );
   }
@@ -685,13 +610,4 @@ TimeOfDay _recommendedArrival(TimeOfDay cateringClosesAt) {
   final totalMinutes =
       (cateringClosesAt.hour * 60 + cateringClosesAt.minute - 15) % (24 * 60);
   return TimeOfDay(hour: totalMinutes ~/ 60, minute: totalMinutes % 60);
-}
-
-String _statusLabel(ConcertStatus status) {
-  return switch (status) {
-    ConcertStatus.planned => 'Planifié',
-    ConcertStatus.confirmed => 'Confirmé',
-    ConcertStatus.completed => 'Terminé',
-    ConcertStatus.cancelled => 'Annulé',
-  };
 }

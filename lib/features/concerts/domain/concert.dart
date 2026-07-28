@@ -60,7 +60,6 @@ class Concert {
     this.operationalReport,
     this.collections = const [],
     this.distribution,
-    this.tour,
     this.time,
     this.notes,
     this.venueId,
@@ -80,7 +79,6 @@ class Concert {
   final String id;
   final String organizationId;
   final String artist;
-  final String? tour;
   final DateTime date;
   final String? time;
   final ConcertStatus status;
@@ -115,7 +113,6 @@ class Concert {
       id: json['id'] as String,
       organizationId: json['organization_id'] as String,
       artist: json['artist'] as String,
-      tour: json['tour'] as String?,
       date: DateTime.parse(json['concert_date'] as String),
       time: json['concert_time'] as String?,
       status: ConcertStatus.fromJson(json['status'] as String),
@@ -171,7 +168,6 @@ class Concert {
       'id': id,
       'organization_id': organizationId,
       'artist': artist,
-      'tour': tour,
       'concert_date': _dateToJson(date),
       'concert_time': time,
       'status': status.jsonValue,
@@ -254,30 +250,22 @@ class ConcertDraft {
     required this.artist,
     required this.date,
     required this.venueId,
-    required this.status,
-    this.tour,
-    this.time,
     this.cateringClosesAt,
     this.notes,
     this.promoterContactName,
     this.promoterContactPhone,
-    this.promoterContactEmail,
     this.cateringContactName,
     this.cateringContactPhone,
     this.cateringContactEmail,
   });
 
   final String artist;
-  final String? tour;
   final DateTime date;
-  final String? time;
   final String venueId;
   final String? cateringClosesAt;
-  final ConcertStatus status;
   final String? notes;
   final String? promoterContactName;
   final String? promoterContactPhone;
-  final String? promoterContactEmail;
   final String? cateringContactName;
   final String? cateringContactPhone;
   final String? cateringContactEmail;
@@ -285,16 +273,12 @@ class ConcertDraft {
   Map<String, dynamic> toJson() {
     return {
       'artist': artist,
-      'tour': tour,
       'concert_date': _dateToJson(date),
-      'concert_time': time,
-      'status': status.jsonValue,
       'venue_id': venueId,
       'catering_closes_at': cateringClosesAt,
       'notes': notes,
       'promoter_contact_name': _nullIfBlank(promoterContactName),
       'promoter_contact_phone': _nullIfBlank(promoterContactPhone),
-      'promoter_contact_email': _nullIfBlank(promoterContactEmail),
       'catering_contact_name': _nullIfBlank(cateringContactName),
       'catering_contact_phone': _nullIfBlank(cateringContactPhone),
       'catering_contact_email': _nullIfBlank(cateringContactEmail),

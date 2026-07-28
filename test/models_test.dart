@@ -62,7 +62,6 @@ void main() {
       'id': '8714fd8c-c080-47e8-849a-1309bbd9950d',
       'organization_id': '3bc8ad12-a047-4a80-a3de-abab6791dc35',
       'artist': 'Artiste',
-      'tour': null,
       'concert_date': '2026-07-24',
       'concert_time': '20:30:00',
       'status': 'confirmed',
@@ -102,27 +101,26 @@ void main() {
       artist: 'Artiste',
       date: DateTime(2026, 7, 24),
       venueId: 'eb3127ff-a9af-4968-ac67-cba782488eef',
-      status: ConcertStatus.planned,
       cateringClosesAt: '23:00:00',
     );
 
     expect(draft.toJson(), {
       'artist': 'Artiste',
-      'tour': null,
       'concert_date': '2026-07-24',
-      'concert_time': null,
-      'status': 'planned',
       'venue_id': 'eb3127ff-a9af-4968-ac67-cba782488eef',
       'catering_closes_at': '23:00:00',
       'notes': null,
       'promoter_contact_name': null,
       'promoter_contact_phone': null,
-      'promoter_contact_email': null,
       'catering_contact_name': null,
       'catering_contact_phone': null,
       'catering_contact_email': null,
     });
     expect(draft.toJson(), isNot(contains('title')));
+    expect(draft.toJson(), isNot(contains('tour')));
+    expect(draft.toJson(), isNot(contains('concert_time')));
+    expect(draft.toJson(), isNot(contains('status')));
+    expect(draft.toJson(), isNot(contains('promoter_contact_email')));
   });
 
   test('Concert lit les noms de salle et de producteur préchargés', () {
@@ -193,8 +191,6 @@ void main() {
       artist: 'Artiste',
       date: DateTime(2026, 9, 15),
       venueId: 'venue-id',
-      time: '20:00:00',
-      status: ConcertStatus.planned,
       promoterContactName: '   ',
       promoterContactPhone: ' +33 6 00 00 00 00 ',
       cateringContactEmail: '',

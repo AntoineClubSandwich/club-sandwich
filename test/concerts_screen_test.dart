@@ -130,7 +130,7 @@ void main() {
     expect(find.text('Titre'), findsNothing);
   });
 
-  testWidgets('préremplit tous les champs existants en modification', (
+  testWidgets('préremplit les champs du formulaire simplifié en modification', (
     tester,
   ) async {
     const venue = Venue(
@@ -146,7 +146,6 @@ void main() {
     );
     final concert = buildConcert(
       artist: 'VICTOR',
-      tour: 'Nouvelle tournée',
       time: '21:30:00',
       status: ConcertStatus.confirmed,
       venue: venue,
@@ -173,16 +172,31 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_fieldText(tester, 'concert-artist-field'), 'VICTOR');
-    expect(_fieldText(tester, 'concert-tour-field'), 'Nouvelle tournée');
     expect(_fieldText(tester, 'concert-venue-field'), 'Olympia');
-    expect(find.text('21:30'), findsOneWidget);
-    expect(find.text('Confirmé'), findsOneWidget);
-    expect(find.text('Fermeture du catering : 23:00'), findsOneWidget);
-    expect(find.text('Producteur Exemple'), findsOneWidget);
+    expect(find.byKey(const ValueKey('concert-tour-field')), findsNothing);
+    expect(find.byKey(const ValueKey('concert-time-field')), findsNothing);
+    expect(find.byKey(const ValueKey('concert-status-field')), findsNothing);
+    expect(
+      find.text(
+        'Fermeture du catering '
+        '(à renseigner quand transmise par le catering)',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('23:00'), findsOneWidget);
+    expect(find.text('Producteur Exemple'), findsNothing);
     expect(find.text('Rue Caumartin, 75009 Paris'), findsOneWidget);
     expect(find.text('Sonner à la porte noire.'), findsOneWidget);
     expect(find.text('Récupération côté scène'), findsOneWidget);
-    expect(find.text('Camille'), findsOneWidget);
+    expect(_fieldText(tester, 'promoter-contact-name'), 'Camille');
+    expect(_fieldText(tester, 'promoter-contact-phone'), '0600000000');
+    expect(find.byKey(const ValueKey('promoter-contact-email')), findsNothing);
+    expect(
+      find.text(
+        'Personne à contacter pour toute question relative à cette maraude.',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Alex'), findsOneWidget);
   });
 
@@ -193,6 +207,10 @@ void main() {
     await tester.tap(find.text('Ouvrir une maraude'));
     await tester.pumpAndSettle();
 
+    expect(
+      find.text('Ex. : Accès, code porte, consignes particulières, etc.'),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Ouvrir la maraude'));
     await tester.pump();
 
@@ -277,12 +295,22 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Salle Pleyel'));
+    await tester.enterText(
+      find.byKey(const ValueKey('promoter-contact-name')),
+      'Camille Martin',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('promoter-contact-phone')),
+      '06 00 00 00 00',
+    );
     await tester.ensureVisible(find.text('Ouvrir la maraude'));
     await tester.tap(find.text('Ouvrir la maraude'));
     await tester.pumpAndSettle();
 
     expect(repository.createdDraft?.artist, 'Nouvel artiste');
     expect(repository.createdDraft?.venueId, testVenue.id);
+    expect(repository.createdDraft?.promoterContactName, 'Camille Martin');
+    expect(repository.createdDraft?.promoterContactPhone, '06 00 00 00 00');
     expect(find.text('Concert créé.'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -518,12 +546,12 @@ class _FakeConcertRepository extends ConcertRepository {
     createdDraft = draft;
     return buildConcert(
       artist: draft.artist,
-      tour: draft.tour,
       date: draft.date,
-      time: draft.time,
-      status: draft.status,
+      status: ConcertStatus.planned,
       venue: testVenue,
       cateringClosesAt: draft.cateringClosesAt,
+      promoterContactName: draft.promoterContactName,
+      promoterContactPhone: draft.promoterContactPhone,
     );
   }
 
@@ -534,12 +562,12 @@ class _FakeConcertRepository extends ConcertRepository {
     return buildConcert(
       id: concertId,
       artist: draft.artist,
-      tour: draft.tour,
       date: draft.date,
-      time: draft.time,
-      status: draft.status,
+      status: ConcertStatus.planned,
       venue: testVenue,
       cateringClosesAt: draft.cateringClosesAt,
+      promoterContactName: draft.promoterContactName,
+      promoterContactPhone: draft.promoterContactPhone,
     );
   }
 
