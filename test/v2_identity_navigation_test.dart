@@ -738,6 +738,84 @@ void main() {
     },
   );
 
+  testWidgets(
+    'la confirmation d’une invitation rafraîchit le solde de crédits du bénévole',
+    (tester) async {
+      final repository = _FakeInvitationRepository();
+      var creditSummaryFetchCount = 0;
+      final ownApplication = InvitationApplication(
+        id: 'application-id',
+        userId: 'volunteer-profile-id',
+        status: InvitationApplicationStatus.selected,
+        createdAt: DateTime.utc(2026, 7, 28),
+        confirmationStatus: VolunteerConfirmationStatus.pending,
+        confirmationDueAt: DateTime.utc(2026, 8, 5, 12),
+      );
+
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1280, 900);
+      addTearDown(() {
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPhysicalSize();
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserContextProvider.overrideWith(
+              (ref) async => const CurrentUserContext(
+                profileId: 'volunteer-profile-id',
+                role: AppUserRole.volunteer,
+                status: UserAccountStatus.active,
+              ),
+            ),
+            invitationCampaignsProvider.overrideWith(
+              (ref) async => [_campaign(ownApplication: ownApplication)],
+            ),
+            invitationRepositoryProvider.overrideWithValue(repository),
+            volunteerCreditCountProvider.overrideWith((ref) async => 3),
+            volunteerCreditSummaryProvider.overrideWith((ref) async {
+              creditSummaryFetchCount += 1;
+              return const VolunteerCreditSummary(
+                earned: 3,
+                consumed: 0,
+                available: 3,
+              );
+            }),
+          ],
+          child: MaterialApp(
+            home: Column(
+              children: [
+                const Expanded(child: InvitationsScreen()),
+                Consumer(
+                  builder: (context, ref, _) {
+                    ref.watch(volunteerCreditSummaryProvider);
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final fetchCountBeforeConfirm = creditSummaryFetchCount;
+
+      await tester.tap(find.byKey(const ValueKey('confirm-invitation-button')));
+      await tester.pumpAndSettle();
+
+      expect(repository.confirmedApplicationIds, ['application-id']);
+      expect(
+        creditSummaryFetchCount,
+        greaterThan(fetchCountBeforeConfirm),
+        reason:
+            'le solde de crédits doit être rechargé après la confirmation '
+            'd’une invitation, sinon l’écran affiche un solde périmé',
+      );
+    },
+  );
+
   testWidgets('une invitation confirmée par le bénévole est affichée validée', (
     tester,
   ) async {

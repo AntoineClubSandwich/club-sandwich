@@ -605,32 +605,53 @@ void main() {
   testWidgets('combine salle, organisation, contact et statuts puis efface', (
     tester,
   ) async {
-    await pumpConcerts(tester, [
-      buildConcert(
-        id: 'matching',
-        artist: 'Artiste correspondant',
-        venue: testVenue,
-        promoterOrganizationName: 'Organisation Alpha',
-        promoterContactName: 'Camille Martin',
-        status: ConcertStatus.confirmed,
-        maraudeStatus: MaraudeStatus.open,
-      ),
-      buildConcert(
-        id: 'other',
-        artist: 'Autre artiste',
-        venue: const Venue(
-          id: 'other-venue',
-          name: 'Olympia',
-          city: 'Paris',
-          postalCode: '75009',
-          publicAddressLine1: '28 boulevard des Capucines',
+    await pumpConcerts(
+      tester,
+      [
+        buildConcert(
+          id: 'matching',
+          organizationId: 'organization-alpha',
+          artist: 'Artiste correspondant',
+          venue: testVenue,
+          promoterOrganizationName: 'Organisation Alpha',
+          promoterContactName: 'Camille Martin',
+          status: ConcertStatus.confirmed,
+          maraudeStatus: MaraudeStatus.open,
         ),
-        promoterOrganizationName: 'Organisation Beta',
-        promoterContactName: 'Autre contact',
-        status: ConcertStatus.planned,
-        maraudeStatus: MaraudeStatus.draft,
-      ),
-    ]);
+        buildConcert(
+          id: 'other',
+          organizationId: 'organization-beta',
+          artist: 'Autre artiste',
+          venue: const Venue(
+            id: 'other-venue',
+            name: 'Olympia',
+            city: 'Paris',
+            postalCode: '75009',
+            publicAddressLine1: '28 boulevard des Capucines',
+          ),
+          promoterOrganizationName: 'Organisation Beta',
+          promoterContactName: 'Autre contact',
+          status: ConcertStatus.planned,
+          maraudeStatus: MaraudeStatus.draft,
+        ),
+      ],
+      organizations: [
+        Organization(
+          id: 'organization-alpha',
+          name: 'Organisation Alpha',
+          slug: 'organisation-alpha',
+          kind: OrganizationKind.promoter,
+          createdAt: DateTime(2026, 1, 1),
+        ),
+        Organization(
+          id: 'organization-beta',
+          name: 'Organisation Beta',
+          slug: 'organisation-beta',
+          kind: OrganizationKind.promoter,
+          createdAt: DateTime(2026, 1, 1),
+        ),
+      ],
+    );
 
     await tester.tap(find.text('Filtres'));
     await tester.pumpAndSettle();
@@ -638,10 +659,17 @@ void main() {
       find.byKey(const ValueKey('concert-filter-venue')),
       'pleyel',
     );
-    await tester.enterText(
-      find.byKey(const ValueKey('concert-filter-producer')),
-      'alpha',
+    await tester.ensureVisible(
+      find.byKey(
+        const ValueKey('concert-filter-organization-organization-alpha'),
+      ),
     );
+    await tester.tap(
+      find.byKey(
+        const ValueKey('concert-filter-organization-organization-alpha'),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('concert-filter-promoter')),
       'camille',
@@ -666,6 +694,99 @@ void main() {
 
     expect(find.text('Artiste correspondant'), findsOneWidget);
     expect(find.text('Autre artiste'), findsOneWidget);
+  });
+
+  testWidgets('filtre plusieurs organisations à la fois et par catering', (
+    tester,
+  ) async {
+    await pumpConcerts(
+      tester,
+      [
+        buildConcert(
+          id: 'alpha-concert',
+          organizationId: 'organization-alpha',
+          artist: 'Concert Alpha',
+          cateringContactName: 'Traiteur Dupont',
+        ),
+        buildConcert(
+          id: 'beta-concert',
+          organizationId: 'organization-beta',
+          artist: 'Concert Beta',
+        ),
+        buildConcert(
+          id: 'gamma-concert',
+          organizationId: 'organization-gamma',
+          artist: 'Concert Gamma',
+          cateringContactName: 'Traiteur Martin',
+        ),
+      ],
+      organizations: [
+        Organization(
+          id: 'organization-alpha',
+          name: 'Organisation Alpha',
+          slug: 'organisation-alpha',
+          kind: OrganizationKind.promoter,
+          createdAt: DateTime(2026, 1, 1),
+        ),
+        Organization(
+          id: 'organization-beta',
+          name: 'Organisation Beta',
+          slug: 'organisation-beta',
+          kind: OrganizationKind.promoter,
+          createdAt: DateTime(2026, 1, 1),
+        ),
+        Organization(
+          id: 'organization-gamma',
+          name: 'Organisation Gamma',
+          slug: 'organisation-gamma',
+          kind: OrganizationKind.promoter,
+          createdAt: DateTime(2026, 1, 1),
+        ),
+      ],
+    );
+
+    await tester.tap(find.text('Filtres'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(
+        const ValueKey('concert-filter-organization-organization-alpha'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        const ValueKey('concert-filter-organization-organization-gamma'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Concert Alpha'), findsOneWidget);
+    expect(find.text('Concert Beta'), findsNothing);
+    expect(find.text('Concert Gamma'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('concert-filter-catering')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Avec catering').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Concert Alpha'), findsOneWidget);
+    expect(find.text('Concert Gamma'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('concert-filter-catering')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sans catering').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Concert Alpha'), findsNothing);
+    expect(find.text('Concert Gamma'), findsNothing);
+
+    await tester.tap(find.text('Effacer les filtres'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Concert Alpha'), findsOneWidget);
+    expect(find.text('Concert Beta'), findsOneWidget);
+    expect(find.text('Concert Gamma'), findsOneWidget);
   });
 }
 

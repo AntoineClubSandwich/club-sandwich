@@ -6,6 +6,7 @@ import 'package:club_sandwich/features/venues/domain/venue.dart';
 
 Concert buildConcert({
   String id = 'concert-id',
+  String organizationId = 'organization-id',
   String artist = 'Artiste',
   DateTime? date,
   String? time,
@@ -31,7 +32,7 @@ Concert buildConcert({
 }) {
   return Concert(
     id: id,
-    organizationId: 'organization-id',
+    organizationId: organizationId,
     artist: artist,
     date: date ?? DateTime(2026, 9, 15),
     time: time,

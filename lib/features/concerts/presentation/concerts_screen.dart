@@ -23,10 +23,11 @@ class ConcertsScreen extends ConsumerStatefulWidget {
 class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
   final _artistFilterController = TextEditingController();
   final _venueFilterController = TextEditingController();
-  final _producerFilterController = TextEditingController();
   final _promoterFilterController = TextEditingController();
+  Set<String> _selectedOrganizationIds = {};
   ConcertStatus? _concertStatusFilter;
   MaraudeStatus? _maraudeStatusFilter;
+  bool? _cateringFilter;
   late DateTime _displayedMonth;
 
   @override
@@ -40,7 +41,6 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
   void dispose() {
     _artistFilterController.dispose();
     _venueFilterController.dispose();
-    _producerFilterController.dispose();
     _promoterFilterController.dispose();
     super.dispose();
   }
@@ -50,6 +50,12 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
     final asyncConcerts = ref.watch(concertsProvider);
     final viewMode = ref.watch(concertViewModeProvider);
     final currentRole = ref.watch(currentUserContextProvider).value?.role;
+    final promoterOrganizations =
+        (ref.watch(organizationsProvider).value ?? const <Organization>[])
+            .where(
+              (organization) => organization.kind == OrganizationKind.promoter,
+            )
+            .toList(growable: false);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -83,15 +89,22 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
                           child: _ConcertFilters(
                             artistController: _artistFilterController,
                             venueController: _venueFilterController,
-                            producerController: _producerFilterController,
                             promoterController: _promoterFilterController,
+                            organizations: promoterOrganizations,
+                            selectedOrganizationIds: _selectedOrganizationIds,
                             concertStatus: _concertStatusFilter,
                             maraudeStatus: _maraudeStatusFilter,
+                            cateringFilter: _cateringFilter,
                             onTextChanged: (_) => setState(() {}),
+                            onOrganizationsChanged: (value) => setState(
+                              () => _selectedOrganizationIds = value,
+                            ),
                             onConcertStatusChanged: (value) =>
                                 setState(() => _concertStatusFilter = value),
                             onMaraudeStatusChanged: (value) =>
                                 setState(() => _maraudeStatusFilter = value),
+                            onCateringChanged: (value) =>
+                                setState(() => _cateringFilter = value),
                             onClear: _clearFilters,
                           ),
                         ),
@@ -150,18 +163,22 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
   List<Concert> _filterConcerts(List<Concert> items) {
     final artist = _normalize(_artistFilterController.text);
     final venue = _normalize(_venueFilterController.text);
-    final producer = _normalize(_producerFilterController.text);
     final promoter = _normalize(_promoterFilterController.text);
     return items
         .where((concert) {
+          final hasCatering =
+              concert.cateringContactName != null &&
+              concert.cateringContactName!.trim().isNotEmpty;
           return _contains(concert.artist, artist) &&
               _contains(concert.venueName, venue) &&
-              _contains(concert.promoterOrganizationName, producer) &&
               _contains(concert.promoterContactName, promoter) &&
+              (_selectedOrganizationIds.isEmpty ||
+                  _selectedOrganizationIds.contains(concert.organizationId)) &&
               (_concertStatusFilter == null ||
                   concert.status == _concertStatusFilter) &&
               (_maraudeStatusFilter == null ||
-                  concert.maraudeStatus == _maraudeStatusFilter);
+                  concert.maraudeStatus == _maraudeStatusFilter) &&
+              (_cateringFilter == null || hasCatering == _cateringFilter);
         })
         .toList(growable: false);
   }
@@ -169,11 +186,12 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
   void _clearFilters() {
     _artistFilterController.clear();
     _venueFilterController.clear();
-    _producerFilterController.clear();
     _promoterFilterController.clear();
     setState(() {
+      _selectedOrganizationIds = {};
       _concertStatusFilter = null;
       _maraudeStatusFilter = null;
+      _cateringFilter = null;
     });
   }
 
@@ -266,25 +284,33 @@ class _ConcertFilters extends StatelessWidget {
   const _ConcertFilters({
     required this.artistController,
     required this.venueController,
-    required this.producerController,
     required this.promoterController,
+    required this.organizations,
+    required this.selectedOrganizationIds,
     required this.concertStatus,
     required this.maraudeStatus,
+    required this.cateringFilter,
     required this.onTextChanged,
+    required this.onOrganizationsChanged,
     required this.onConcertStatusChanged,
     required this.onMaraudeStatusChanged,
+    required this.onCateringChanged,
     required this.onClear,
   });
 
   final TextEditingController artistController;
   final TextEditingController venueController;
-  final TextEditingController producerController;
   final TextEditingController promoterController;
+  final List<Organization> organizations;
+  final Set<String> selectedOrganizationIds;
   final ConcertStatus? concertStatus;
   final MaraudeStatus? maraudeStatus;
+  final bool? cateringFilter;
   final ValueChanged<String> onTextChanged;
+  final ValueChanged<Set<String>> onOrganizationsChanged;
   final ValueChanged<ConcertStatus?> onConcertStatusChanged;
   final ValueChanged<MaraudeStatus?> onMaraudeStatusChanged;
+  final ValueChanged<bool?> onCateringChanged;
   final VoidCallback onClear;
 
   @override
@@ -319,13 +345,6 @@ class _ConcertFilters extends StatelessWidget {
                     keyValue: 'concert-filter-venue',
                     controller: venueController,
                     label: 'Salle',
-                    onChanged: onTextChanged,
-                  ),
-                  _FilterTextField(
-                    width: fieldWidth,
-                    keyValue: 'concert-filter-producer',
-                    controller: producerController,
-                    label: 'Organisation tourneur',
                     onChanged: onTextChanged,
                   ),
                   _FilterTextField(
@@ -379,10 +398,62 @@ class _ConcertFilters extends StatelessWidget {
                       onChanged: onMaraudeStatusChanged,
                     ),
                   ),
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DropdownButtonFormField<bool?>(
+                      key: const ValueKey('concert-filter-catering'),
+                      initialValue: cateringFilter,
+                      decoration: const InputDecoration(labelText: 'Catering'),
+                      items: const [
+                        DropdownMenuItem(value: null, child: Text('Tous')),
+                        DropdownMenuItem(
+                          value: true,
+                          child: Text('Avec catering'),
+                        ),
+                        DropdownMenuItem(
+                          value: false,
+                          child: Text('Sans catering'),
+                        ),
+                      ],
+                      onChanged: onCateringChanged,
+                    ),
+                  ),
                 ],
               );
             },
           ),
+          if (organizations.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Organisation tourneur',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              key: const ValueKey('concert-filter-organizations'),
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final organization in organizations)
+                  FilterChip(
+                    key: ValueKey(
+                      'concert-filter-organization-${organization.id}',
+                    ),
+                    label: Text(organization.name),
+                    selected: selectedOrganizationIds.contains(organization.id),
+                    onSelected: (selected) {
+                      final updated = Set<String>.of(selectedOrganizationIds);
+                      if (selected) {
+                        updated.add(organization.id);
+                      } else {
+                        updated.remove(organization.id);
+                      }
+                      onOrganizationsChanged(updated);
+                    },
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerRight,

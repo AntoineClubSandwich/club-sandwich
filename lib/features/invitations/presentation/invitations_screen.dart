@@ -482,6 +482,7 @@ class _VolunteerCampaignActionState
         await repository.withdraw(application.id);
       } else if (application.awaitsConfirmation) {
         await repository.confirm(application.id);
+        ref.invalidate(volunteerCreditSummaryProvider);
       }
       ref.invalidate(invitationCampaignsProvider);
     } catch (error) {
@@ -1023,7 +1024,7 @@ class _CampaignDialogState extends State<_CampaignDialog> {
                 key: const ValueKey('invitation-title-field'),
                 controller: _title,
                 autofocus: true,
-                decoration: const InputDecoration(labelText: 'Titre'),
+                decoration: const InputDecoration(labelText: 'Artiste'),
                 validator: _required,
               ),
               const SizedBox(height: 12),
