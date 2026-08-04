@@ -7,6 +7,8 @@ import 'package:club_sandwich/features/concerts/presentation/concert_formatters.
 import 'package:club_sandwich/features/concerts/presentation/maraude_calendar.dart';
 import 'package:club_sandwich/features/organizations/data/organization_providers.dart';
 import 'package:club_sandwich/features/organizations/domain/organization.dart';
+import 'package:club_sandwich/shared/utils/error_messages.dart';
+import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -47,6 +49,7 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
   Widget build(BuildContext context) {
     final asyncConcerts = ref.watch(concertsProvider);
     final viewMode = ref.watch(concertViewModeProvider);
+    final currentRole = ref.watch(currentUserContextProvider).value?.role;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -61,8 +64,9 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
           ),
           Expanded(
             child: asyncConcerts.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stackTrace) => _ConcertsError(
+              loading: () =>
+                  const AppLoadingState(label: 'Chargement des maraudes'),
+              error: (error, stackTrace) => AppErrorState(
                 message: _errorMessage(error),
                 onRetry: () => ref.invalidate(concertsProvider),
               ),
@@ -107,6 +111,7 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
                       else if (viewMode == ConcertViewMode.list)
                         _ConcertListSliver(
                           concerts: _sortForDashboard(filtered),
+                          role: currentRole,
                         )
                       else
                         SliverPadding(
@@ -132,11 +137,13 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _createConcert(context),
-        icon: const Icon(Icons.add),
-        label: const Text('Nouvelle maraude'),
-      ),
+      floatingActionButton: asyncConcerts.value?.isNotEmpty == true
+          ? FloatingActionButton.extended(
+              onPressed: () => _createConcert(context),
+              icon: const Icon(Icons.add),
+              label: const Text('Nouvelle maraude'),
+            )
+          : null,
     );
   }
 
@@ -189,11 +196,16 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
     CurrentUserContext? account;
     try {
       account = await ref.read(currentUserContextProvider.future);
-    } on Exception {
+    } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Impossible de vérifier votre compte utilisateur.'),
+        SnackBar(
+          content: Text(
+            describeError(
+              error,
+              'Impossible de vérifier votre compte utilisateur.',
+            ),
+          ),
         ),
       );
       return;
@@ -212,11 +224,16 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
               (organization) => organization.kind == OrganizationKind.promoter,
             )
             .toList(growable: false);
-      } on Exception {
+      } catch (error) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Impossible de charger les organisations tourneurs.'),
+          SnackBar(
+            content: Text(
+              describeError(
+                error,
+                'Impossible de charger les organisations tourneurs.',
+              ),
+            ),
           ),
         );
         return;
@@ -241,7 +258,7 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
 
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Concert créé.')));
+    ).showSnackBar(const SnackBar(content: Text('Maraude créée.')));
   }
 }
 
@@ -308,14 +325,14 @@ class _ConcertFilters extends StatelessWidget {
                     width: fieldWidth,
                     keyValue: 'concert-filter-producer',
                     controller: producerController,
-                    label: 'Producteur',
+                    label: 'Organisation tourneur',
                     onChanged: onTextChanged,
                   ),
                   _FilterTextField(
                     width: fieldWidth,
                     keyValue: 'concert-filter-promoter',
                     controller: promoterController,
-                    label: 'Tourneur',
+                    label: 'Contact tourneur',
                     onChanged: onTextChanged,
                   ),
                   SizedBox(
@@ -414,9 +431,10 @@ class _FilterTextField extends StatelessWidget {
 }
 
 class _ConcertListSliver extends StatelessWidget {
-  const _ConcertListSliver({required this.concerts});
+  const _ConcertListSliver({required this.concerts, required this.role});
 
   final List<Concert> concerts;
+  final AppUserRole? role;
 
   @override
   Widget build(BuildContext context) {
@@ -434,7 +452,8 @@ class _ConcertListSliver extends StatelessWidget {
               mainAxisExtent: 290,
             ),
             delegate: SliverChildBuilderDelegate(
-              (context, index) => _ConcertCard(concert: concerts[index]),
+              (context, index) =>
+                  _ConcertCard(concert: concerts[index], role: role),
               childCount: concerts.length,
             ),
           );
@@ -445,9 +464,10 @@ class _ConcertListSliver extends StatelessWidget {
 }
 
 class _ConcertCard extends ConsumerWidget {
-  const _ConcertCard({required this.concert});
+  const _ConcertCard({required this.concert, required this.role});
 
   final Concert concert;
+  final AppUserRole? role;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -474,35 +494,41 @@ class _ConcertCard extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  PopupMenuButton<_ConcertAction>(
-                    tooltip: 'Actions',
-                    onSelected: (action) {
-                      switch (action) {
-                        case _ConcertAction.edit:
-                          _edit(context, ref);
-                        case _ConcertAction.delete:
-                          deleteConcertWithConfirmation(context, ref, concert);
-                      }
-                    },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: _ConcertAction.edit,
-                        child: ListTile(
-                          leading: Icon(Icons.edit_outlined),
-                          title: Text('Modifier'),
-                          contentPadding: EdgeInsets.zero,
+                  if (role == AppUserRole.admin || role == AppUserRole.promoter)
+                    PopupMenuButton<_ConcertAction>(
+                      tooltip: 'Actions',
+                      onSelected: (action) {
+                        switch (action) {
+                          case _ConcertAction.edit:
+                            _edit(context, ref);
+                          case _ConcertAction.delete:
+                            deleteConcertWithConfirmation(
+                              context,
+                              ref,
+                              concert,
+                            );
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: _ConcertAction.edit,
+                          child: ListTile(
+                            leading: Icon(Icons.edit_outlined),
+                            title: Text('Modifier'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
                         ),
-                      ),
-                      PopupMenuItem(
-                        value: _ConcertAction.delete,
-                        child: ListTile(
-                          leading: Icon(Icons.delete_outline),
-                          title: Text('Supprimer'),
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                    ],
-                  ),
+                        if (role == AppUserRole.admin)
+                          const PopupMenuItem(
+                            value: _ConcertAction.delete,
+                            child: ListTile(
+                              leading: Icon(Icons.delete_outline),
+                              title: Text('Supprimer'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                      ],
+                    ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -570,7 +596,7 @@ class _ConcertCard extends ConsumerWidget {
     ref.invalidate(concertDetailsProvider(concert.id));
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Concert modifié.')));
+    ).showSnackBar(const SnackBar(content: Text('Maraude modifiée.')));
   }
 }
 
@@ -642,35 +668,6 @@ class _NoFilterResults extends StatelessWidget {
   }
 }
 
-class _ConcertsError extends StatelessWidget {
-  const _ConcertsError({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48),
-            const SizedBox(height: 16),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton.tonal(
-              onPressed: onRetry,
-              child: const Text('Réessayer'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 Future<bool> deleteConcertWithConfirmation(
   BuildContext context,
   WidgetRef ref,
@@ -709,11 +706,22 @@ Future<bool> deleteConcertWithConfirmation(
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Concert supprimé.')));
+      ).showSnackBar(const SnackBar(content: Text('Maraude supprimée.')));
     }
     return true;
-  } on Exception catch (error) {
-    if (context.mounted) _showError(context, error);
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            describeError(
+              error,
+              'Impossible de supprimer la maraude. Veuillez réessayer.',
+            ),
+          ),
+        ),
+      );
+    }
     return false;
   }
 }
@@ -842,10 +850,4 @@ bool _contains(String? value, String query) {
 
 String _errorMessage(Object error) {
   return 'Une erreur est survenue lors du chargement des maraudes.';
-}
-
-void _showError(BuildContext context, Object error) {
-  ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(_errorMessage(error))));
 }

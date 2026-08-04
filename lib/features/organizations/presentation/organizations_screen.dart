@@ -1,5 +1,7 @@
 import 'package:club_sandwich/features/organizations/data/organization_providers.dart';
 import 'package:club_sandwich/features/organizations/domain/organization.dart';
+import 'package:club_sandwich/shared/utils/error_messages.dart';
+import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,16 +27,21 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
         label: const Text('Ajouter'),
       ),
       body: organizations.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) =>
-            _Retry(onPressed: () => ref.invalidate(organizationsProvider)),
+        loading: () =>
+            const AppLoadingState(label: 'Chargement des organisations'),
+        error: (_, _) => AppErrorState(
+          message: 'Impossible de charger les organisations.',
+          onRetry: () => ref.invalidate(organizationsProvider),
+        ),
         data: (items) {
           final promoters = items
               .where((item) => item.kind == OrganizationKind.promoter)
               .toList(growable: false);
           if (promoters.isEmpty) {
-            return const Center(
-              child: Text('Aucune organisation tourneur enregistrée.'),
+            return const AppEmptyState(
+              title: 'Aucune organisation',
+              message: 'Aucune organisation tourneur n’est enregistrée.',
+              icon: Icons.business_outlined,
             );
           }
           final selectedId = _selectedId ?? promoters.first.id;
@@ -144,8 +151,12 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
       ref.invalidate(organizationsProvider);
       ref.invalidate(organizationDetailsProvider(saved.id));
       if (mounted) setState(() => _selectedId = saved.id);
-    } catch (_) {
-      if (mounted) _message('Impossible d’enregistrer cette organisation.');
+    } catch (error) {
+      if (mounted) {
+        _message(
+          describeError(error, 'Impossible d’enregistrer cette organisation.'),
+        );
+      }
     }
   }
 
@@ -164,6 +175,10 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
             child: const Text('Annuler'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Supprimer'),
           ),
@@ -175,10 +190,14 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
       await ref.read(organizationRepositoryProvider).delete(organization.id);
       ref.invalidate(organizationsProvider);
       if (mounted) setState(() => _selectedId = null);
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         _message(
-          'Cette organisation est encore utilisée et ne peut pas être supprimée.',
+          describeError(
+            error,
+            'Cette organisation est encore utilisée et ne peut pas être '
+            'supprimée.',
+          ),
         );
       }
     }
@@ -190,17 +209,23 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
       builder: (_) => const _ContactDialog(),
     );
     if (values == null) return;
-    await ref
-        .read(organizationRepositoryProvider)
-        .addContact(
-          organization.id,
-          firstName: values[0]!,
-          lastName: values[1]!,
-          jobTitle: values[2],
-          email: values[3],
-          phone: values[4],
-        );
-    ref.invalidate(organizationDetailsProvider(organization.id));
+    try {
+      await ref
+          .read(organizationRepositoryProvider)
+          .addContact(
+            organization.id,
+            firstName: values[0]!,
+            lastName: values[1]!,
+            jobTitle: values[2],
+            email: values[3],
+            phone: values[4],
+          );
+      ref.invalidate(organizationDetailsProvider(organization.id));
+    } catch (error) {
+      if (mounted) {
+        _message(describeError(error, 'Impossible d’ajouter ce contact.'));
+      }
+    }
   }
 
   Future<void> _addDocument(Organization organization) async {
@@ -209,10 +234,16 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
       builder: (_) => const _DocumentDialog(),
     );
     if (values == null) return;
-    await ref
-        .read(organizationRepositoryProvider)
-        .addDocument(organization.id, name: values[0], url: values[1]);
-    ref.invalidate(organizationDetailsProvider(organization.id));
+    try {
+      await ref
+          .read(organizationRepositoryProvider)
+          .addDocument(organization.id, name: values[0], url: values[1]);
+      ref.invalidate(organizationDetailsProvider(organization.id));
+    } catch (error) {
+      if (mounted) {
+        _message(describeError(error, 'Impossible d’ajouter ce document.'));
+      }
+    }
   }
 
   void _message(String text) {
@@ -253,9 +284,11 @@ class _OrganizationDetailsPane extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final details = ref.watch(organizationDetailsProvider(organizationId));
     return details.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, _) => _Retry(
-        onPressed: () =>
+      loading: () =>
+          const AppLoadingState(label: 'Chargement de l’organisation'),
+      error: (_, _) => AppErrorState(
+        message: 'Impossible de charger cette organisation.',
+        onRetry: () =>
             ref.invalidate(organizationDetailsProvider(organizationId)),
       ),
       data: (value) {
@@ -391,6 +424,7 @@ class _OrganizationFormDialogState extends State<_OrganizationFormDialog> {
     _controllers = [
       TextEditingController(text: value?.name ?? ''),
       TextEditingController(text: value?.slug ?? ''),
+      TextEditingController(text: value?.emailDomain ?? ''),
       TextEditingController(text: value?.contactEmail ?? ''),
       TextEditingController(text: value?.phone ?? ''),
       TextEditingController(text: value?.address ?? ''),
@@ -424,11 +458,20 @@ class _OrganizationFormDialogState extends State<_OrganizationFormDialog> {
             children: [
               _field(0, 'Nom', required: true, autofocus: true),
               _field(1, 'Identifiant (slug)', required: true),
-              _field(2, 'Adresse e-mail'),
-              _field(3, 'Téléphone'),
-              _field(4, 'Adresse'),
-              _field(5, 'Site web'),
-              _field(6, 'Notes', maxLines: 3),
+              _field(
+                2,
+                'Domaine e-mail (ex. auguri.fr)',
+                helper:
+                    'Un compte Tourneur invité avec une adresse de ce '
+                    'domaine se voit proposer cette organisation '
+                    'automatiquement.',
+                validator: _domainValidator,
+              ),
+              _field(3, 'Adresse e-mail'),
+              _field(4, 'Téléphone'),
+              _field(5, 'Adresse'),
+              _field(6, 'Site web'),
+              _field(7, 'Notes', maxLines: 3),
             ],
           ),
         ),
@@ -447,11 +490,12 @@ class _OrganizationFormDialogState extends State<_OrganizationFormDialog> {
             OrganizationDraft(
               name: _controllers[0].text,
               slug: _controllers[1].text,
-              contactEmail: _controllers[2].text,
-              phone: _controllers[3].text,
-              address: _controllers[4].text,
-              websiteUrl: _controllers[5].text,
-              notes: _controllers[6].text,
+              emailDomain: _controllers[2].text,
+              contactEmail: _controllers[3].text,
+              phone: _controllers[4].text,
+              address: _controllers[5].text,
+              websiteUrl: _controllers[6].text,
+              notes: _controllers[7].text,
             ),
           );
         },
@@ -466,20 +510,35 @@ class _OrganizationFormDialogState extends State<_OrganizationFormDialog> {
     bool required = false,
     bool autofocus = false,
     int maxLines = 1,
+    String? helper,
+    String? Function(String?)? validator,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: TextFormField(
       controller: _controllers[index],
       autofocus: autofocus,
       maxLines: maxLines,
-      decoration: InputDecoration(labelText: label),
-      validator: required
-          ? (value) => value == null || value.trim().isEmpty
-                ? '$label est obligatoire.'
-                : null
-          : null,
+      decoration: InputDecoration(labelText: label, helperText: helper),
+      validator:
+          validator ??
+          (required
+              ? (value) => value == null || value.trim().isEmpty
+                    ? '$label est obligatoire.'
+                    : null
+              : null),
     ),
   );
+}
+
+String? _domainValidator(String? value) {
+  final domain = value?.trim() ?? '';
+  if (domain.isEmpty) return null;
+  final isValidDomain = RegExp(
+    r'^[a-z0-9.-]+\.[a-z]{2,}$',
+  ).hasMatch(domain.toLowerCase());
+  return isValidDomain
+      ? null
+      : 'Saisissez un domaine valide, ex. auguri.fr (sans @).';
 }
 
 class _ContactDialog extends StatefulWidget {
@@ -657,20 +716,6 @@ class _Metric extends StatelessWidget {
   Widget build(BuildContext context) => Chip(
     avatar: const Icon(Icons.insights_outlined, size: 18),
     label: Text('$label : $value'),
-  );
-}
-
-class _Retry extends StatelessWidget {
-  const _Retry({required this.onPressed});
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: FilledButton.icon(
-      onPressed: onPressed,
-      icon: const Icon(Icons.refresh),
-      label: const Text('Réessayer'),
-    ),
   );
 }
 

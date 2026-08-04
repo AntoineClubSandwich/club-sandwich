@@ -4,22 +4,24 @@ import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_appli
 class MaraudeOperationalReport {
   const MaraudeOperationalReport({
     required this.concertId,
-    required this.totalWeightKg,
-    required this.estimatedMeals,
     required this.createdAt,
     required this.updatedAt,
+    this.totalWeightKg,
+    this.estimatedMeals,
+    this.distanceKm,
+    this.quantitiesUnavailable = false,
     this.comment,
-    this.photoFolderUrl,
     this.lastModifiedBy,
   });
 
   factory MaraudeOperationalReport.fromJson(Map<String, dynamic> json) {
     return MaraudeOperationalReport(
       concertId: json['concert_id'] as String,
-      totalWeightKg: (json['total_weight_kg'] as num).toDouble(),
-      estimatedMeals: (json['estimated_meals'] as num).toInt(),
+      totalWeightKg: (json['total_weight_kg'] as num?)?.toDouble(),
+      estimatedMeals: (json['estimated_meals'] as num?)?.toInt(),
+      distanceKm: (json['distance_km'] as num?)?.toDouble(),
+      quantitiesUnavailable: json['quantities_unavailable'] as bool? ?? false,
       comment: _nullIfBlank(json['comment'] as String?),
-      photoFolderUrl: _nullIfBlank(json['photo_folder_url'] as String?),
       lastModifiedBy: json['last_modified_by'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
@@ -27,10 +29,11 @@ class MaraudeOperationalReport {
   }
 
   final String concertId;
-  final double totalWeightKg;
-  final int estimatedMeals;
+  final double? totalWeightKg;
+  final int? estimatedMeals;
+  final double? distanceKm;
+  final bool quantitiesUnavailable;
   final String? comment;
-  final String? photoFolderUrl;
   final String? lastModifiedBy;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -38,16 +41,44 @@ class MaraudeOperationalReport {
 
 class MaraudeReportDraft {
   const MaraudeReportDraft({
-    required this.totalWeightKg,
-    required this.estimatedMeals,
+    this.totalWeightKg,
+    this.estimatedMeals,
+    this.distanceKm,
+    this.quantitiesUnavailable = false,
     this.comment,
-    this.photoFolderUrl,
   });
 
-  final double totalWeightKg;
-  final int estimatedMeals;
+  final double? totalWeightKg;
+  final int? estimatedMeals;
+  final double? distanceKm;
+  final bool quantitiesUnavailable;
   final String? comment;
-  final String? photoFolderUrl;
+}
+
+class MaraudePhoto {
+  const MaraudePhoto({
+    required this.id,
+    required this.concertId,
+    required this.uploadedBy,
+    required this.storagePath,
+    required this.createdAt,
+  });
+
+  factory MaraudePhoto.fromJson(Map<String, dynamic> json) {
+    return MaraudePhoto(
+      id: json['id'] as String,
+      concertId: json['concert_id'] as String,
+      uploadedBy: json['uploaded_by'] as String,
+      storagePath: json['storage_path'] as String,
+      createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+
+  final String id;
+  final String concertId;
+  final String uploadedBy;
+  final String storagePath;
+  final DateTime createdAt;
 }
 
 class MaraudeOverview {
@@ -58,7 +89,10 @@ class MaraudeOverview {
     required this.maraudeStatus,
     required this.venueName,
     required this.applicationCount,
+    this.pendingApplicationCount = 0,
     required this.selectedCount,
+    this.pendingConfirmationCount = 0,
+    this.pendingCreditValidationCount = 0,
     required this.isAdmin,
     this.time,
     this.venueAddress,
@@ -68,6 +102,7 @@ class MaraudeOverview {
     this.estimatedMeals,
     this.ownStatus,
     this.ownTeamRole,
+    this.ownConfirmationStatus,
   });
 
   factory MaraudeOverview.fromJson(Map<String, dynamic> json) {
@@ -82,7 +117,13 @@ class MaraudeOverview {
       cateringName: _nullIfBlank(json['catering_name'] as String?),
       cateringClosesAt: json['catering_closes_at'] as String?,
       applicationCount: (json['application_count'] as num?)?.toInt() ?? 0,
+      pendingApplicationCount:
+          (json['pending_application_count'] as num?)?.toInt() ?? 0,
       selectedCount: (json['selected_count'] as num?)?.toInt() ?? 0,
+      pendingConfirmationCount:
+          (json['pending_confirmation_count'] as num?)?.toInt() ?? 0,
+      pendingCreditValidationCount:
+          (json['pending_credit_validation_count'] as num?)?.toInt() ?? 0,
       totalWeightKg: (json['total_weight_kg'] as num?)?.toDouble(),
       estimatedMeals: (json['estimated_meals'] as num?)?.toInt(),
       ownStatus: json['own_status'] == null
@@ -91,6 +132,11 @@ class MaraudeOverview {
       ownTeamRole: json['own_team_role'] == null
           ? null
           : MaraudeRole.fromDatabase(json['own_team_role'] as String),
+      ownConfirmationStatus: json['own_confirmation_status'] == null
+          ? null
+          : VolunteerConfirmationStatus.fromDatabase(
+              json['own_confirmation_status'] as String,
+            ),
       isAdmin: json['is_admin'] as bool? ?? false,
     );
   }
@@ -105,12 +151,21 @@ class MaraudeOverview {
   final String? cateringName;
   final String? cateringClosesAt;
   final int applicationCount;
+  final int pendingApplicationCount;
   final int selectedCount;
+  final int pendingConfirmationCount;
+  final int pendingCreditValidationCount;
   final double? totalWeightKg;
   final int? estimatedMeals;
   final ConcertVolunteerStatus? ownStatus;
   final MaraudeRole? ownTeamRole;
+  final VolunteerConfirmationStatus? ownConfirmationStatus;
   final bool isAdmin;
+
+  /// Whether this maraude is open for applications and the current
+  /// volunteer hasn't applied to it yet.
+  bool get isOpenForApplication =>
+      maraudeStatus == MaraudeStatus.open && ownStatus == null;
 
   DateTime get recommendedArrival {
     final value = cateringClosesAt;

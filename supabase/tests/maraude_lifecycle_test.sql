@@ -55,6 +55,21 @@ values
     '90000000-0000-0000-0000-000000000002',
     'lifecycle-admin@example.test',
     '{"first_name":"Admin","last_name":"Maraude"}'::jsonb
+  ),
+  (
+    '90000000-0000-0000-0000-000000000003',
+    'lifecycle-leader@example.test',
+    '{"first_name":"Camille","last_name":"Leader"}'::jsonb
+  ),
+  (
+    '90000000-0000-0000-0000-000000000004',
+    'lifecycle-member2@example.test',
+    '{"first_name":"Sacha","last_name":"Membre"}'::jsonb
+  ),
+  (
+    '90000000-0000-0000-0000-000000000005',
+    'lifecycle-member3@example.test',
+    '{"first_name":"Lou","last_name":"Membre"}'::jsonb
   );
 
 insert into public.memberships (organization_id, profile_id, role)
@@ -66,7 +81,10 @@ from public.organizations organization
 cross join (
   values
     ('90000000-0000-0000-0000-000000000001'::uuid, 'volunteer'),
-    ('90000000-0000-0000-0000-000000000002'::uuid, 'admin')
+    ('90000000-0000-0000-0000-000000000002'::uuid, 'admin'),
+    ('90000000-0000-0000-0000-000000000003'::uuid, 'volunteer'),
+    ('90000000-0000-0000-0000-000000000004'::uuid, 'volunteer'),
+    ('90000000-0000-0000-0000-000000000005'::uuid, 'volunteer')
 ) as member_data(profile_id, role)
 where organization.slug = 'club-sandwich';
 
@@ -90,6 +108,42 @@ cross join lateral (
   select id from public.venues order by name limit 1
 ) venue
 where organization.slug = 'club-sandwich';
+
+insert into public.concert_volunteers (
+  concert_id,
+  user_id,
+  status,
+  team_role
+)
+values
+  (
+    '91000000-0000-0000-0000-000000000001',
+    '90000000-0000-0000-0000-000000000003',
+    'selected',
+    'team_leader'
+  ),
+  (
+    '91000000-0000-0000-0000-000000000001',
+    '90000000-0000-0000-0000-000000000004',
+    'selected',
+    'logistics'
+  ),
+  (
+    '91000000-0000-0000-0000-000000000001',
+    '90000000-0000-0000-0000-000000000005',
+    'selected',
+    'communication'
+  );
+
+update public.concert_volunteers
+set
+  role_acknowledged_at = clock_timestamp(),
+  confirmation_status = 'confirmed'
+where concert_id = '91000000-0000-0000-0000-000000000001';
+
+update public.concert_volunteers
+set attendance_status = 'present'
+where concert_id = '91000000-0000-0000-0000-000000000001';
 
 select results_eq(
   $$
@@ -117,7 +171,7 @@ select throws_ok(
     )
   $$,
   '42501',
-  'Seul un administrateur peut modifier la maraude',
+  'Concert inaccessible',
   'Un bénévole ne modifie pas le cycle'
 );
 
@@ -135,7 +189,7 @@ select lives_ok(
       '91000000-0000-0000-0000-000000000001'
     )
   $$,
-  'Une maraude démarre sans condition opérationnelle bloquante'
+  'L’administrateur démarre avec un chef confirmé et présent'
 );
 
 select results_eq(
@@ -173,7 +227,7 @@ select results_eq(
   'La clôture conserve des dates chronologiques'
 );
 
-select lives_ok(
+select throws_ok(
   $$
     select public.set_maraude_status(
       '91000000-0000-0000-0000-000000000001',
@@ -181,7 +235,9 @@ select lives_ok(
       null
     )
   $$,
-  'Une maraude clôturée peut être rouverte'
+  '22023',
+  'Cette maraude ne peut pas être démarrée',
+  'Une maraude clôturée ne peut pas être rouverte'
 );
 
 select results_eq(
@@ -189,15 +245,15 @@ select results_eq(
     select count(*)::bigint
     from public.concerts
     where id = '91000000-0000-0000-0000-000000000001'
-      and maraude_status = 'in_progress'
+      and maraude_status = 'completed'
       and actual_start_at is not null
-      and actual_end_at is null
+      and actual_end_at is not null
   $$,
   array[1::bigint],
-  'La réouverture conserve le début et efface la fin'
+  'Le refus de réouverture conserve la clôture'
 );
 
-select lives_ok(
+select throws_ok(
   $$
     select public.set_maraude_status(
       '91000000-0000-0000-0000-000000000001',
@@ -205,7 +261,9 @@ select lives_ok(
       null
     )
   $$,
-  'L’administrateur peut corriger le statut vers Ouverte'
+  '22023',
+  'Une maraude archivée ne peut plus changer d''état',
+  'Une maraude clôturée ne revient pas à Ouverte'
 );
 
 select results_eq(
@@ -213,15 +271,15 @@ select results_eq(
     select count(*)::bigint
     from public.concerts
     where id = '91000000-0000-0000-0000-000000000001'
-      and maraude_status = 'open'
-      and actual_start_at is null
-      and actual_end_at is null
+      and maraude_status = 'completed'
+      and actual_start_at is not null
+      and actual_end_at is not null
   $$,
   array[1::bigint],
-  'Revenir à Ouverte nettoie les dates réelles'
+  'Les dates réelles restent conservées'
 );
 
-select lives_ok(
+select throws_ok(
   $$
     select public.set_maraude_status(
       '91000000-0000-0000-0000-000000000001',
@@ -229,10 +287,12 @@ select lives_ok(
       null
     )
   $$,
-  'Une équipe peut être déclarée validée sans composition imposée'
+  '22023',
+  'Une maraude archivée ne peut plus changer d''état',
+  'Une maraude clôturée ne revient pas à Équipe prête'
 );
 
-select lives_ok(
+select throws_ok(
   $$
     select public.set_maraude_status(
       '91000000-0000-0000-0000-000000000001',
@@ -240,7 +300,9 @@ select lives_ok(
       'Concert annulé'
     )
   $$,
-  'Une maraude peut être annulée sans suppression'
+  '22023',
+  'Une maraude archivée ne peut plus changer d''état',
+  'Une maraude clôturée ne peut plus être annulée'
 );
 
 select results_eq(
@@ -249,8 +311,8 @@ select results_eq(
     from public.concerts
     where id = '91000000-0000-0000-0000-000000000001'
   $$,
-  $$ values ('cancelled'::text, 'Concert annulé'::text) $$,
-  'L’annulation et son motif facultatif sont conservés'
+  $$ values ('completed'::text, null::text) $$,
+  'La clôture reste la source de vérité'
 );
 
 reset role;

@@ -3,9 +3,12 @@ import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/organizations/data/organization_providers.dart';
 import 'package:club_sandwich/features/invitations/data/invitation_providers.dart';
+import 'package:club_sandwich/features/notifications/data/workflow_notification_providers.dart';
+import 'package:club_sandwich/features/notifications/presentation/workflow_notifications_button.dart';
 import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
 import 'package:club_sandwich/features/profiles/domain/profile.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
+import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -49,6 +52,7 @@ class AppShell extends ConsumerWidget {
         ref.invalidate(maraudeOverviewProvider);
         ref.invalidate(concertVolunteerSectionProvider);
         ref.invalidate(invitationCampaignsProvider);
+        ref.invalidate(workflowNotificationsProvider);
         ref.invalidate(currentUserContextProvider);
         ref.invalidate(managedUsersProvider);
       },
@@ -56,7 +60,10 @@ class AppShell extends ConsumerWidget {
 
     if (!isDesktop) {
       return Scaffold(
-        appBar: AppBar(title: Text(destinations[selectedIndex].label)),
+        appBar: AppBar(
+          title: Text(destinations[selectedIndex].label),
+          actions: const [WorkflowNotificationsButton()],
+        ),
         drawer: Drawer(
           child: SafeArea(
             child: Column(
@@ -99,7 +106,10 @@ class AppShell extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(destinations[selectedIndex].label)),
+      appBar: AppBar(
+        title: Text(destinations[selectedIndex].label),
+        actions: const [WorkflowNotificationsButton()],
+      ),
       body: Row(
         children: [
           SizedBox(
@@ -155,12 +165,16 @@ class _UserAccountPanelState extends ConsumerState<_UserAccountPanel> {
       await ref.read(authRepositoryProvider).signOut();
       widget.onSignedOut();
       if (mounted) context.go('/login');
-    } on Exception {
+    } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'La déconnexion a échoué. Vérifiez votre connexion et réessayez.',
+            describeError(
+              error,
+              'La déconnexion a échoué. Vérifiez votre connexion et '
+              'réessayez.',
+            ),
           ),
         ),
       );
@@ -196,18 +210,24 @@ class _UserAccountPanelState extends ConsumerState<_UserAccountPanel> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      primaryLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    if (showEmail)
-                      Text(
-                        email,
+                    Tooltip(
+                      message: primaryLabel,
+                      child: Text(
+                        primaryLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    if (showEmail)
+                      Tooltip(
+                        message: email,
+                        child: Text(
+                          email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       ),
                   ],
                 ),

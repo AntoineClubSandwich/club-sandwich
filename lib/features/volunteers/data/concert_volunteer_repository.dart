@@ -24,6 +24,7 @@ class ConcertVolunteerRepository {
 
   Future<ConcertVolunteerSectionData> fetchSection(String concertId) async {
     final userId = _requireUserId();
+    await client.rpc<int>('expire_volunteer_confirmations');
     final results = await Future.wait<Object?>([
       _fetchCounts(concertId),
       _fetchAccess(concertId),
@@ -64,26 +65,42 @@ class ConcertVolunteerRepository {
       activeRole: account.role,
       currentUserId: userId,
       canViewApplications: canViewApplications,
-      canManageConcert:
-          isAdmin || (isPromoter && access.canManageConcert),
+      canManageConcert: isAdmin || (isPromoter && access.canManageConcert),
       canApply: canApply,
       applications: applications,
     );
   }
 
-  Future<ConcertVolunteerApplication> apply(String concertId) async {
+  Future<void> apply(String concertId) async {
     final userId = _requireUserId();
-    final row = await client
-        .from('concert_volunteers')
-        .insert({
-          'concert_id': concertId,
-          'user_id': userId,
-          'status': ConcertVolunteerStatus.pending.databaseValue,
-        })
-        .select()
-        .single();
+    await client.from('concert_volunteers').insert({
+      'concert_id': concertId,
+      'user_id': userId,
+      'status': ConcertVolunteerStatus.pending.databaseValue,
+    });
+  }
 
-    return ConcertVolunteerApplication.fromJson(row);
+  Future<Map<String, dynamic>?> fetchPrivateVolunteerInformation(
+    String userId,
+  ) async {
+    final rows = await client.rpc<List<dynamic>>(
+      'get_volunteer_private_information',
+      params: {'requested_user_id': userId},
+    );
+    if (rows.isEmpty) return null;
+    final result = Map<String, dynamic>.from(rows.first as Map);
+    for (final field in [
+      'identity_document_path',
+      'social_security_document_path',
+    ]) {
+      final path = result[field] as String?;
+      if (path != null) {
+        result['${field}_url'] = await client.storage
+            .from('volunteer-private-documents')
+            .createSignedUrl(path, 300);
+      }
+    }
+    return result;
   }
 
   Future<void> reapply(String concertId) async {
@@ -100,6 +117,19 @@ class ConcertVolunteerRepository {
         .update({'status': ConcertVolunteerStatus.withdrawn.databaseValue})
         .eq('id', applicationId)
         .eq('user_id', userId);
+  }
+
+  Future<void> confirmParticipation(
+    String concertId, {
+    required bool roleAcknowledged,
+  }) async {
+    await client.rpc<void>(
+      'confirm_concert_participation',
+      params: {
+        'requested_concert_id': concertId,
+        'requested_role_acknowledged': roleAcknowledged,
+      },
+    );
   }
 
   Future<void> setStatus(
@@ -168,10 +198,63 @@ class ConcertVolunteerRepository {
     String applicationId,
     VolunteerAttendanceStatus status,
   ) async {
-    await client
-        .from('concert_volunteers')
-        .update({'attendance_status': status.databaseValue})
-        .eq('id', applicationId);
+    await client.rpc<void>(
+      'set_volunteer_attendance',
+      params: {
+        'requested_application_id': applicationId,
+        'requested_status': status.databaseValue,
+      },
+    );
+  }
+
+  Future<MaraudeAttendanceData> fetchAttendance(String concertId) async {
+    final rows = await client.rpc<List<dynamic>>(
+      'get_maraude_attendance',
+      params: {'requested_concert_id': concertId},
+    );
+    return MaraudeAttendanceData(
+      rows
+          .map(
+            (row) =>
+                MaraudeAttendanceMember.fromJson(row! as Map<String, dynamic>),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  Future<int> validateAttendance(String concertId) async {
+    return client.rpc<int>(
+      'validate_maraude_attendance',
+      params: {'requested_concert_id': concertId},
+    );
+  }
+
+  Future<int> fetchCreditCount() async {
+    return client.rpc<int>('get_my_volunteer_credit_count');
+  }
+
+  Future<VolunteerCreditSummary> fetchCreditSummary() async {
+    final rows = await client.rpc<List<dynamic>>(
+      'get_my_volunteer_credit_summary',
+    );
+    if (rows.isEmpty) return VolunteerCreditSummary.empty;
+    return VolunteerCreditSummary.fromJson(rows.first as Map<String, dynamic>);
+  }
+
+  Future<List<ConcertVolunteerRosterEntry>> fetchRoster(
+    String concertId,
+  ) async {
+    final rows = await client.rpc<List<dynamic>>(
+      'get_concert_volunteer_roster',
+      params: {'requested_concert_id': concertId},
+    );
+    return rows
+        .map(
+          (row) => ConcertVolunteerRosterEntry.fromJson(
+            row! as Map<String, dynamic>,
+          ),
+        )
+        .toList(growable: false);
   }
 
   String _requireUserId() {
@@ -217,12 +300,69 @@ class ConcertVolunteerRepository {
       params: {'requested_concert_id': concertId},
     );
 
-    return rows
+    final applications = rows
         .map(
           (row) => ConcertVolunteerApplication.fromJson(
             row! as Map<String, dynamic>,
           ),
         )
+        .toList(growable: false);
+    if (isPromoter || applications.isEmpty) return applications;
+
+    final confirmationRows = await client
+        .from('concert_volunteers')
+        .select(
+          'id, confirmation_status, confirmation_requested_at, '
+          'confirmation_due_at, confirmation_responded_at, '
+          'role_acknowledged_at, attendance_validated_at, '
+          'attendance_validated_by, last_modified_by',
+        )
+        .eq('concert_id', concertId);
+    final confirmations = {
+      for (final row in confirmationRows) row['id'] as String: row,
+    };
+
+    return applications
+        .map((application) {
+          final confirmation = confirmations[application.id];
+          if (confirmation == null) return application;
+          return application.copyWith(
+            confirmationStatus: confirmation['confirmation_status'] == null
+                ? null
+                : VolunteerConfirmationStatus.fromDatabase(
+                    confirmation['confirmation_status'] as String,
+                  ),
+            confirmationRequestedAt:
+                confirmation['confirmation_requested_at'] == null
+                ? null
+                : DateTime.parse(
+                    confirmation['confirmation_requested_at'] as String,
+                  ),
+            confirmationDueAt: confirmation['confirmation_due_at'] == null
+                ? null
+                : DateTime.parse(confirmation['confirmation_due_at'] as String),
+            confirmationRespondedAt:
+                confirmation['confirmation_responded_at'] == null
+                ? null
+                : DateTime.parse(
+                    confirmation['confirmation_responded_at'] as String,
+                  ),
+            roleAcknowledgedAt: confirmation['role_acknowledged_at'] == null
+                ? null
+                : DateTime.parse(
+                    confirmation['role_acknowledged_at'] as String,
+                  ),
+            attendanceValidatedAt:
+                confirmation['attendance_validated_at'] == null
+                ? null
+                : DateTime.parse(
+                    confirmation['attendance_validated_at'] as String,
+                  ),
+            attendanceValidatedBy:
+                confirmation['attendance_validated_by'] as String?,
+            lastModifiedBy: confirmation['last_modified_by'] as String?,
+          );
+        })
         .toList(growable: false);
   }
 }

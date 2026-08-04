@@ -2,7 +2,9 @@ import 'package:club_sandwich/features/administration/presentation/administratio
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/auth/presentation/activation_screen.dart';
+import 'package:club_sandwich/features/auth/presentation/forgot_password_screen.dart';
 import 'package:club_sandwich/features/auth/presentation/login_screen.dart';
+import 'package:club_sandwich/features/auth/presentation/reset_password_screen.dart';
 import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
 import 'package:club_sandwich/features/dashboard/presentation/dashboard_screen.dart';
@@ -16,6 +18,8 @@ import 'package:go_router/go_router.dart';
 
 abstract final class AppRoutes {
   static const login = '/login';
+  static const forgotPassword = '/forgot-password';
+  static const resetPassword = '/reset-password';
   static const activate = '/activate';
   static const dashboard = '/dashboard';
   static const maraudes = '/maraudes';
@@ -39,10 +43,25 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final isAuthenticated = repository.session != null;
       final isOnLogin = state.matchedLocation == AppRoutes.login;
+      final isOnForgotPassword =
+          state.matchedLocation == AppRoutes.forgotPassword;
+      final isOnResetPassword =
+          state.matchedLocation == AppRoutes.resetPassword;
       final isOnActivation = state.matchedLocation == AppRoutes.activate;
 
-      if (!isAuthenticated && !isOnLogin) return AppRoutes.login;
+      // Supabase opens a real authenticated session as soon as the
+      // password-recovery link is opened, so this must be checked before
+      // the generic isAuthenticated branch below — otherwise the user
+      // would land straight on the dashboard instead of the reset form.
+      if (ref.watch(passwordRecoveryProvider)) {
+        return isOnResetPassword ? null : AppRoutes.resetPassword;
+      }
+
+      if (!isAuthenticated && !isOnLogin && !isOnForgotPassword) {
+        return AppRoutes.login;
+      }
       if (!isAuthenticated) return null;
+      if (isOnResetPassword) return AppRoutes.dashboard;
 
       final accountContext = ref.read(currentUserContextProvider).value;
       if (accountContext == null) {
@@ -66,6 +85,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.login,
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.forgotPassword,
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.resetPassword,
+        builder: (context, state) => const ResetPasswordScreen(),
       ),
       GoRoute(
         path: AppRoutes.activate,

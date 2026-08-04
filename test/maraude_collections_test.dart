@@ -99,6 +99,7 @@ void main() {
         quantity: 25,
         unit: CollectionUnit.piece,
         weightKg: 12.5,
+        averageWeightKg: 0.5,
         comment: 'Complet',
       );
 
@@ -108,14 +109,24 @@ void main() {
 
       expect(requests.map((request) => request.method), [
         'POST',
-        'PATCH',
+        'POST',
         'DELETE',
       ]);
       expect(jsonDecode(requests[0].body), {
-        ...draft.toJson(),
-        'concert_id': 'concert-id',
+        'requested_concert_id': 'concert-id',
+        'requested_collection_id': null,
+        'requested_category': 'prepared_meals',
+        'requested_description': 'Plateaux',
+        'requested_quantity': 25.0,
+        'requested_unit': 'piece',
+        'requested_average_weight_kg': 0.5,
+        'requested_comment': 'Complet',
       });
-      expect(requests[1].url.queryParameters['id'], 'eq.collection-id');
+      expect(requests[0].url.path, endsWith('/rpc/save_maraude_collection'));
+      expect(
+        jsonDecode(requests[1].body)['requested_collection_id'],
+        'collection-id',
+      );
       expect(requests[2].url.queryParameters['id'], 'eq.collection-id');
     });
 
@@ -205,31 +216,52 @@ void main() {
     ]);
     await _pumpCollections(tester, store, isAdmin: true);
 
-    expect(find.text('Nombre de lots'), findsOneWidget);
+    expect(find.text('Types renseignés'), findsOneWidget);
+    expect(find.text('2 / 6'), findsOneWidget);
     expect(find.text('Poids total (kg)'), findsOneWidget);
     expect(find.text('30.5'), findsOneWidget);
     expect(find.text('Nombre total de pièces'), findsOneWidget);
     expect(find.text('25'), findsOneWidget);
     expect(find.text('Repas préparés'), findsOneWidget);
-    expect(find.text('25 pièces'), findsOneWidget);
+    expect(find.text('25 plats'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Ajouter un lot'));
-    await tester.tap(find.text('Ajouter un lot'));
+    await tester.ensureVisible(find.text('Ajouter un type de plat'));
+    await tester.tap(find.text('Ajouter un type de plat'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Ajouter le lot'));
-    await tester.tap(find.text('Ajouter le lot'));
+    await tester.drag(
+      find.byType(SingleChildScrollView).last,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Ajouter le lot'));
     await tester.pump();
     expect(find.text('La quantité est obligatoire.'), findsOneWidget);
+    expect(find.text('Le type de plat est obligatoire.'), findsOneWidget);
+    expect(find.text('Le poids moyen est obligatoire.'), findsOneWidget);
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Quantité'),
+      find.widgetWithText(TextFormField, 'Nombre total de plats'),
       '10',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Type de plat'),
+      'Gratins',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Poids moyen d’un plat (kg)'),
+      '0,5',
     );
     await tester.enterText(
       find.byKey(const ValueKey('collection-comment')),
       'Nouveau lot',
     );
-    await tester.tap(find.text('Ajouter le lot'));
+    await tester.drag(
+      find.byType(SingleChildScrollView).last,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Ajouter le lot'));
     await tester.pumpAndSettle();
 
     expect(store.collections, hasLength(3));
@@ -242,8 +274,16 @@ void main() {
     await tester.tap(find.text('Modifier').last);
     await tester.pumpAndSettle();
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Quantité'),
+      find.widgetWithText(TextFormField, 'Nombre total de plats'),
       '30',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Type de plat'),
+      'Sandwichs',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Poids moyen d’un plat (kg)'),
+      '0,5',
     );
     await tester.ensureVisible(find.text('Enregistrer les modifications'));
     await tester.tap(find.text('Enregistrer les modifications'));
@@ -263,18 +303,15 @@ void main() {
     expect(store.collections, hasLength(2));
   });
 
-  testWidgets('une maraude terminée affiche la collecte en lecture seule', (
-    tester,
-  ) async {
+  testWidgets('un admin corrige une collecte archivée', (tester) async {
     final store = _CollectionStore([
       _collection(),
     ], status: MaraudeStatus.completed);
     await _pumpCollections(tester, store, isAdmin: true);
 
-    expect(find.text('Cette collecte est en lecture seule.'), findsOneWidget);
     expect(find.text('Repas préparés'), findsOneWidget);
-    expect(find.text('Ajouter un lot'), findsNothing);
-    expect(find.byTooltip('Actions du lot'), findsNothing);
+    expect(find.text('Ajouter une correction de collecte'), findsOneWidget);
+    expect(find.byTooltip('Actions du lot'), findsOneWidget);
   });
 }
 
@@ -354,6 +391,8 @@ Future<void> _pumpCollections(
       ),
     ),
   );
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('maraude-workspace-operations')));
   await tester.pumpAndSettle();
 }
 

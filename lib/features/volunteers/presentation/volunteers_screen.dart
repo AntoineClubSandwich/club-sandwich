@@ -4,8 +4,9 @@ import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_calendar.dart';
-import 'package:club_sandwich/features/concerts/presentation/maraude_overview_card.dart';
+import 'package:club_sandwich/features/concerts/presentation/maraude_list_section.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
+import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -31,7 +32,10 @@ class _VolunteersScreenState extends ConsumerState<VolunteersScreen> {
   Widget build(BuildContext context) {
     final role = ref.watch(currentUserContextProvider).value?.role;
     if (role == AppUserRole.admin) {
-      return _VolunteerDirectory(users: ref.watch(managedUsersProvider));
+      return _VolunteerDirectory(
+        users: ref.watch(managedUsersProvider),
+        onRetry: () => ref.invalidate(managedUsersProvider),
+      );
     }
     final overview = ref.watch(maraudeOverviewProvider);
     final viewMode = ref.watch(concertViewModeProvider);
@@ -48,13 +52,11 @@ class _VolunteersScreenState extends ConsumerState<VolunteersScreen> {
           ),
           Expanded(
             child: overview.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, _) => Center(
-                child: FilledButton.icon(
-                  onPressed: () => ref.invalidate(maraudeOverviewProvider),
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Réessayer'),
-                ),
+              loading: () =>
+                  const AppLoadingState(label: 'Chargement des maraudes'),
+              error: (_, _) => AppErrorState(
+                message: 'Impossible de charger vos maraudes.',
+                onRetry: () => ref.invalidate(maraudeOverviewProvider),
               ),
               data: (items) => viewMode == ConcertViewMode.list
                   ? _VolunteerMaraudes(items: items)
@@ -94,16 +96,20 @@ class _VolunteersScreenState extends ConsumerState<VolunteersScreen> {
 }
 
 class _VolunteerDirectory extends StatelessWidget {
-  const _VolunteerDirectory({required this.users});
+  const _VolunteerDirectory({required this.users, required this.onRetry});
+
   final AsyncValue<List<ManagedUser>> users;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Colors.transparent,
     body: users.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, _) =>
-          const Center(child: Text('Impossible de charger les bénévoles.')),
+      loading: () => const AppLoadingState(label: 'Chargement des bénévoles'),
+      error: (_, _) => AppErrorState(
+        message: 'Impossible de charger les bénévoles.',
+        onRetry: onRetry,
+      ),
       data: (items) {
         final volunteers = items
             .where((item) => item.role == AppUserRole.volunteer)
@@ -119,11 +125,10 @@ class _VolunteerDirectory extends StatelessWidget {
             Text('${volunteers.length} bénévole(s)'),
             const SizedBox(height: 18),
             if (volunteers.isEmpty)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text('Aucun bénévole.'),
-                ),
+              const AppEmptyState(
+                title: 'Aucun bénévole',
+                message: 'Aucun compte bénévole n’est enregistré.',
+                icon: Icons.groups_outlined,
               )
             else
               for (final volunteer in volunteers)
@@ -153,15 +158,8 @@ class _VolunteerMaraudes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final open =
-        items
-            .where(
-              (item) =>
-                  item.maraudeStatus == MaraudeStatus.open &&
-                  item.ownStatus == null,
-            )
-            .toList()
-          ..sort((a, b) => a.date.compareTo(b.date));
+    final open = items.where((item) => item.isOpenForApplication).toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
     final ownItems = items
         .where((item) => item.ownStatus != null)
         .toList(growable: false);
@@ -172,16 +170,33 @@ class _VolunteerMaraudes extends StatelessWidget {
             .where(
               (item) =>
                   !item.date.isBefore(todayDate) &&
-                  item.maraudeStatus != MaraudeStatus.cancelled,
+                  item.maraudeStatus != MaraudeStatus.completed &&
+                  item.maraudeStatus != MaraudeStatus.cancelled &&
+                  (item.ownStatus == ConcertVolunteerStatus.pending ||
+                      item.ownStatus == ConcertVolunteerStatus.selected),
             )
             .toList()
           ..sort((a, b) => a.date.compareTo(b.date));
+    final toRegularize =
+        ownItems
+            .where(
+              (item) =>
+                  item.date.isBefore(todayDate) &&
+                  item.maraudeStatus != MaraudeStatus.completed &&
+                  item.maraudeStatus != MaraudeStatus.cancelled &&
+                  (item.ownStatus == ConcertVolunteerStatus.pending ||
+                      item.ownStatus == ConcertVolunteerStatus.selected),
+            )
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
     final history =
         ownItems
             .where(
               (item) =>
-                  item.maraudeStatus == MaraudeStatus.completed &&
-                  item.ownStatus == ConcertVolunteerStatus.selected,
+                  item.ownStatus == ConcertVolunteerStatus.notSelected ||
+                  item.ownStatus == ConcertVolunteerStatus.withdrawn ||
+                  (item.maraudeStatus == MaraudeStatus.completed &&
+                      item.ownStatus == ConcertVolunteerStatus.selected),
             )
             .toList()
           ..sort((a, b) => b.date.compareTo(a.date));
@@ -189,40 +204,33 @@ class _VolunteerMaraudes extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 48),
       children: [
-        if (open.isEmpty && upcoming.isEmpty)
-          const Text('Aucune maraude à venir.')
-        else if (open.isNotEmpty) ...[
-          Text(
-            'Maraudes ouvertes',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          for (final item in open)
-            MaraudeOverviewCard(maraude: item, actionLabel: 'Je me propose'),
-        ],
-        if (upcoming.isNotEmpty) ...[
-          if (open.isNotEmpty) const SizedBox(height: 24),
-          Text('À venir', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          for (final item in upcoming)
-            MaraudeOverviewCard(
-              maraude: item,
-              actionLabel: _availabilityLabel(item.ownStatus!),
-            ),
-        ],
-        if (history.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          Text(
-            'Historique personnel',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          for (final item in history)
-            MaraudeOverviewCard(
-              maraude: item,
-              actionLabel: 'Consulter la maraude',
-            ),
-        ],
+        if (open.isEmpty && upcoming.isEmpty && toRegularize.isEmpty)
+          const Text('Aucune maraude à venir.'),
+        MaraudeListSection(
+          title: 'Maraudes ouvertes',
+          items: open,
+          actionLabel: 'Je me propose',
+        ),
+        MaraudeListSection(
+          title: 'À venir',
+          items: upcoming,
+          actionLabelFor: (item) => _availabilityLabel(item.ownStatus!),
+        ),
+        MaraudeListSection(
+          title: 'À régulariser',
+          items: toRegularize,
+          actionLabelFor: (item) => _availabilityLabel(item.ownStatus!),
+        ),
+        MaraudeListSection(
+          title: 'Historique personnel',
+          items: history,
+          canOpenFor: (item) =>
+              item.ownStatus == ConcertVolunteerStatus.selected,
+          actionLabelFor: (item) =>
+              item.ownStatus == ConcertVolunteerStatus.selected
+              ? 'Consulter la maraude'
+              : _availabilityLabel(item.ownStatus!),
+        ),
       ],
     );
   }

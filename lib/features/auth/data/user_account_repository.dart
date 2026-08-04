@@ -35,11 +35,11 @@ class UserAccountRepository {
     );
   }
 
-  Future<void> inviteUser(
+  Future<UserInvitationDelivery> inviteUser(
     UserInvitationDraft draft, {
     required String redirectTo,
   }) async {
-    await _invokeAdminUsers({
+    final data = await _invokeAdminUsers({
       'action': 'invite',
       'firstName': draft.firstName,
       'lastName': draft.lastName,
@@ -48,6 +48,10 @@ class UserAccountRepository {
       'organizationId': draft.organizationId,
       'redirectTo': redirectTo,
     });
+    return UserInvitationDelivery(
+      emailSent: data['emailSent'] as bool? ?? true,
+      activationUrl: data['activationUrl'] as String?,
+    );
   }
 
   Future<void> resendInvitation(
@@ -81,7 +85,9 @@ class UserAccountRepository {
     });
   }
 
-  Future<void> _invokeAdminUsers(Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> _invokeAdminUsers(
+    Map<String, dynamic> body,
+  ) async {
     final response = await _client.functions.invoke('admin-users', body: body);
     if (response.status < 200 || response.status >= 300) {
       throw FunctionException(
@@ -90,5 +96,13 @@ class UserAccountRepository {
         reasonPhrase: 'Action utilisateur impossible',
       );
     }
+    return response.data as Map<String, dynamic>? ?? const {};
   }
+}
+
+class UserInvitationDelivery {
+  const UserInvitationDelivery({required this.emailSent, this.activationUrl});
+
+  final bool emailSent;
+  final String? activationUrl;
 }

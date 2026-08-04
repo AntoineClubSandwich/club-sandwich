@@ -4,6 +4,8 @@ import 'package:club_sandwich/core/router/app_router.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/data/auth_repository.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
+import 'package:club_sandwich/features/auth/presentation/forgot_password_screen.dart';
+import 'package:club_sandwich/features/auth/presentation/reset_password_screen.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
 import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dart';
@@ -63,7 +65,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(ConcertDetailScreen), findsOneWidget);
-    expect(find.text('Concert introuvable'), findsOneWidget);
+    expect(find.text('Maraude introuvable'), findsOneWidget);
   });
 
   testWidgets(
@@ -131,6 +133,82 @@ void main() {
 
       expect(authRepository.signInCount, 1);
       expect(find.byType(DashboardScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'un lien de récupération force l’écran de réinitialisation du mot de '
+    'passe',
+    (tester) async {
+      final authRepository = _AuthenticatedAuthRepository();
+      addTearDown(authRepository.dispose);
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(authRepository),
+          currentProfileProvider.overrideWith(
+            (ref) async => Profile(
+              id: 'profile-id',
+              firstName: 'Antoine',
+              lastName: 'Vignol',
+              createdAt: DateTime(2026, 7, 25),
+            ),
+          ),
+          currentUserContextProvider.overrideWith(
+            (ref) async => const CurrentUserContext(
+              profileId: 'profile-id',
+              role: AppUserRole.admin,
+              status: UserAccountStatus.active,
+            ),
+          ),
+          concertsProvider.overrideWith((ref) async => const []),
+          concertDetailsProvider.overrideWith((ref, concertId) async => null),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _RouterTestApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DashboardScreen), findsOneWidget);
+
+      authRepository.emitPasswordRecovery();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ResetPasswordScreen), findsOneWidget);
+      expect(find.byType(DashboardScreen), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'le lien mot de passe oublié ouvre l’écran dédié depuis la connexion',
+    (tester) async {
+      final authRepository = _AuthenticatedAuthRepository();
+      addTearDown(authRepository.dispose);
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(authRepository)],
+      );
+      addTearDown(container.dispose);
+      await authRepository.signOut();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _RouterTestApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Se connecter'), findsOneWidget);
+
+      await tester.tap(find.text('Mot de passe oublié ?'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ForgotPasswordScreen), findsOneWidget);
     },
   );
 
@@ -214,6 +292,12 @@ class _AuthenticatedAuthRepository extends AuthRepository {
     signOutCount++;
     _session = null;
     _authStateController.add(const AuthState(AuthChangeEvent.signedOut, null));
+  }
+
+  void emitPasswordRecovery() {
+    _authStateController.add(
+      AuthState(AuthChangeEvent.passwordRecovery, _session),
+    );
   }
 
   Future<void> dispose() => _authStateController.close();

@@ -1,8 +1,6 @@
 import 'package:club_sandwich/features/collections/domain/maraude_collection.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_report.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
-import 'package:club_sandwich/features/distributions/domain/maraude_distribution.dart';
-import 'package:club_sandwich/features/distributions/presentation/maraude_distribution_form_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -51,6 +49,7 @@ class MaraudeReportPdfService {
           _section('Général', [
             _row('Artiste', report.artist),
             _row('Salle', report.venueName ?? '-'),
+            _row('Tourneur', report.promoterName ?? '-'),
             _row('Date', formatLongFrenchDate(report.concertDate)),
             _row(
               'Durée réelle',
@@ -59,8 +58,6 @@ class MaraudeReportPdfService {
           ]),
           _section('Équipe', [
             _row('Bénévoles sélectionnés', '${report.selectedCount}'),
-            _row('Présents', '${report.presentCount}'),
-            _row('Absents', '${report.absentCount}'),
           ]),
           _section('Collecte', [
             _row('Nombre de lots', '${report.collectionSummary.lotCount}'),
@@ -81,7 +78,6 @@ class MaraudeReportPdfService {
                 ),
             ],
           ]),
-          _distributionSection(report.distribution),
           _section('Commentaire de fin', [
             pw.Text(_textOrDash(report.closingComment)),
           ]),
@@ -100,32 +96,6 @@ class MaraudeReportPdfService {
         '${date.month.toString().padLeft(2, '0')}-'
         '${date.day.toString().padLeft(2, '0')}.pdf';
     return Printing.sharePdf(bytes: bytes, filename: filename);
-  }
-
-  pw.Widget _distributionSection(MaraudeDistribution? distribution) {
-    if (distribution == null) {
-      return _section('Distribution', [pw.Text('Aucune distribution.')]);
-    }
-    return _section('Distribution', [
-      _row('Lieu', _textOrDash(distribution.distributionLocation)),
-      _row(
-        'Bénéficiaires estimés',
-        distribution.estimatedBeneficiaries?.toString() ?? '-',
-      ),
-      _row(
-        'Repas distribués',
-        distribution.distributedMeals?.toString() ?? '-',
-      ),
-      _row(
-        'Poids restant',
-        distribution.remainingWeightKg == null
-            ? '-'
-            : '${formatDistributionNumber(distribution.remainingWeightKg!)} kg',
-      ),
-      _row('Début', _dateTime(distribution.distributionStartedAt)),
-      _row('Fin', _dateTime(distribution.distributionCompletedAt)),
-      _row('Incident', _textOrDash(distribution.incidentComment)),
-    ]);
   }
 
   pw.Widget _section(String title, List<pw.Widget> children) {
@@ -170,16 +140,15 @@ class MaraudeReportPdfService {
 }
 
 String _collectionLine(MaraudeCollection collection) {
+  final description = collection.description?.trim();
+  final title = description?.isNotEmpty == true
+      ? description!
+      : collection.category.label;
   final weight = collection.weightKg == null
       ? ''
       : ' - ${_number(collection.weightKg!)} kg';
-  return '${collection.category.label} : '
+  return '$title : '
       '${_number(collection.quantity)} ${collection.unit.label}$weight';
-}
-
-String _dateTime(DateTime? value) {
-  if (value == null) return '-';
-  return formatFrenchDateTime(value).replaceFirst('\n', ' à ');
 }
 
 String _textOrDash(String? value) {

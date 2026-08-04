@@ -87,6 +87,8 @@ class MaraudeCalendarItem {
     required this.statusLabel,
     required this.tone,
     this.time,
+    this.countLabel = 'bénévoles',
+    this.countTarget = 3,
   });
 
   final String id;
@@ -97,6 +99,12 @@ class MaraudeCalendarItem {
   final int selectedVolunteerCount;
   final String statusLabel;
   final MaraudeCalendarTone tone;
+  final String countLabel;
+  final int? countTarget;
+
+  String get countSummary => countTarget == null
+      ? '$selectedVolunteerCount $countLabel'
+      : '$selectedVolunteerCount/$countTarget $countLabel';
 }
 
 class MaraudeCalendar extends StatelessWidget {
@@ -328,7 +336,7 @@ class _CalendarTile extends StatelessWidget {
       item.venueName,
       formatLongFrenchDate(item.date),
       if (item.time != null) formatDatabaseTime(item.time!),
-      '${item.selectedVolunteerCount} bénévoles',
+      '${item.selectedVolunteerCount} ${item.countLabel}',
       item.statusLabel,
     ].join('\n');
     return Tooltip(
@@ -390,10 +398,7 @@ class _CalendarTile extends StatelessWidget {
                     ),
                   ],
                 ),
-                Text(
-                  '${item.selectedVolunteerCount}/4 bénévoles',
-                  style: const TextStyle(fontSize: 10),
-                ),
+                Text(item.countSummary, style: const TextStyle(fontSize: 10)),
               ],
             ),
           ),
@@ -478,7 +483,7 @@ class _MobileCalendarCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '${item.time == null ? 'Heure non renseignée' : formatDatabaseTime(item.time!)}'
-                      ' · ${item.selectedVolunteerCount}/4 bénévoles',
+                      ' · ${item.countSummary}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     Text(

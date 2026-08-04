@@ -21,6 +21,7 @@ class Organization {
     required this.slug,
     required this.createdAt,
     this.kind = OrganizationKind.promoter,
+    this.emailDomain,
     this.contactEmail,
     this.phone,
     this.address,
@@ -33,6 +34,7 @@ class Organization {
   final String slug;
   final DateTime createdAt;
   final OrganizationKind kind;
+  final String? emailDomain;
   final String? contactEmail;
   final String? phone;
   final String? address;
@@ -48,6 +50,7 @@ class Organization {
       kind: json['kind'] == null
           ? OrganizationKind.promoter
           : OrganizationKind.fromJson(json['kind'] as String),
+      emailDomain: json['email_domain'] as String?,
       contactEmail: json['contact_email'] as String?,
       phone: json['phone'] as String?,
       address: json['address'] as String?,
@@ -63,6 +66,7 @@ class Organization {
       'slug': slug,
       'created_at': createdAt.toIso8601String(),
       'kind': kind.jsonValue,
+      'email_domain': emailDomain,
       'contact_email': contactEmail,
       'phone': phone,
       'address': address,
@@ -70,12 +74,24 @@ class Organization {
       'notes': notes,
     };
   }
+
+  /// Whether [email]'s domain matches this organization's configured
+  /// [emailDomain] (case-insensitive). Used to pre-select the
+  /// organization when an admin invites a Tourneur account.
+  bool matchesEmailDomain(String email) {
+    final domain = emailDomain;
+    if (domain == null || domain.isEmpty) return false;
+    final separator = email.lastIndexOf('@');
+    if (separator == -1 || separator == email.length - 1) return false;
+    return email.substring(separator + 1).toLowerCase() == domain;
+  }
 }
 
 class OrganizationDraft {
   const OrganizationDraft({
     required this.name,
     required this.slug,
+    this.emailDomain,
     this.contactEmail,
     this.phone,
     this.address,
@@ -85,6 +101,7 @@ class OrganizationDraft {
 
   final String name;
   final String slug;
+  final String? emailDomain;
   final String? contactEmail;
   final String? phone;
   final String? address;
@@ -95,6 +112,7 @@ class OrganizationDraft {
     'name': name.trim(),
     'slug': slug.trim().toLowerCase(),
     'kind': OrganizationKind.promoter.jsonValue,
+    'email_domain': _nullIfBlank(emailDomain)?.toLowerCase(),
     'contact_email': _nullIfBlank(contactEmail),
     'phone': _nullIfBlank(phone),
     'address': _nullIfBlank(address),

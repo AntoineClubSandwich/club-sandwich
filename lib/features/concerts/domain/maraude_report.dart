@@ -7,6 +7,7 @@ class MaraudeReport {
   const MaraudeReport({
     required this.artist,
     required this.venueName,
+    required this.promoterName,
     required this.concertDate,
     required this.selectedCount,
     required this.presentCount,
@@ -26,6 +27,7 @@ class MaraudeReport {
     return MaraudeReport(
       artist: concert.artist,
       venueName: concert.venueName,
+      promoterName: concert.promoterOrganizationName,
       concertDate: concert.date,
       actualStartAt: concert.actualStartAt,
       actualEndAt: concert.actualEndAt,
@@ -43,6 +45,7 @@ class MaraudeReport {
 
   final String artist;
   final String? venueName;
+  final String? promoterName;
   final DateTime concertDate;
   final DateTime? actualStartAt;
   final DateTime? actualEndAt;

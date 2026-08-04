@@ -8,10 +8,12 @@ import 'package:club_sandwich/features/concerts/presentation/concert_detail_scre
 import 'package:club_sandwich/features/concerts/presentation/concert_form.dart';
 import 'package:club_sandwich/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:club_sandwich/features/distributions/presentation/maraude_distribution_form_dialog.dart';
+import 'package:club_sandwich/features/invitations/data/invitation_providers.dart';
 import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
 import 'package:club_sandwich/shared/widgets/app_shell.dart';
+import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
 import 'package:club_sandwich/shared/widgets/environment_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +22,60 @@ import 'package:flutter_test/flutter_test.dart';
 import 'helpers/test_data.dart';
 
 void main() {
+  testWidgets('les états communs restent explicites et accessibles', (
+    tester,
+  ) async {
+    var retried = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AppErrorState(
+            message: 'Impossible de charger les données.',
+            onRetry: () => retried = true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Chargement impossible'), findsOneWidget);
+    expect(find.text('Impossible de charger les données.'), findsOneWidget);
+    await tester.tap(find.text('Réessayer'));
+    expect(retried, isTrue);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: AppLoadingState(label: 'Chargement des maraudes')),
+      ),
+    );
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.bySemanticsLabel('Chargement des maraudes'), findsOneWidget);
+  });
+
+  testWidgets(
+    'le dashboard signale une indisponibilité partielle sans masquer le reste',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            maraudeOverviewProvider.overrideWith((ref) async => const []),
+            invitationCampaignsProvider.overrideWith(
+              (ref) => Future.error(StateError('Erreur simulée')),
+            ),
+          ],
+          child: const MaterialApp(home: DashboardScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Les invitations sont temporairement indisponibles.'),
+        findsOneWidget,
+      );
+      expect(find.text('Aucune action en attente.'), findsOneWidget);
+      expect(find.text('Réessayer'), findsOneWidget);
+    },
+  );
+
   testWidgets('la connexion valide le format de l’adresse e-mail', (
     tester,
   ) async {
@@ -65,7 +121,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Aucune action en attente.'), findsOneWidget);
+    expect(find.text('Accueil'), findsWidgets);
     expect(find.byType(NavigationRail), findsNothing);
     expect(tester.takeException(), isNull);
 
@@ -73,7 +129,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(NavigationRail), findsOneWidget);
-    expect(find.text('Tableau de bord'), findsWidgets);
+    expect(find.text('Accueil'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
@@ -175,8 +231,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Bilan'), findsOneWidget);
-    expect(find.text('Maraude terminée'), findsOneWidget);
+    expect(find.text('Bilan'), findsWidgets);
+    final operations = find.byKey(
+      const ValueKey('maraude-workspace-operations'),
+    );
+    await tester.ensureVisible(operations);
+    await tester.tap(operations);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('L’état est archivé et ne peut plus être modifié.'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 

@@ -163,87 +163,12 @@ void main() {
     });
   });
 
-  testWidgets('affiche l’absence de fiche et permet sa création', (
-    tester,
-  ) async {
+  testWidgets('masque la distribution sur la fiche maraude', (tester) async {
     final store = _DistributionStore();
     await _pumpDistribution(tester, store, isAdmin: true);
 
-    expect(find.text('Aucune distribution enregistrée.'), findsOneWidget);
-    await tester.ensureVisible(find.text('Ajouter la distribution'));
-    await tester.tap(find.text('Ajouter la distribution'));
-    await tester.pumpAndSettle();
-
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Lieu de distribution'),
-      'Place de la République',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Bénéficiaires estimés'),
-      '42',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Repas distribués'),
-      '35',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Poids restant (kg)'),
-      '7,5',
-    );
-    await tester.ensureVisible(
-      find.widgetWithText(FilledButton, 'Ajouter la distribution').last,
-    );
-    await tester.tap(
-      find.widgetWithText(FilledButton, 'Ajouter la distribution').last,
-    );
-    await tester.pumpAndSettle();
-
-    expect(store.distribution?.estimatedBeneficiaries, 42);
-    expect(find.text('Place de la République'), findsOneWidget);
-    expect(find.text('7.5 kg'), findsOneWidget);
-  });
-
-  testWidgets('affiche et permet de modifier une fiche existante', (
-    tester,
-  ) async {
-    final store = _DistributionStore(distribution: _distribution());
-    await _pumpDistribution(tester, store, isAdmin: true);
-
-    expect(find.text('Place de la République'), findsOneWidget);
-    expect(find.text('42'), findsOneWidget);
-    expect(find.text('35'), findsOneWidget);
-    expect(find.text('RAS'), findsOneWidget);
-
-    await tester.ensureVisible(find.text('Modifier'));
-    await tester.tap(find.text('Modifier'));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Repas distribués'),
-      '40',
-    );
-    await tester.ensureVisible(find.text('Enregistrer les modifications'));
-    await tester.tap(find.text('Enregistrer les modifications'));
-    await tester.pumpAndSettle();
-
-    expect(store.distribution?.distributedMeals, 40);
-    expect(find.text('40'), findsOneWidget);
-  });
-
-  testWidgets('une maraude terminée affiche la distribution en lecture seule', (
-    tester,
-  ) async {
-    final store = _DistributionStore(
-      distribution: _distribution(),
-      status: MaraudeStatus.completed,
-    );
-    await _pumpDistribution(tester, store, isAdmin: true);
-
-    expect(
-      find.text('Cette distribution est en lecture seule.'),
-      findsOneWidget,
-    );
-    expect(find.text('Place de la République'), findsNWidgets(2));
-    expect(find.byKey(const ValueKey('edit-distribution')), findsNothing);
+    expect(find.text('Distribution'), findsNothing);
+    expect(find.text('Ajouter la distribution'), findsNothing);
   });
 }
 
@@ -286,22 +211,6 @@ Map<String, dynamic> _distributionJson({
   };
 }
 
-MaraudeDistribution _distribution({int distributedMeals = 35}) {
-  return MaraudeDistribution(
-    id: 'distribution-id',
-    concertId: 'concert-id',
-    distributionLocation: 'Place de la République',
-    estimatedBeneficiaries: 42,
-    distributedMeals: distributedMeals,
-    remainingWeightKg: 7.5,
-    distributionStartedAt: DateTime.utc(2026, 7, 27, 22),
-    distributionCompletedAt: DateTime.utc(2026, 7, 27, 23),
-    incidentComment: 'RAS',
-    createdAt: DateTime.utc(2026, 7, 27, 21),
-    updatedAt: DateTime.utc(2026, 7, 27, 21),
-  );
-}
-
 Future<void> _pumpDistribution(
   WidgetTester tester,
   _DistributionStore store, {
@@ -333,23 +242,16 @@ Future<void> _pumpDistribution(
 }
 
 class _DistributionStore {
-  _DistributionStore({
-    this.distribution,
-    this.status = MaraudeStatus.inProgress,
-  }) {
+  _DistributionStore() {
     repository = _FakeMaraudeDistributionRepository(this);
   }
 
   MaraudeDistribution? distribution;
-  final MaraudeStatus status;
   late final _FakeMaraudeDistributionRepository repository;
 
   Concert get concert => buildConcert(
-    maraudeStatus: status,
+    maraudeStatus: MaraudeStatus.inProgress,
     actualStartAt: DateTime(2026, 7, 27, 21, 12),
-    actualEndAt: status == MaraudeStatus.completed
-        ? DateTime(2026, 7, 27, 23, 5)
-        : null,
     distribution: distribution,
   );
 }

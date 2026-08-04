@@ -2,6 +2,7 @@ import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/shared/widgets/brand_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -126,8 +127,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             if (!_isLoading) _submit();
                           },
                         ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _isLoading
+                                ? null
+                                : () => context.go('/forgot-password'),
+                            child: const Text('Mot de passe oublié ?'),
+                          ),
+                        ),
                         if (_errorMessage != null) ...[
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 4),
                           Semantics(
                             liveRegion: true,
                             child: Text(
@@ -138,7 +148,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                           ),
                         ],
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 12),
                         ElevatedButton(
                           onPressed: _isLoading ? null : _submit,
                           child: _isLoading

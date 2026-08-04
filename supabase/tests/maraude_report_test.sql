@@ -36,6 +36,11 @@ values
     'c0000000-0000-0000-0000-000000000004',
     'report-admin@example.test',
     '{"first_name":"Admin","last_name":"Bilan"}'::jsonb
+  ),
+  (
+    'c0000000-0000-0000-0000-000000000005',
+    'report-member3@example.test',
+    '{"first_name":"Nour","last_name":"Petit"}'::jsonb
   );
 
 insert into public.memberships (
@@ -65,6 +70,10 @@ cross join (
     (
       'c0000000-0000-0000-0000-000000000004'::uuid,
       'admin'
+    ),
+    (
+      'c0000000-0000-0000-0000-000000000005'::uuid,
+      'volunteer'
     )
 ) as member_data(profile_id, role)
 where o.slug = 'club-sandwich';
@@ -111,7 +120,36 @@ values
     'c0000000-0000-0000-0000-000000000002',
     'selected',
     'absent'
+  ),
+  (
+    'c1000000-0000-0000-0000-000000000001',
+    'c0000000-0000-0000-0000-000000000005',
+    'selected',
+    'absent'
   );
+
+update public.concert_volunteers
+set
+  team_role = case
+    when user_id = 'c0000000-0000-0000-0000-000000000001'
+      then 'team_leader'::public.maraude_role
+    else 'collection_distribution'::public.maraude_role
+  end
+where concert_id = 'c1000000-0000-0000-0000-000000000001';
+
+update public.concert_volunteers
+set
+  role_acknowledged_at = clock_timestamp(),
+  confirmation_status = 'confirmed'
+where concert_id = 'c1000000-0000-0000-0000-000000000001';
+
+update public.concert_volunteers
+set attendance_status = case
+  when user_id = 'c0000000-0000-0000-0000-000000000001'
+    then 'present'::public.volunteer_attendance_status
+  else 'absent'::public.volunteer_attendance_status
+end
+where concert_id = 'c1000000-0000-0000-0000-000000000001';
 
 set local role authenticated;
 select set_config(
@@ -208,7 +246,7 @@ select results_eq(
     )
   $$,
   $$
-    values (2::bigint, 1::bigint, 1::bigint)
+    values (3::bigint, 1::bigint, 2::bigint)
   $$,
   'Les compteurs du bilan sont calculés depuis les candidatures'
 );

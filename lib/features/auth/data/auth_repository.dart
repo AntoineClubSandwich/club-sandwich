@@ -15,6 +15,13 @@ class AuthRepository {
     await _client.auth.signInWithPassword(email: email, password: password);
   }
 
+  Future<void> sendPasswordResetEmail(
+    String email, {
+    required String redirectTo,
+  }) async {
+    await _client.auth.resetPasswordForEmail(email, redirectTo: redirectTo);
+  }
+
   Future<void> signOut() async {
     await _client.auth.signOut();
   }

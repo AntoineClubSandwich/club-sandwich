@@ -1,24 +1,31 @@
+import 'dart:async';
+
 import 'package:club_sandwich/features/collections/data/maraude_collection_providers.dart';
 import 'package:club_sandwich/features/collections/domain/maraude_collection.dart';
 import 'package:club_sandwich/features/collections/presentation/maraude_collection_form_dialog.dart';
+import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
+import 'package:club_sandwich/features/concerts/data/maraude_chat_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
+import 'package:club_sandwich/features/concerts/domain/maraude_message.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_report.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_form.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_report_providers.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_operational_report_card.dart';
+import 'package:club_sandwich/features/concerts/presentation/maraude_role_mission_sheet.dart';
 import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dart';
-import 'package:club_sandwich/features/distributions/data/maraude_distribution_providers.dart';
-import 'package:club_sandwich/features/distributions/domain/maraude_distribution.dart';
-import 'package:club_sandwich/features/distributions/presentation/maraude_distribution_form_dialog.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_repository.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
 import 'package:club_sandwich/features/volunteers/domain/volunteer_profile.dart';
+import 'package:club_sandwich/features/volunteers/presentation/volunteer_documents_panel.dart';
+import 'package:club_sandwich/shared/utils/error_messages.dart';
+import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 
 class ConcertDetailScreen extends ConsumerWidget {
@@ -33,7 +40,7 @@ class ConcertDetailScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: concert.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const AppLoadingState(label: 'Chargement de la maraude'),
         error: (error, stackTrace) => _DetailError(
           onRetry: () => ref.invalidate(concertDetailsProvider(concertId)),
         ),
@@ -46,26 +53,63 @@ class ConcertDetailScreen extends ConsumerWidget {
   }
 }
 
-class _ConcertDetails extends ConsumerWidget {
+enum _MaraudeWorkspace {
+  summary('Synthèse', Icons.dashboard_outlined),
+  team('Équipe', Icons.groups_outlined),
+  operations('Opérations', Icons.local_shipping_outlined),
+  attendance('Présences et crédits', Icons.fact_check_outlined),
+  report('Bilan', Icons.summarize_outlined),
+  discussion('Discussion', Icons.chat_bubble_outline);
+
+  const _MaraudeWorkspace(this.label, this.icon);
+
+  final String label;
+  final IconData icon;
+}
+
+class _ConcertDetails extends ConsumerStatefulWidget {
   const _ConcertDetails({required this.concert});
 
   final Concert concert;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ConcertDetails> createState() => _ConcertDetailsState();
+}
+
+class _ConcertDetailsState extends ConsumerState<_ConcertDetails> {
+  _MaraudeWorkspace _selectedWorkspace = _MaraudeWorkspace.summary;
+
+  Concert get concert => widget.concert;
+
+  @override
+  Widget build(BuildContext context) {
     final volunteerSection = ref.watch(
       concertVolunteerSectionProvider(concert.id),
     );
-    final volunteerData = volunteerSection.value;
+    final currentAccount = ref.watch(currentUserContextProvider).value;
+    final loadedVolunteerData = volunteerSection.value;
+    final volunteerData =
+        currentAccount == null ||
+            (loadedVolunteerData?.currentUserId == currentAccount.profileId &&
+                loadedVolunteerData?.activeRole == currentAccount.role)
+        ? loadedVolunteerData
+        : null;
     final canManageMaraude = volunteerData?.isAdmin ?? false;
     final canManageConcert = volunteerData?.canManageConcert ?? false;
     final ownApplication = volunteerData?.ownApplication;
     final isSelectedVolunteer =
-        ownApplication?.status == ConcertVolunteerStatus.selected;
+        ownApplication?.status == ConcertVolunteerStatus.selected &&
+        ownApplication?.confirmationStatus ==
+            VolunteerConfirmationStatus.confirmed;
     final canEditOperationalReport =
         canManageMaraude ||
         (isSelectedVolunteer &&
-            ownApplication?.teamRole == MaraudeRole.teamLeader);
+            ownApplication?.teamRole == MaraudeRole.teamLeader &&
+            concert.maraudeStatus == MaraudeStatus.inProgress);
+    final canCompleteMaraude =
+        !canManageMaraude &&
+        isSelectedVolunteer &&
+        ownApplication?.teamRole == MaraudeRole.teamLeader;
     final canEditOperationalPhoto =
         !canEditOperationalReport &&
         isSelectedVolunteer &&
@@ -74,9 +118,28 @@ class _ConcertDetails extends ConsumerWidget {
         concert.maraudeStatus == MaraudeStatus.completed &&
         volunteerData != null &&
         (volunteerData.isAdmin ||
+            (volunteerData.activeRole == AppUserRole.promoter &&
+                canManageConcert) ||
             (ownApplication?.status == ConcertVolunteerStatus.selected &&
-                ownApplication?.effectiveAttendanceStatus ==
-                    VolunteerAttendanceStatus.present));
+                ownApplication?.confirmationStatus ==
+                    VolunteerConfirmationStatus.confirmed));
+    final isVolunteer = volunteerData?.activeRole == AppUserRole.volunteer;
+    final workspaces = <_MaraudeWorkspace>[
+      _MaraudeWorkspace.summary,
+      _MaraudeWorkspace.team,
+      _MaraudeWorkspace.operations,
+      if (canManageMaraude && concert.maraudeStatus == MaraudeStatus.completed)
+        _MaraudeWorkspace.attendance,
+      if (canViewReport) _MaraudeWorkspace.report,
+      if (volunteerData?.isAdmin == true ||
+          (ownApplication?.status == ConcertVolunteerStatus.selected &&
+              ownApplication?.confirmationStatus ==
+                  VolunteerConfirmationStatus.confirmed))
+        _MaraudeWorkspace.discussion,
+    ];
+    final selectedWorkspace = workspaces.contains(_selectedWorkspace)
+        ? _selectedWorkspace
+        : _MaraudeWorkspace.summary;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -109,84 +172,145 @@ class _ConcertDetails extends ConsumerWidget {
                         ? () => _delete(context, ref)
                         : null,
                   ),
+                  const SizedBox(height: 20),
+                  _MaraudeProgress(
+                    concert: concert,
+                    ownApplication: ownApplication,
+                    isVolunteer: isVolunteer,
+                  ),
+                  const SizedBox(height: 16),
+                  _NextActionCard(
+                    concert: concert,
+                    ownApplication: ownApplication,
+                    isAdmin: canManageMaraude,
+                    isVolunteer: isVolunteer,
+                    onOpen: (workspace) =>
+                        setState(() => _selectedWorkspace = workspace),
+                    onOpenMission: (role) =>
+                        showMaraudeRoleMissionSheet(context, role),
+                  ),
+                  if (isVolunteer &&
+                      ownApplication?.confirmationStatus ==
+                          VolunteerConfirmationStatus.confirmed &&
+                      ownApplication?.teamRole != null) ...[
+                    const SizedBox(height: 16),
+                    MaraudeRoleMissionCard(role: ownApplication!.teamRole!),
+                  ],
+                  const SizedBox(height: 16),
+                  _WorkspaceNavigation(
+                    workspaces: workspaces,
+                    selected: selectedWorkspace,
+                    onSelected: (workspace) =>
+                        setState(() => _selectedWorkspace = workspace),
+                  ),
                   const SizedBox(height: 24),
                   Wrap(
                     spacing: spacing,
                     runSpacing: spacing,
                     children: [
-                      SizedBox(
-                        width: sectionWidth,
-                        child: _InformationSection(concert: concert),
-                      ),
-                      SizedBox(
-                        width: sectionWidth,
-                        child: _VenueSection(concert: concert),
-                      ),
-                      SizedBox(
-                        width: sectionWidth,
-                        child: _MaraudeSection(
-                          concert: concert,
-                          canManage: canManageMaraude,
+                      if (selectedWorkspace == _MaraudeWorkspace.summary) ...[
+                        SizedBox(
+                          width: sectionWidth,
+                          child: _InformationSection(concert: concert),
                         ),
-                      ),
-                      SizedBox(
-                        width: sectionWidth,
-                        child: _CollectionsSection(
-                          concert: concert,
-                          canManage: canManageMaraude,
+                        SizedBox(
+                          width: sectionWidth,
+                          child: _VenueSection(concert: concert),
                         ),
-                      ),
-                      SizedBox(
-                        width: sectionWidth,
-                        child: _DistributionSection(
-                          concert: concert,
-                          canManage: canManageMaraude,
+                        SizedBox(
+                          width: sectionWidth,
+                          child: _ContactsSection(concert: concert),
                         ),
-                      ),
-                      if (concert.maraudeStatus == MaraudeStatus.inProgress ||
-                          concert.maraudeStatus == MaraudeStatus.completed ||
-                          concert.operationalReport != null)
+                        if (isVolunteer &&
+                            ownApplication?.status !=
+                                ConcertVolunteerStatus.selected)
+                          SizedBox(
+                            width: availableWidth,
+                            child: _VolunteersSection(
+                              concertId: concert.id,
+                              maraudeStatus: concert.maraudeStatus,
+                            ),
+                          ),
+                      ],
+                      if (selectedWorkspace == _MaraudeWorkspace.team)
+                        SizedBox(
+                          width: availableWidth,
+                          child: _VolunteersSection(
+                            concertId: concert.id,
+                            maraudeStatus: concert.maraudeStatus,
+                          ),
+                        ),
+                      if (selectedWorkspace == _MaraudeWorkspace.team)
+                        SizedBox(
+                          width: sectionWidth,
+                          child: const _PlaceholderSection(
+                            title: 'Documents',
+                            icon: Icons.folder_outlined,
+                            message: 'Aucun document disponible.',
+                          ),
+                        ),
+                      if (selectedWorkspace == _MaraudeWorkspace.operations)
+                        SizedBox(
+                          width: sectionWidth,
+                          child: _MaraudeSection(
+                            concert: concert,
+                            canManage: canManageMaraude,
+                            canComplete: canCompleteMaraude,
+                          ),
+                        ),
+                      if (selectedWorkspace == _MaraudeWorkspace.attendance &&
+                          canManageMaraude &&
+                          concert.maraudeStatus == MaraudeStatus.completed)
+                        SizedBox(
+                          width: availableWidth,
+                          child: _AttendanceSection(
+                            concertId: concert.id,
+                            maraudeStatus: concert.maraudeStatus,
+                          ),
+                        ),
+                      if (selectedWorkspace == _MaraudeWorkspace.operations)
+                        SizedBox(
+                          width: sectionWidth,
+                          child: _CollectionsSection(
+                            concert: concert,
+                            canEdit: canEditOperationalReport,
+                          ),
+                        ),
+                      if (selectedWorkspace == _MaraudeWorkspace.operations &&
+                          (concert.maraudeStatus == MaraudeStatus.inProgress ||
+                              concert.maraudeStatus ==
+                                  MaraudeStatus.completed ||
+                              concert.operationalReport != null))
                         SizedBox(
                           width: sectionWidth,
                           child: MaraudeOperationalReportCard(
                             concert: concert,
                             canEdit: canEditOperationalReport,
                             canEditPhoto: canEditOperationalPhoto,
+                            canManagePhotoGallery:
+                                canManageMaraude || canEditOperationalPhoto,
+                            currentUserId: volunteerData?.currentUserId,
+                            isAdmin: canManageMaraude,
                           ),
                         ),
-                      if (canViewReport)
+                      if (selectedWorkspace == _MaraudeWorkspace.report &&
+                          canViewReport)
                         SizedBox(
-                          width: sectionWidth,
+                          width: availableWidth,
                           child: _MaraudeReportSection(
                             concert: concert,
                             volunteerCounts: volunteerData.counts,
                             canEditComment: volunteerData.isAdmin,
+                            applications: volunteerData.applications,
+                            currentUserId: volunteerData.currentUserId,
+                            isAdmin: volunteerData.isAdmin,
                           ),
                         ),
-                      SizedBox(
-                        width: sectionWidth,
-                        child: _ContactsSection(concert: concert),
-                      ),
-                      SizedBox(
-                        width: availableWidth,
-                        child: _VolunteersSection(concertId: concert.id),
-                      ),
-                      SizedBox(
-                        width: sectionWidth,
-                        child: const _PlaceholderSection(
-                          title: 'Documents',
-                          icon: Icons.folder_outlined,
-                          message: 'Aucun document disponible.',
+                      if (selectedWorkspace == _MaraudeWorkspace.discussion)
+                        SizedBox(
+                          width: availableWidth,
+                          child: _MaraudeChatSection(concertId: concert.id),
                         ),
-                      ),
-                      SizedBox(
-                        width: sectionWidth,
-                        child: const _PlaceholderSection(
-                          title: 'Commentaires',
-                          icon: Icons.chat_bubble_outline,
-                          message: 'Aucun commentaire.',
-                        ),
-                      ),
                     ],
                   ),
                 ],
@@ -214,7 +338,7 @@ class _ConcertDetails extends ConsumerWidget {
     ref.invalidate(concertDetailsProvider(concert.id));
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Concert modifié.')));
+    ).showSnackBar(const SnackBar(content: Text('Maraude modifiée.')));
   }
 
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
@@ -223,11 +347,398 @@ class _ConcertDetails extends ConsumerWidget {
   }
 }
 
+class _WorkspaceNavigation extends StatelessWidget {
+  const _WorkspaceNavigation({
+    required this.workspaces,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<_MaraudeWorkspace> workspaces;
+  final _MaraudeWorkspace selected;
+  final ValueChanged<_MaraudeWorkspace> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Sections de la maraude',
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final workspace in workspaces)
+            ChoiceChip(
+              key: ValueKey('maraude-workspace-${workspace.name}'),
+              avatar: Icon(workspace.icon, size: 18),
+              label: Text(workspace.label),
+              selected: selected == workspace,
+              onSelected: (_) => onSelected(workspace),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MaraudeProgress extends StatelessWidget {
+  const _MaraudeProgress({
+    required this.concert,
+    required this.ownApplication,
+    required this.isVolunteer,
+  });
+
+  final Concert concert;
+  final ConcertVolunteerApplication? ownApplication;
+  final bool isVolunteer;
+
+  static const _steps = [
+    'Candidature',
+    'Confirmation',
+    'Préparation',
+    'En cours',
+    'Bilan',
+    'Archivée',
+  ];
+
+  int get _currentStep {
+    if (concert.maraudeStatus == MaraudeStatus.completed ||
+        concert.maraudeStatus == MaraudeStatus.cancelled) {
+      return 5;
+    }
+    if (concert.maraudeStatus == MaraudeStatus.inProgress) return 3;
+    if (!isVolunteer) {
+      return concert.maraudeStatus == MaraudeStatus.teamReady ? 2 : 0;
+    }
+    if (ownApplication?.confirmationStatus ==
+        VolunteerConfirmationStatus.confirmed) {
+      return 2;
+    }
+    if (ownApplication?.status == ConcertVolunteerStatus.selected) return 1;
+    return 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = _currentStep;
+    final colors = Theme.of(context).colorScheme;
+    return _SectionCard(
+      title: 'Avancement',
+      icon: Icons.route_outlined,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 700) {
+            return Row(
+              children: [
+                CircularProgressIndicator(value: (current + 1) / _steps.length),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Étape ${current + 1} sur ${_steps.length}'),
+                      Text(
+                        _steps[current],
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              for (var index = 0; index < _steps.length; index++) ...[
+                Expanded(
+                  child: Column(
+                    children: [
+                      Icon(
+                        index < current
+                            ? Icons.check_circle
+                            : index == current
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        color: index <= current
+                            ? colors.primary
+                            : colors.outlineVariant,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _steps[index],
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontWeight: index == current
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: index <= current
+                              ? colors.onSurface
+                              : colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (index < _steps.length - 1)
+                  Expanded(
+                    child: Divider(
+                      color: index < current
+                          ? colors.primary
+                          : colors.outlineVariant,
+                    ),
+                  ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _NextActionCard extends StatelessWidget {
+  const _NextActionCard({
+    required this.concert,
+    required this.ownApplication,
+    required this.isAdmin,
+    required this.isVolunteer,
+    required this.onOpen,
+    required this.onOpenMission,
+  });
+
+  final Concert concert;
+  final ConcertVolunteerApplication? ownApplication;
+  final bool isAdmin;
+  final bool isVolunteer;
+  final ValueChanged<_MaraudeWorkspace> onOpen;
+  final ValueChanged<MaraudeRole> onOpenMission;
+
+  @override
+  Widget build(BuildContext context) {
+    final action = _action;
+    final colors = Theme.of(context).colorScheme;
+    return Card(
+      color: colors.primary,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final description = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Prochaine action',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(color: colors.onPrimary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  action.$1,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colors.onPrimary,
+                  ),
+                ),
+                if (action.$2 != null) ...[
+                  const SizedBox(height: 4),
+                  Text(action.$2!, style: TextStyle(color: colors.onPrimary)),
+                ],
+              ],
+            );
+            final button = FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.onPrimary,
+                foregroundColor: colors.primary,
+              ),
+              onPressed: () {
+                final missionRole = action.$5;
+                if (missionRole != null) {
+                  onOpenMission(missionRole);
+                } else {
+                  onOpen(action.$3);
+                }
+              },
+              child: Text(action.$4),
+            );
+            if (constraints.maxWidth < 480) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.bolt_outlined, color: colors.onPrimary),
+                      const SizedBox(width: 12),
+                      Expanded(child: description),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(width: double.infinity, child: button),
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.bolt_outlined, color: colors.onPrimary),
+                const SizedBox(width: 12),
+                Expanded(child: description),
+                const SizedBox(width: 12),
+                button,
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  (String, String?, _MaraudeWorkspace, String, MaraudeRole?) get _action {
+    if (!isAdmin && !isVolunteer) {
+      if (concert.maraudeStatus == MaraudeStatus.inProgress) {
+        return (
+          'Suivre le déroulement de la maraude',
+          'Consultez les informations opérationnelles disponibles.',
+          _MaraudeWorkspace.operations,
+          'Consulter',
+          null,
+        );
+      }
+      if (concert.maraudeStatus == MaraudeStatus.completed) {
+        return (
+          'Consulter la maraude terminée',
+          'Retrouvez les informations générales de cette maraude.',
+          _MaraudeWorkspace.summary,
+          'Consulter',
+          null,
+        );
+      }
+      return (
+        'Suivre la constitution de l’équipe',
+        'Consultez les candidatures et l’équipe retenue.',
+        _MaraudeWorkspace.team,
+        'Voir l’équipe',
+        null,
+      );
+    }
+    if (concert.maraudeStatus == MaraudeStatus.completed) {
+      if (isAdmin) {
+        return (
+          'Valider les présences et attribuer les crédits',
+          'Les crédits ne sont créés qu’après votre validation.',
+          _MaraudeWorkspace.attendance,
+          'Vérifier',
+          null,
+        );
+      }
+      return (
+        'Consulter le bilan de la maraude',
+        'Votre crédit apparaîtra après validation par un administrateur.',
+        _MaraudeWorkspace.report,
+        'Voir le bilan',
+        null,
+      );
+    }
+    if (concert.maraudeStatus == MaraudeStatus.inProgress) {
+      return (
+        isAdmin
+            ? 'Suivre la collecte et le déroulement'
+            : 'Poursuivre la maraude',
+        'Les informations non relevées resteront indiquées comme non renseignées.',
+        _MaraudeWorkspace.operations,
+        'Ouvrir',
+        null,
+      );
+    }
+    if (ownApplication?.status == ConcertVolunteerStatus.selected &&
+        ownApplication?.confirmationStatus ==
+            VolunteerConfirmationStatus.pending) {
+      return (
+        'Confirmer votre participation',
+        ownApplication?.confirmationDueAt == null
+            ? 'Consultez votre rôle et votre fiche de mission.'
+            : 'Confirmation attendue avant le '
+                  '${formatFrenchDateTime(ownApplication!.confirmationDueAt!)}.',
+        _MaraudeWorkspace.team,
+        'Confirmer',
+        null,
+      );
+    }
+    if (ownApplication?.status == ConcertVolunteerStatus.selected &&
+        ownApplication?.confirmationStatus ==
+            VolunteerConfirmationStatus.confirmed) {
+      return switch (ownApplication?.teamRole) {
+        MaraudeRole.teamLeader => (
+          'Préparer le démarrage de la maraude',
+          'Vous êtes chef d’équipe : vérifiez les informations utiles avant de démarrer.',
+          _MaraudeWorkspace.operations,
+          'Préparer',
+          null,
+        ),
+        MaraudeRole.communication => (
+          'Préparer votre mission de communication',
+          'Votre participation est confirmée comme chargé.e de communication.',
+          _MaraudeWorkspace.operations,
+          'Voir ma mission',
+          MaraudeRole.communication,
+        ),
+        MaraudeRole.logistics => (
+          'Préparer votre mission de logistique',
+          'Votre participation est confirmée comme chargé.e de logistique.',
+          _MaraudeWorkspace.operations,
+          'Voir ma mission',
+          MaraudeRole.logistics,
+        ),
+        MaraudeRole.collectionDistribution => (
+          'Préparer la collecte et la distribution',
+          'Votre participation est confirmée pour la récolte et la distribution.',
+          _MaraudeWorkspace.operations,
+          'Voir ma mission',
+          MaraudeRole.collectionDistribution,
+        ),
+        null => (
+          'Votre participation est confirmée',
+          'Votre rôle doit encore être précisé par l’équipe organisatrice.',
+          _MaraudeWorkspace.team,
+          'Consulter',
+          null,
+        ),
+      };
+    }
+    if (isAdmin) {
+      return (
+        'Constituer et confirmer l’équipe',
+        'Un chef d’équipe confirmé est obligatoire avant le démarrage.',
+        _MaraudeWorkspace.team,
+        'Gérer l’équipe',
+        null,
+      );
+    }
+    return (
+      ownApplication == null
+          ? 'Proposer votre participation'
+          : 'Suivre votre candidature',
+      ownApplication == null
+          ? 'Consultez les informations puis proposez-vous dans l’espace équipe.'
+          : 'Consultez l’état de votre candidature dans l’espace équipe.',
+      _MaraudeWorkspace.team,
+      'Consulter',
+      null,
+    );
+  }
+}
+
 class _MaraudeSection extends ConsumerStatefulWidget {
-  const _MaraudeSection({required this.concert, required this.canManage});
+  const _MaraudeSection({
+    required this.concert,
+    required this.canManage,
+    required this.canComplete,
+  });
 
   final Concert concert;
   final bool canManage;
+  final bool canComplete;
 
   @override
   ConsumerState<_MaraudeSection> createState() => _MaraudeSectionState();
@@ -250,19 +761,21 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
           _MaraudeStatusChip(status: concert.maraudeStatus),
           const Divider(height: 24),
           _DetailRow(
-            label: 'Début réel',
+            label: 'Début',
             value: concert.actualStartAt == null
                 ? '—'
                 : formatFrenchDateTime(concert.actualStartAt!),
           ),
           _DetailRow(
-            label: 'Fin réelle',
+            label: 'Fin',
             value: concert.actualEndAt == null
                 ? '—'
                 : formatFrenchDateTime(concert.actualEndAt!),
             showDivider: widget.canManage,
           ),
-          if (widget.canManage) ...[
+          if (widget.canManage &&
+              concert.maraudeStatus != MaraudeStatus.completed &&
+              concert.maraudeStatus != MaraudeStatus.cancelled) ...[
             DropdownButtonFormField<MaraudeStatus>(
               key: const ValueKey('maraude-status-selector'),
               initialValue: concert.maraudeStatus,
@@ -284,21 +797,116 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
               const SizedBox(height: 12),
               const LinearProgressIndicator(),
             ],
-            if (concert.maraudeStatus == MaraudeStatus.completed) ...[
-              const SizedBox(height: 12),
-              const Text(
-                'Maraude terminée',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ],
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: const ValueKey('correct-maraude-timing'),
+              onPressed: _isSubmitting ? null : _correctTiming,
+              icon: const Icon(Icons.schedule_outlined),
+              label: const Text('Corriger les horaires'),
+            ),
+          ],
+          if (widget.canManage &&
+              (concert.maraudeStatus == MaraudeStatus.completed ||
+                  concert.maraudeStatus == MaraudeStatus.cancelled)) ...[
+            const Text(
+              'L’état est archivé et ne peut plus être modifié.',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
             if (concert.maraudeStatus == MaraudeStatus.cancelled &&
                 concert.cancellationReason != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Text('Motif : ${concert.cancellationReason}'),
             ],
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: const ValueKey('correct-maraude-timing'),
+              onPressed: _isSubmitting ? null : _correctTiming,
+              icon: const Icon(Icons.schedule_outlined),
+              label: const Text('Corriger les horaires'),
+            ),
+          ],
+          if ((widget.canManage || widget.canComplete) &&
+              (concert.maraudeStatus == MaraudeStatus.open ||
+                  concert.maraudeStatus == MaraudeStatus.teamReady)) ...[
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              key: const ValueKey('start-maraude-team-leader'),
+              onPressed: _isSubmitting
+                  ? null
+                  : () => _setStatus(MaraudeStatus.inProgress),
+              icon: const Icon(Icons.play_arrow),
+              label: Text(
+                widget.canManage
+                    ? 'Démarrer à la place du chef'
+                    : 'Démarrer la maraude',
+              ),
+            ),
+          ],
+          if ((widget.canManage || widget.canComplete) &&
+              concert.maraudeStatus == MaraudeStatus.inProgress) ...[
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              key: const ValueKey('complete-maraude-team-leader'),
+              onPressed: _isSubmitting ? null : _complete,
+              icon: const Icon(Icons.check_circle_outline),
+              label: Text(
+                widget.canManage
+                    ? 'Clôturer à la place du chef'
+                    : 'Terminer la maraude',
+              ),
+            ),
           ],
         ],
       ),
+    );
+  }
+
+  Future<void> _complete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Terminer la maraude ?'),
+        content: const Text(
+          'La maraude sera clôturée. Les présences devront ensuite être '
+          'validées par un administrateur avant l’attribution des crédits. '
+          'Si aucun compte rendu n’est enregistré, les quantités seront '
+          'marquées comme non renseignées.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Terminer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _setStatus(MaraudeStatus.completed);
+  }
+
+  Future<void> _correctTiming() async {
+    final correction = await showDialog<_MaraudeTimingCorrection>(
+      context: context,
+      builder: (context) => _MaraudeTimingDialog(
+        startAt: widget.concert.actualStartAt,
+        endAt: widget.concert.actualEndAt,
+      ),
+    );
+    if (correction == null || !mounted) return;
+    await _changeStatus(
+      action: () => ref
+          .read(concertRepositoryProvider)
+          .correctMaraudeTiming(
+            widget.concert.id,
+            startAt: correction.startAt,
+            endAt: correction.endAt,
+          ),
+      successMessage: 'Horaires corrigés.',
+      errorMessage: 'Impossible de corriger les horaires.',
     );
   }
 
@@ -328,13 +936,376 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
       ).showSnackBar(SnackBar(content: Text(successMessage)));
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(errorMessage)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(describeError(error, errorMessage))),
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
+}
+
+class _AttendanceSection extends ConsumerStatefulWidget {
+  const _AttendanceSection({
+    required this.concertId,
+    required this.maraudeStatus,
+  });
+
+  final String concertId;
+  final MaraudeStatus maraudeStatus;
+
+  @override
+  ConsumerState<_AttendanceSection> createState() => _AttendanceSectionState();
+}
+
+class _AttendanceSectionState extends ConsumerState<_AttendanceSection> {
+  final Set<String> _updatingMembers = {};
+  bool _isValidating = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final attendance = ref.watch(maraudeAttendanceProvider(widget.concertId));
+    return _SectionCard(
+      title: 'Présences et crédits',
+      icon: Icons.fact_check_outlined,
+      child: attendance.when(
+        loading: () => const AppLoadingState(label: 'Chargement des présences'),
+        error: (_, _) => AppErrorState(
+          message: 'Impossible de charger les présences.',
+          onRetry: () =>
+              ref.invalidate(maraudeAttendanceProvider(widget.concertId)),
+        ),
+        data: _buildAttendance,
+      ),
+    );
+  }
+
+  Widget _buildAttendance(MaraudeAttendanceData data) {
+    if (data.members.isEmpty) {
+      return const Text('Aucun bénévole sélectionné.');
+    }
+
+    final validationAvailable =
+        data.canValidate &&
+        widget.maraudeStatus == MaraudeStatus.completed &&
+        data.pendingCount == 0 &&
+        !data.isValidated;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Indiquez les bénévoles présents, puis confirmez pour attribuer '
+          'leurs crédits d’invitation.',
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            Chip(label: Text('${data.members.length} sélectionnés')),
+            Chip(label: Text('Présents : ${data.presentCount}')),
+            Chip(label: Text('Absents : ${data.absentCount}')),
+            Chip(label: Text('En attente : ${data.pendingCount}')),
+          ],
+        ),
+        const SizedBox(height: 12),
+        for (final member in data.members) ...[
+          _AttendanceMemberRow(
+            member: member,
+            isUpdating: _updatingMembers.contains(member.applicationId),
+            onChanged: (status) => _setAttendance(member, status),
+          ),
+          if (member != data.members.last) const Divider(height: 24),
+        ],
+        if (data.canValidate) ...[
+          const Divider(height: 28),
+          if (data.isValidated)
+            const Row(
+              children: [
+                Icon(Icons.verified_outlined),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Présences validées. Les crédits des bénévoles présents '
+                    'ont été attribués.',
+                  ),
+                ),
+              ],
+            )
+          else
+            FilledButton.icon(
+              key: const ValueKey('validate-maraude-attendance'),
+              onPressed: validationAvailable && !_isValidating
+                  ? _validate
+                  : null,
+              icon: _isValidating
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.verified_outlined),
+              label: const Text('Valider les présences et les crédits'),
+            ),
+          if (data.pendingCount > 0)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Renseignez toutes les présences avant de les valider.',
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _setAttendance(
+    MaraudeAttendanceMember member,
+    VolunteerAttendanceStatus status,
+  ) async {
+    setState(() => _updatingMembers.add(member.applicationId));
+    try {
+      await ref
+          .read(concertVolunteerRepositoryProvider)
+          .setAttendanceStatus(member.applicationId, status);
+      _invalidate();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Présence mise à jour.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            describeError(error, 'Impossible de modifier cette présence.'),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _updatingMembers.remove(member.applicationId));
+      }
+    }
+  }
+
+  Future<void> _validate() async {
+    setState(() => _isValidating = true);
+    try {
+      final awarded = await ref
+          .read(concertVolunteerRepositoryProvider)
+          .validateAttendance(widget.concertId);
+      _invalidate();
+      ref.invalidate(volunteerCreditCountProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '$awarded crédit${awarded > 1 ? 's' : ''} attribué'
+            '${awarded > 1 ? 's' : ''}.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            describeError(error, 'Impossible de valider les présences.'),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isValidating = false);
+    }
+  }
+
+  void _invalidate() {
+    ref.invalidate(maraudeAttendanceProvider(widget.concertId));
+    ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
+    ref.invalidate(concertDetailsProvider(widget.concertId));
+    ref.invalidate(concertsProvider);
+  }
+}
+
+class _AttendanceMemberRow extends StatelessWidget {
+  const _AttendanceMemberRow({
+    required this.member,
+    required this.isUpdating,
+    required this.onChanged,
+  });
+
+  final MaraudeAttendanceMember member;
+  final bool isUpdating;
+  final ValueChanged<VolunteerAttendanceStatus> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final isConfirmed =
+        member.confirmationStatus == VolunteerConfirmationStatus.confirmed;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          member.displayName,
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 2),
+        Text(member.teamRole?.label ?? 'Rôle non attribué'),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<VolunteerAttendanceStatus>(
+          key: ValueKey('attendance-${member.applicationId}'),
+          initialValue: member.attendanceStatus,
+          decoration: const InputDecoration(labelText: 'Présence'),
+          items: [
+            for (final status in VolunteerAttendanceStatus.values)
+              DropdownMenuItem(value: status, child: Text(status.label)),
+          ],
+          onChanged: !isConfirmed || isUpdating
+              ? null
+              : (status) {
+                  if (status != null && status != member.attendanceStatus) {
+                    onChanged(status);
+                  }
+                },
+        ),
+        if (!isConfirmed)
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text(
+              'La participation doit être confirmée avant de renseigner '
+              'la présence.',
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            'Dernière modification'
+            '${member.lastModifiedByName == null ? '' : ' par ${member.lastModifiedByName}'}'
+            ' · ${formatFrenchDateTime(member.lastModifiedAt)}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MaraudeTimingCorrection {
+  const _MaraudeTimingCorrection({this.startAt, this.endAt});
+  final DateTime? startAt;
+  final DateTime? endAt;
+}
+
+class _MaraudeTimingDialog extends StatefulWidget {
+  const _MaraudeTimingDialog({this.startAt, this.endAt});
+  final DateTime? startAt;
+  final DateTime? endAt;
+
+  @override
+  State<_MaraudeTimingDialog> createState() => _MaraudeTimingDialogState();
+}
+
+class _MaraudeTimingDialogState extends State<_MaraudeTimingDialog> {
+  final _key = GlobalKey<FormState>();
+  late final TextEditingController _start;
+  late final TextEditingController _end;
+
+  @override
+  void initState() {
+    super.initState();
+    _start = TextEditingController(text: _timingValue(widget.startAt));
+    _end = TextEditingController(text: _timingValue(widget.endAt));
+  }
+
+  @override
+  void dispose() {
+    _start.dispose();
+    _end.dispose();
+    super.dispose();
+  }
+
+  DateTime? _parse(String value) {
+    final normalized = value.trim();
+    if (normalized.isEmpty) return null;
+    return DateTime.tryParse(normalized.replaceFirst(' ', 'T'));
+  }
+
+  String? _validate(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    return _parse(value) == null ? 'Format attendu : AAAA-MM-JJ HH:MM' : null;
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Corriger les horaires'),
+    content: Form(
+      key: _key,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextFormField(
+            key: const ValueKey('maraude-start-correction'),
+            controller: _start,
+            decoration: const InputDecoration(
+              labelText: 'Début',
+              hintText: 'AAAA-MM-JJ HH:MM',
+            ),
+            validator: _validate,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            key: const ValueKey('maraude-end-correction'),
+            controller: _end,
+            decoration: const InputDecoration(
+              labelText: 'Fin',
+              hintText: 'AAAA-MM-JJ HH:MM',
+            ),
+            validator: (value) {
+              final formatError = _validate(value);
+              if (formatError != null) return formatError;
+              final start = _parse(_start.text);
+              final end = _parse(value ?? '');
+              if (start != null && end != null && end.isBefore(start)) {
+                return 'La fin doit être postérieure au début.';
+              }
+              return null;
+            },
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Annuler'),
+      ),
+      FilledButton(
+        onPressed: () {
+          if (!(_key.currentState?.validate() ?? false)) return;
+          Navigator.pop(
+            context,
+            _MaraudeTimingCorrection(
+              startAt: _parse(_start.text),
+              endAt: _parse(_end.text),
+            ),
+          );
+        },
+        child: const Text('Enregistrer'),
+      ),
+    ],
+  );
+}
+
+String _timingValue(DateTime? value) {
+  if (value == null) return '';
+  final local = value.toLocal();
+  return '${local.year.toString().padLeft(4, '0')}-'
+      '${local.month.toString().padLeft(2, '0')}-'
+      '${local.day.toString().padLeft(2, '0')} '
+      '${local.hour.toString().padLeft(2, '0')}:'
+      '${local.minute.toString().padLeft(2, '0')}';
 }
 
 class _MaraudeStatusChip extends StatelessWidget {
@@ -363,10 +1334,10 @@ class _MaraudeStatusChip extends StatelessWidget {
 }
 
 class _CollectionsSection extends ConsumerStatefulWidget {
-  const _CollectionsSection({required this.concert, required this.canManage});
+  const _CollectionsSection({required this.concert, required this.canEdit});
 
   final Concert concert;
-  final bool canManage;
+  final bool canEdit;
 
   @override
   ConsumerState<_CollectionsSection> createState() =>
@@ -376,9 +1347,7 @@ class _CollectionsSection extends ConsumerStatefulWidget {
 class _CollectionsSectionState extends ConsumerState<_CollectionsSection> {
   final Set<String> _deletingIds = {};
 
-  bool get _canEdit =>
-      widget.canManage &&
-      widget.concert.maraudeStatus == MaraudeStatus.inProgress;
+  bool get _canEdit => widget.canEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -396,8 +1365,8 @@ class _CollectionsSectionState extends ConsumerState<_CollectionsSection> {
             runSpacing: 8,
             children: [
               _CollectionSummaryValue(
-                label: 'Nombre de lots',
-                value: summary.lotCount.toString(),
+                label: 'Types renseignés',
+                value: '${summary.lotCount} / 6',
               ),
               _CollectionSummaryValue(
                 label: 'Poids total (kg)',
@@ -409,24 +1378,58 @@ class _CollectionsSectionState extends ConsumerState<_CollectionsSection> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 16,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Pensez à demander quels sont les régimes alimentaires ou '
+                  'restrictions alimentaires concernés.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
           if (_canEdit) ...[
             const SizedBox(height: 16),
+            if (widget.concert.maraudeStatus == MaraudeStatus.completed) ...[
+              const Text(
+                'Maraude archivée : les changements sont enregistrés comme '
+                'des corrections administratives.',
+              ),
+              const SizedBox(height: 12),
+            ],
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.icon(
-                onPressed: () => _openForm(),
+                onPressed: collections.length >= 6 ? null : () => _openForm(),
                 icon: const Icon(Icons.add),
-                label: const Text('Ajouter un lot'),
+                label: Text(
+                  collections.length >= 6
+                      ? '6 types renseignés'
+                      : widget.concert.maraudeStatus == MaraudeStatus.completed
+                      ? 'Ajouter une correction de collecte'
+                      : 'Ajouter un type de plat',
+                ),
               ),
             ),
           ] else if (widget.concert.maraudeStatus ==
               MaraudeStatus.completed) ...[
             const SizedBox(height: 16),
-            const Text('Cette collecte est en lecture seule.'),
+            const Text('Cette collecte est archivée en lecture seule.'),
           ],
           const Divider(height: 28),
           if (collections.isEmpty)
-            const Text('Aucun lot enregistré.')
+            const Text('Aucun type de plat renseigné.')
           else
             for (final collection in collections)
               _CollectionItem(
@@ -458,6 +1461,8 @@ class _CollectionsSectionState extends ConsumerState<_CollectionsSection> {
     );
     if (saved != true || !mounted) return;
     ref.invalidate(concertDetailsProvider(widget.concert.id));
+    ref.invalidate(concertsProvider);
+    ref.invalidate(maraudeOverviewProvider);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(collection == null ? 'Lot ajouté.' : 'Lot modifié.'),
@@ -466,12 +1471,16 @@ class _CollectionsSectionState extends ConsumerState<_CollectionsSection> {
   }
 
   Future<void> _delete(MaraudeCollection collection) async {
+    final description = collection.description?.trim();
+    final title = description?.isNotEmpty == true
+        ? description!
+        : collection.category.label;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Supprimer ce lot ?'),
         content: Text(
-          'Le lot « ${collection.category.label} » et ses quantités seront '
+          'Le lot « $title » et ses quantités seront '
           'retirés définitivement de la collecte et du bilan.',
         ),
         actions: [
@@ -496,6 +1505,8 @@ class _CollectionsSectionState extends ConsumerState<_CollectionsSection> {
     try {
       await ref.read(maraudeCollectionRepositoryProvider).delete(collection.id);
       ref.invalidate(concertDetailsProvider(widget.concert.id));
+      ref.invalidate(concertsProvider);
+      ref.invalidate(maraudeOverviewProvider);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -503,7 +1514,11 @@ class _CollectionsSectionState extends ConsumerState<_CollectionsSection> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible de supprimer ce lot.')),
+        SnackBar(
+          content: Text(
+            describeError(error, 'Impossible de supprimer ce lot.'),
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _deletingIds.remove(collection.id));
@@ -565,15 +1580,13 @@ class _CollectionItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    collection.category.label,
+                    description?.isNotEmpty == true
+                        ? description!
+                        : collection.category.label,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  if (description?.isNotEmpty == true) ...[
-                    const SizedBox(height: 4),
-                    Text(description!),
-                  ],
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 12,
@@ -581,11 +1594,16 @@ class _CollectionItem extends StatelessWidget {
                     children: [
                       Text(
                         '${formatCollectionNumber(collection.quantity)} '
-                        '${collection.unit.label}',
+                        'plats',
                       ),
+                      if (collection.averageWeightKg != null)
+                        Text(
+                          'Poids moyen : '
+                          '${formatCollectionNumber(collection.averageWeightKg!)} kg',
+                        ),
                       if (collection.weightKg != null)
                         Text(
-                          'Poids : '
+                          'Poids total : '
                           '${formatCollectionNumber(collection.weightKg!)} kg',
                         ),
                     ],
@@ -639,121 +1657,6 @@ class _CollectionItem extends StatelessWidget {
 
 enum _CollectionAction { edit, delete }
 
-class _DistributionSection extends ConsumerWidget {
-  const _DistributionSection({required this.concert, required this.canManage});
-
-  final Concert concert;
-  final bool canManage;
-
-  bool get canEdit =>
-      canManage && concert.maraudeStatus == MaraudeStatus.inProgress;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final distribution = concert.distribution;
-
-    return _SectionCard(
-      title: 'Distribution',
-      icon: Icons.volunteer_activism_outlined,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (distribution == null)
-            const Text('Aucune distribution enregistrée.')
-          else ...[
-            _DetailRow(
-              label: 'Lieu de distribution',
-              value: _valueOrDash(distribution.distributionLocation),
-            ),
-            _DetailRow(
-              label: 'Bénéficiaires estimés',
-              value: distribution.estimatedBeneficiaries?.toString() ?? '—',
-            ),
-            _DetailRow(
-              label: 'Repas distribués',
-              value: distribution.distributedMeals?.toString() ?? '—',
-            ),
-            _DetailRow(
-              label: 'Poids restant',
-              value: distribution.remainingWeightKg == null
-                  ? '—'
-                  : '${formatDistributionNumber(distribution.remainingWeightKg!)} kg',
-            ),
-            _DetailRow(
-              label: 'Début de la distribution',
-              value: distribution.distributionStartedAt == null
-                  ? '—'
-                  : formatFrenchDateTime(distribution.distributionStartedAt!),
-            ),
-            _DetailRow(
-              label: 'Fin de la distribution',
-              value: distribution.distributionCompletedAt == null
-                  ? '—'
-                  : formatFrenchDateTime(distribution.distributionCompletedAt!),
-            ),
-            _DetailRow(
-              label: 'Commentaire d’incident',
-              value: _valueOrDash(distribution.incidentComment),
-              showDivider: false,
-            ),
-          ],
-          if (canEdit) ...[
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton.icon(
-                key: const ValueKey('edit-distribution'),
-                onPressed: () => _openForm(context, ref, distribution),
-                icon: Icon(
-                  distribution == null ? Icons.add : Icons.edit_outlined,
-                ),
-                label: Text(
-                  distribution == null ? 'Ajouter la distribution' : 'Modifier',
-                ),
-              ),
-            ),
-          ] else if (concert.maraudeStatus == MaraudeStatus.completed) ...[
-            const SizedBox(height: 16),
-            const Text('Cette distribution est en lecture seule.'),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Future<void> _openForm(
-    BuildContext context,
-    WidgetRef ref,
-    MaraudeDistribution? distribution,
-  ) async {
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (context) => MaraudeDistributionFormDialog(
-        initialDistribution: distribution,
-        onSubmit: (draft) async {
-          final repository = ref.read(maraudeDistributionRepositoryProvider);
-          if (distribution == null) {
-            await repository.create(concert.id, draft);
-          } else {
-            await repository.update(distribution.id, draft);
-          }
-        },
-      ),
-    );
-    if (saved != true || !context.mounted) return;
-    ref.invalidate(concertDetailsProvider(concert.id));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          distribution == null
-              ? 'Distribution ajoutée.'
-              : 'Distribution modifiée.',
-        ),
-      ),
-    );
-  }
-}
-
 String _valueOrDash(String? value) {
   final trimmed = value?.trim();
   return trimmed == null || trimmed.isEmpty ? '—' : trimmed;
@@ -764,11 +1667,17 @@ class _MaraudeReportSection extends ConsumerStatefulWidget {
     required this.concert,
     required this.volunteerCounts,
     required this.canEditComment,
+    required this.applications,
+    required this.currentUserId,
+    required this.isAdmin,
   });
 
   final Concert concert;
   final ConcertVolunteerCounts volunteerCounts;
   final bool canEditComment;
+  final List<ConcertVolunteerApplication> applications;
+  final String? currentUserId;
+  final bool isAdmin;
 
   @override
   ConsumerState<_MaraudeReportSection> createState() =>
@@ -784,7 +1693,6 @@ class _MaraudeReportSectionState extends ConsumerState<_MaraudeReportSection> {
   @override
   Widget build(BuildContext context) {
     final report = _report;
-    final distribution = report.distribution;
 
     return _SectionCard(
       title: 'Bilan',
@@ -796,6 +1704,7 @@ class _MaraudeReportSectionState extends ConsumerState<_MaraudeReportSection> {
           const SizedBox(height: 12),
           _DetailRow(label: 'Artiste', value: report.artist),
           _DetailRow(label: 'Salle', value: report.venueName ?? '—'),
+          _DetailRow(label: 'Tourneur', value: report.promoterName ?? '—'),
           _DetailRow(
             label: 'Date',
             value: formatLongFrenchDate(report.concertDate),
@@ -812,8 +1721,17 @@ class _MaraudeReportSectionState extends ConsumerState<_MaraudeReportSection> {
             value: report.selectedCount.toString(),
           ),
           _DetailRow(label: 'Présents', value: report.presentCount.toString()),
-          _DetailRow(label: 'Absents', value: report.absentCount.toString()),
-          const SizedBox(height: 8),
+          _DetailRow(
+            label: 'Absents',
+            value: report.absentCount.toString(),
+            showDivider: widget.applications.isEmpty,
+          ),
+          if (widget.applications.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            for (final application in widget.applications)
+              _TeamRosterLine(application: application),
+            const SizedBox(height: 12),
+          ],
           Text('Collecte', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
           _DetailRow(
@@ -828,41 +1746,48 @@ class _MaraudeReportSectionState extends ConsumerState<_MaraudeReportSection> {
           _DetailRow(
             label: 'Quantité totale de pièces',
             value: formatCollectionNumber(report.collectionSummary.totalPieces),
+            showDivider: report.distribution == null,
           ),
-          const SizedBox(height: 8),
-          Text('Distribution', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 12),
-          if (distribution == null)
-            const Text('Aucune distribution enregistrée.')
-          else ...[
+          if (report.distribution != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Distribution',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
             _DetailRow(
               label: 'Lieu',
-              value: _valueOrDash(distribution.distributionLocation),
+              value: _valueOrDash(report.distribution!.distributionLocation),
             ),
             _DetailRow(
               label: 'Bénéficiaires estimés',
-              value: distribution.estimatedBeneficiaries?.toString() ?? '—',
+              value:
+                  report.distribution!.estimatedBeneficiaries?.toString() ??
+                  '—',
             ),
             _DetailRow(
               label: 'Repas distribués',
-              value: distribution.distributedMeals?.toString() ?? '—',
+              value: report.distribution!.distributedMeals?.toString() ?? '—',
             ),
             _DetailRow(
               label: 'Poids restant',
-              value: distribution.remainingWeightKg == null
+              value: report.distribution!.remainingWeightKg == null
                   ? '—'
-                  : '${formatDistributionNumber(distribution.remainingWeightKg!)} kg',
-            ),
-            _DetailRow(
-              label: 'Horaires',
-              value: _distributionSchedule(distribution),
-            ),
-            _DetailRow(
-              label: 'Incident',
-              value: _valueOrDash(distribution.incidentComment),
+                  : '${formatCollectionNumber(report.distribution!.remainingWeightKg!)} kg',
             ),
           ],
           const SizedBox(height: 8),
+          Text('Photos', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 12),
+          MaraudePhotoGallery(
+            concertId: widget.concert.id,
+            canUpload: false,
+            isUploading: false,
+            onUpload: () {},
+            currentUserId: widget.currentUserId,
+            isAdmin: widget.isAdmin,
+          ),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
@@ -930,11 +1855,46 @@ class _MaraudeReportSectionState extends ConsumerState<_MaraudeReportSection> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d’exporter le bilan.')),
+        SnackBar(
+          content: Text(
+            describeError(error, 'Impossible d’exporter le bilan.'),
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
+  }
+}
+
+class _TeamRosterLine extends StatelessWidget {
+  const _TeamRosterLine({required this.application});
+
+  final ConcertVolunteerApplication application;
+
+  @override
+  Widget build(BuildContext context) {
+    final role = application.teamRole;
+    final attendance = application.effectiveAttendanceStatus;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              role == null
+                  ? application.displayName
+                  : '${application.displayName} — ${role.label}',
+            ),
+          ),
+          if (attendance != null)
+            Text(
+              attendance.label,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1033,23 +1993,13 @@ class _ClosingCommentDialogState extends State<_ClosingCommentDialog> {
       if (!mounted) return;
       setState(() {
         _isSubmitting = false;
-        _errorMessage = 'Impossible d’enregistrer le commentaire de fin.';
+        _errorMessage = describeError(
+          error,
+          'Impossible d’enregistrer le commentaire de fin.',
+        );
       });
     }
   }
-}
-
-String _distributionSchedule(MaraudeDistribution distribution) {
-  final start = distribution.distributionStartedAt;
-  final end = distribution.distributionCompletedAt;
-  if (start == null && end == null) return '—';
-  final startLabel = start == null
-      ? 'Début non renseigné'
-      : formatFrenchDateTime(start).replaceFirst('\n', ' à ');
-  final endLabel = end == null
-      ? 'Fin non renseignée'
-      : formatFrenchDateTime(end).replaceFirst('\n', ' à ');
-  return '$startLabel\n$endLabel';
 }
 
 class _DetailHeader extends StatelessWidget {
@@ -1106,10 +2056,7 @@ class _DetailHeader extends StatelessWidget {
                     icon: Icons.calendar_today_outlined,
                     text: formatLongFrenchDate(concert.date),
                   ),
-                  Chip(
-                    visualDensity: VisualDensity.compact,
-                    label: Text(_statusLabel(concert.status)),
-                  ),
+                  _MaraudeStatusChip(status: concert.maraudeStatus),
                 ],
               ),
             ],
@@ -1260,16 +2207,20 @@ extension on _ApplicationFilter {
 }
 
 class _VolunteersSection extends ConsumerStatefulWidget {
-  const _VolunteersSection({required this.concertId});
+  const _VolunteersSection({
+    required this.concertId,
+    required this.maraudeStatus,
+  });
 
   final String concertId;
+  final MaraudeStatus maraudeStatus;
 
   @override
   ConsumerState<_VolunteersSection> createState() => _VolunteersSectionState();
 }
 
 class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
-  static const _minimumTeamSize = 4;
+  static const _minimumTeamSize = 3;
 
   bool _isSubmitting = false;
   bool _isSavingTeam = false;
@@ -1292,27 +2243,26 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
     final section = ref.watch(
       concertVolunteerSectionProvider(widget.concertId),
     );
+    final currentAccount = ref.watch(currentUserContextProvider).value;
 
     return _SectionCard(
       title: 'Bénévoles',
       icon: Icons.groups_outlined,
       child: section.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Impossible de charger les candidatures.'),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => ref.invalidate(
-                concertVolunteerSectionProvider(widget.concertId),
-              ),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Réessayer'),
-            ),
-          ],
+        loading: () => const AppLoadingState(label: 'Chargement des bénévoles'),
+        error: (_, _) => AppErrorState(
+          message: 'Impossible de charger les candidatures.',
+          onRetry: () =>
+              ref.invalidate(concertVolunteerSectionProvider(widget.concertId)),
         ),
-        data: _buildContent,
+        data: (data) {
+          if (currentAccount != null &&
+              (data.currentUserId != currentAccount.profileId ||
+                  data.activeRole != currentAccount.role)) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return _buildContent(data);
+        },
       ),
     );
   }
@@ -1337,8 +2287,10 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
         const SizedBox(height: 4),
         Text(_selectedCountLabel(data.counts.selectedCount)),
         const SizedBox(height: 20),
-        if (data.activeRole == AppUserRole.volunteer && data.canApply) ...[
-          if (ownApplication == null)
+        if (data.activeRole == AppUserRole.volunteer) ...[
+          if (ownApplication == null &&
+              data.canApply &&
+              _applicationWindowIsOpen)
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton(
@@ -1351,22 +2303,40 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
                     : const Text('Je me propose'),
               ),
             )
-          else
+          else if (ownApplication != null)
             _OwnApplication(
               application: ownApplication,
               isSubmitting: _isSubmitting,
-              onWithdraw: _canWithdraw(ownApplication.status)
+              onWithdraw:
+                  _canWithdraw(ownApplication.status, widget.maraudeStatus)
                   ? _withdraw
                   : null,
+              onConfirm:
+                  _applicationWindowIsOpen &&
+                      ownApplication.status ==
+                          ConcertVolunteerStatus.selected &&
+                      ownApplication.confirmationStatus ==
+                          VolunteerConfirmationStatus.pending
+                  ? _confirmParticipation
+                  : null,
               onReapply:
-                  ownApplication.status == ConcertVolunteerStatus.withdrawn
+                  _applicationWindowIsOpen &&
+                      data.canApply &&
+                      ownApplication.status == ConcertVolunteerStatus.withdrawn
                   ? _reapply
                   : null,
             ),
+          const SizedBox(height: 16),
+          _VolunteerRosterPreview(concertId: widget.concertId),
         ],
-        if (data.isAdmin) ...[
+        if (data.isAdmin && _canEditTeam) ...[
           const Divider(height: 32),
           _buildTeamBuilder(data, visibleApplications),
+        ] else if (data.isAdmin) ...[
+          const Divider(height: 32),
+          const _LockedTeamNotice(),
+          const SizedBox(height: 16),
+          _PromoterApplications(applications: visibleApplications),
         ] else if (data.isPromoter && data.canViewApplications) ...[
           const Divider(height: 32),
           _PromoterApplications(applications: visibleApplications),
@@ -1374,6 +2344,12 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       ],
     );
   }
+
+  bool get _canEditTeam =>
+      widget.maraudeStatus == MaraudeStatus.open ||
+      widget.maraudeStatus == MaraudeStatus.teamReady;
+
+  bool get _applicationWindowIsOpen => _canEditTeam;
 
   Widget _buildTeamBuilder(
     ConcertVolunteerSectionData data,
@@ -1439,10 +2415,6 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
               onReject: () => _rejectApplication(application.id),
               onRemove: () => _removeFromDraft(application.id),
               onRoleChanged: (role) => _assignDraftRole(application.id, role),
-              onAttendanceChanged:
-                  application.status == ConcertVolunteerStatus.selected
-                  ? (status) => _setAttendanceStatus(application.id, status)
-                  : null,
             ),
       ],
     );
@@ -1453,7 +2425,6 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       minimumTeamSize: _minimumTeamSize,
       isDirty: _teamDirty,
       isSaving: _isSavingTeam,
-      attendanceCounts: data.attendanceCounts,
       onSave: _canSaveTeam ? _saveTeam : null,
     );
 
@@ -1494,7 +2465,13 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
   }
 
   bool get _canSaveTeam {
-    return _teamDirty && !_isSavingTeam;
+    return _teamDirty &&
+        !_isSavingTeam &&
+        _draftTeamRoles.length >= _minimumTeamSize &&
+        _draftTeamRoles.values
+                .where((role) => role == MaraudeRole.teamLeader)
+                .length ==
+            1;
   }
 
   void _synchronizeTeamDraft(List<ConcertVolunteerApplication> applications) {
@@ -1564,7 +2541,11 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
   }
 
   bool _isRoleAvailable(MaraudeRole role, String applicationId) {
-    return true;
+    if (role != MaraudeRole.teamLeader) return true;
+    return !_draftTeamRoles.entries.any(
+      (entry) =>
+          entry.key != applicationId && entry.value == MaraudeRole.teamLeader,
+    );
   }
 
   void _selectInDraft(String applicationId) {
@@ -1590,6 +2571,7 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
   }
 
   Future<void> _apply() async {
+    if (!_applicationWindowIsOpen) return;
     setState(() => _isSubmitting = true);
     try {
       await ref
@@ -1607,7 +2589,12 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       );
     } catch (error) {
       if (!mounted) return;
-      _showError('Impossible d’enregistrer votre candidature.');
+      _showError(
+        describeError(
+          error,
+          'Impossible d’enregistrer votre candidature. Veuillez réessayer.',
+        ),
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -1623,7 +2610,7 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
         section.activeRole != AppUserRole.volunteer ||
         section.currentUserId == null ||
         application.userId != section.currentUserId ||
-        !_canWithdraw(application.status)) {
+        !_canWithdraw(application.status, widget.maraudeStatus)) {
       return;
     }
 
@@ -1665,13 +2652,117 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       ).showSnackBar(const SnackBar(content: Text('Désistement enregistré.')));
     } catch (error) {
       if (!mounted) return;
-      _showError('Impossible d’enregistrer votre désistement.');
+      _showError(
+        describeError(error, 'Impossible d’enregistrer votre désistement.'),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _confirmParticipation() async {
+    final section = ref
+        .read(concertVolunteerSectionProvider(widget.concertId))
+        .value;
+    final application = section?.ownApplication;
+    if (section == null ||
+        application == null ||
+        section.activeRole != AppUserRole.volunteer ||
+        application.userId != section.currentUserId ||
+        application.status != ConcertVolunteerStatus.selected ||
+        application.confirmationStatus != VolunteerConfirmationStatus.pending ||
+        application.teamRole == null) {
+      return;
+    }
+
+    var acknowledged = false;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Confirmer ma participation'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Fiche de mission',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.assignment_ind_outlined),
+                  title: Text(application.teamRole!.label),
+                  subtitle: const Text(
+                    'Ce rôle vous est attribué pour cette maraude.',
+                  ),
+                  trailing: TextButton(
+                    key: const ValueKey('open-mission-sheet-confirm-dialog'),
+                    onPressed: () => showMaraudeRoleMissionSheet(
+                      context,
+                      application.teamRole!,
+                    ),
+                    child: const Text('Voir la fiche complète'),
+                  ),
+                ),
+                CheckboxListTile(
+                  key: const ValueKey('acknowledge-mission-role'),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: acknowledged,
+                  onChanged: (value) =>
+                      setDialogState(() => acknowledged = value ?? false),
+                  title: const Text(
+                    'J’ai pris connaissance de ma fiche de mission.',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              key: const ValueKey('submit-participation-confirmation'),
+              onPressed: acknowledged
+                  ? () => Navigator.of(dialogContext).pop(true)
+                  : null,
+              child: const Text('Je confirme ma participation'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      await ref
+          .read(concertVolunteerRepositoryProvider)
+          .confirmParticipation(widget.concertId, roleAcknowledged: true);
+      ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
+      ref.invalidate(maraudeAttendanceProvider(widget.concertId));
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Participation confirmée.')));
+    } catch (error) {
+      if (!mounted) return;
+      _showError(
+        describeError(error, 'Impossible de confirmer votre participation.'),
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
   Future<void> _reapply() async {
+    if (!_applicationWindowIsOpen) return;
     setState(() => _isSubmitting = true);
     try {
       await ref
@@ -1679,12 +2770,14 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
           .reapply(widget.concertId);
       ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Votre disponibilité a été transmise.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Disponibilité transmise.')));
     } catch (error) {
       if (!mounted) return;
-      _showError('Impossible de renouveler votre disponibilité.');
+      _showError(
+        describeError(error, 'Impossible de renouveler votre disponibilité.'),
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -1713,33 +2806,9 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       ).showSnackBar(const SnackBar(content: Text('Équipe enregistrée.')));
     } catch (error) {
       if (!mounted) return;
-      _showError('Impossible d’enregistrer l’équipe.');
+      _showError(describeError(error, 'Impossible d’enregistrer l’équipe.'));
     } finally {
       if (mounted) setState(() => _isSavingTeam = false);
-    }
-  }
-
-  Future<void> _setAttendanceStatus(
-    String applicationId,
-    VolunteerAttendanceStatus status,
-  ) async {
-    setState(() => _updatingApplications.add(applicationId));
-    try {
-      await ref
-          .read(concertVolunteerRepositoryProvider)
-          .setAttendanceStatus(applicationId, status);
-      ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Présence : ${status.label}.')));
-    } catch (error) {
-      if (!mounted) return;
-      _showError('Impossible de modifier cette présence.');
-    } finally {
-      if (mounted) {
-        setState(() => _updatingApplications.remove(applicationId));
-      }
     }
   }
 
@@ -1758,7 +2827,9 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       ).showSnackBar(const SnackBar(content: Text('Candidature refusée.')));
     } catch (error) {
       if (!mounted) return;
-      _showError('Impossible de refuser cette candidature.');
+      _showError(
+        describeError(error, 'Impossible de refuser cette candidature.'),
+      );
     } finally {
       if (mounted) {
         setState(() => _updatingApplications.remove(applicationId));
@@ -1821,9 +2892,41 @@ class _PromoterApplications extends StatelessWidget {
   }
 }
 
-bool _canWithdraw(ConcertVolunteerStatus status) {
-  return status == ConcertVolunteerStatus.pending ||
-      status == ConcertVolunteerStatus.selected;
+class _LockedTeamNotice extends StatelessWidget {
+  const _LockedTeamNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card.filled(
+      key: const ValueKey('locked-maraude-team'),
+      margin: EdgeInsets.zero,
+      child: const Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.lock_outline),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'La composition et les rôles de l’équipe sont verrouillés '
+                'depuis le démarrage de la maraude.',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+bool _canWithdraw(ConcertVolunteerStatus status, MaraudeStatus maraudeStatus) {
+  final applicationWindowIsOpen =
+      maraudeStatus == MaraudeStatus.open ||
+      maraudeStatus == MaraudeStatus.teamReady;
+  return applicationWindowIsOpen &&
+      (status == ConcertVolunteerStatus.pending ||
+          status == ConcertVolunteerStatus.selected);
 }
 
 class _OwnApplication extends StatelessWidget {
@@ -1831,12 +2934,14 @@ class _OwnApplication extends StatelessWidget {
     required this.application,
     required this.isSubmitting,
     required this.onWithdraw,
+    required this.onConfirm,
     required this.onReapply,
   });
 
   final ConcertVolunteerApplication application;
   final bool isSubmitting;
   final VoidCallback? onWithdraw;
+  final VoidCallback? onConfirm;
   final VoidCallback? onReapply;
 
   @override
@@ -1850,16 +2955,39 @@ class _OwnApplication extends StatelessWidget {
         ),
         if (application.status == ConcertVolunteerStatus.selected) ...[
           const SizedBox(height: 6),
+          Text(
+            application.confirmationStatus?.label ??
+                'Confirmation à synchroniser',
+          ),
           if (application.teamRole != null)
             Text('Rôle : ${application.teamRole!.label}'),
-          Text('Présence : ${application.effectiveAttendanceStatus!.label}'),
+          if (application.confirmationStatus ==
+                  VolunteerConfirmationStatus.pending &&
+              application.confirmationDueAt != null)
+            Text(
+              'À confirmer avant le '
+              '${formatFrenchDateTime(application.confirmationDueAt!)}',
+            ),
+          if (application.confirmationStatus ==
+              VolunteerConfirmationStatus.confirmed)
+            Text(
+              'Présence : '
+              '${application.effectiveAttendanceStatus?.label ?? 'À renseigner'}',
+            ),
         ],
-        const SizedBox(height: 12),
-        TextButton.icon(
-          onPressed: () => _showVolunteerProfileDialog(context, application),
-          icon: const Icon(Icons.person_outline),
-          label: const Text('Voir mon profil'),
-        ),
+        if (onConfirm != null) ...[
+          const SizedBox(height: 4),
+          FilledButton(
+            key: const ValueKey('confirm-concert-participation'),
+            onPressed: isSubmitting ? null : onConfirm,
+            child: isSubmitting
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Je confirme ma participation'),
+          ),
+        ],
         if (onWithdraw != null) ...[
           const SizedBox(height: 4),
           OutlinedButton(
@@ -1869,7 +2997,11 @@ class _OwnApplication extends StatelessWidget {
                     dimension: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Je me désiste'),
+                : Text(
+                    onConfirm == null
+                        ? 'Je me désiste'
+                        : 'Je ne suis plus disponible',
+                  ),
           ),
         ],
         if (onReapply != null) ...[
@@ -1890,6 +3022,87 @@ class _OwnApplication extends StatelessWidget {
   }
 }
 
+/// Lets a volunteer see who has already applied and who is already
+/// selected before deciding whether to apply themselves — deliberately
+/// limited to names, status and role (see
+/// get_concert_volunteer_roster): no contact or personal information.
+class _VolunteerRosterPreview extends ConsumerWidget {
+  const _VolunteerRosterPreview({required this.concertId});
+
+  final String concertId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final roster = ref.watch(concertVolunteerRosterProvider(concertId));
+    return roster.when(
+      loading: () => const SizedBox(
+        height: 40,
+        child: Center(
+          child: SizedBox.square(
+            dimension: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (entries) {
+        if (entries.isEmpty) return const SizedBox.shrink();
+        final selected = entries
+            .where((entry) => entry.status == ConcertVolunteerStatus.selected)
+            .toList(growable: false);
+        final pending = entries
+            .where((entry) => entry.status != ConcertVolunteerStatus.selected)
+            .toList(growable: false);
+        return Column(
+          key: const ValueKey('volunteer-roster-preview'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Qui s’est déjà positionné',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            if (selected.isNotEmpty) ...[
+              Text(
+                'Déjà sélectionnés',
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+              for (final entry in selected) _RosterLine(entry: entry),
+              const SizedBox(height: 8),
+            ],
+            if (pending.isNotEmpty) ...[
+              Text(
+                'Candidatures en attente',
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+              for (final entry in pending) _RosterLine(entry: entry),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _RosterLine extends StatelessWidget {
+  const _RosterLine({required this.entry});
+
+  final ConcertVolunteerRosterEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final role = entry.teamRole;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Text(
+        role == null
+            ? entry.displayName
+            : '${entry.displayName} — ${role.label}',
+      ),
+    );
+  }
+}
+
 class _TeamBuilderSummary extends StatelessWidget {
   const _TeamBuilderSummary({
     required this.applications,
@@ -1897,7 +3110,6 @@ class _TeamBuilderSummary extends StatelessWidget {
     required this.minimumTeamSize,
     required this.isDirty,
     required this.isSaving,
-    required this.attendanceCounts,
     required this.onSave,
   });
 
@@ -1906,13 +3118,24 @@ class _TeamBuilderSummary extends StatelessWidget {
   final int minimumTeamSize;
   final bool isDirty;
   final bool isSaving;
-  final TeamAttendanceCounts attendanceCounts;
   final VoidCallback? onSave;
 
   @override
   Widget build(BuildContext context) {
     final hasLeader = roles.containsValue(MaraudeRole.teamLeader);
-    final isRecommendedSize = roles.length >= minimumTeamSize;
+    final hasMinimumSize = roles.length >= minimumTeamSize;
+    final isValidTeam = hasMinimumSize && hasLeader;
+    final teamApplications = applications.where(
+      (application) => roles.containsKey(application.id),
+    );
+    final confirmedCount = teamApplications
+        .where(
+          (application) =>
+              application.confirmationStatus ==
+              VolunteerConfirmationStatus.confirmed,
+        )
+        .length;
+    final pendingConfirmationCount = roles.length - confirmedCount;
     final colors = Theme.of(context).colorScheme;
 
     return Card.filled(
@@ -1933,6 +3156,13 @@ class _TeamBuilderSummary extends StatelessWidget {
             Text(
               '${roles.length} / $minimumTeamSize bénévoles',
               style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$confirmedCount confirmé${confirmedCount > 1 ? 's' : ''} · '
+              '$pendingConfirmationCount confirmation'
+              '${pendingConfirmationCount > 1 ? 's' : ''} attendue'
+              '${pendingConfirmationCount > 1 ? 's' : ''}',
             ),
             const Divider(height: 28),
             _TeamRoleSummary(
@@ -1958,18 +3188,19 @@ class _TeamBuilderSummary extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  isRecommendedSize
+                  isValidTeam
                       ? Icons.check_circle_outline
                       : Icons.pending_actions_outlined,
-                  color: isRecommendedSize ? colors.primary : colors.tertiary,
+                  color: isValidTeam ? colors.primary : colors.tertiary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    isRecommendedSize
-                        ? 'Équipe enregistrable'
-                        : '${roles.length} bénévole${roles.length > 1 ? 's' : ''} — '
-                              '$minimumTeamSize sont généralement recommandés.',
+                    isValidTeam
+                        ? 'Équipe complète : un chef et au moins deux autres bénévoles.'
+                        : !hasMinimumSize
+                        ? 'Ajoutez au moins $minimumTeamSize bénévoles.'
+                        : 'Attribuez le rôle de chef d’équipe à une personne.',
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),
@@ -1996,10 +3227,6 @@ class _TeamBuilderSummary extends StatelessWidget {
                 'Cette recommandation ne bloque pas l’enregistrement.',
                 style: TextStyle(fontSize: 12),
               ),
-            ],
-            if (attendanceCounts.selectedCount > 0) ...[
-              const Divider(height: 28),
-              _TeamAttendanceSummary(counts: attendanceCounts),
             ],
           ],
         ),
@@ -2095,7 +3322,6 @@ class _TeamCandidateCard extends StatelessWidget {
     required this.onReject,
     required this.onRemove,
     required this.onRoleChanged,
-    required this.onAttendanceChanged,
   });
 
   final ConcertVolunteerApplication application;
@@ -2106,7 +3332,6 @@ class _TeamCandidateCard extends StatelessWidget {
   final VoidCallback onReject;
   final VoidCallback onRemove;
   final ValueChanged<MaraudeRole> onRoleChanged;
-  final ValueChanged<VolunteerAttendanceStatus>? onAttendanceChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -2154,13 +3379,16 @@ class _TeamCandidateCard extends StatelessWidget {
                             children: [
                               _ApplicationStatusChip(status: effectiveStatus),
                               if (isSelected)
-                                const Chip(
+                                Chip(
                                   visualDensity: VisualDensity.compact,
-                                  avatar: Icon(
-                                    Icons.assignment_ind_outlined,
+                                  avatar: const Icon(
+                                    Icons.how_to_reg_outlined,
                                     size: 18,
                                   ),
-                                  label: Text('Rôle attribué'),
+                                  label: Text(
+                                    application.confirmationStatus?.label ??
+                                        'Confirmation à synchroniser',
+                                  ),
                                 ),
                             ],
                           ),
@@ -2193,9 +3421,13 @@ class _TeamCandidateCard extends StatelessWidget {
                 ),
                 _CandidateFact(
                   label: 'Disponibilité',
-                  value: application.status == ConcertVolunteerStatus.withdrawn
-                      ? 'Non disponible'
-                      : 'Confirmée',
+                  value: switch (application.status) {
+                    ConcertVolunteerStatus.withdrawn => 'Non disponible',
+                    ConcertVolunteerStatus.selected =>
+                      application.confirmationStatus?.label ??
+                          'Confirmation à synchroniser',
+                    _ => 'Disponible',
+                  },
                 ),
               ],
             ),
@@ -2265,38 +3497,6 @@ class _TeamCandidateCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (onAttendanceChanged != null) ...[
-                const SizedBox(height: 8),
-                DropdownButtonFormField<VolunteerAttendanceStatus>(
-                  key: ValueKey(
-                    'attendance-${application.id}-'
-                    '${application.effectiveAttendanceStatus}',
-                  ),
-                  initialValue: application.effectiveAttendanceStatus,
-                  decoration: InputDecoration(
-                    labelText: 'Présence',
-                    prefixIcon: Icon(
-                      _attendanceIcon(application.effectiveAttendanceStatus!),
-                      color: _attendanceColor(
-                        context,
-                        application.effectiveAttendanceStatus!,
-                      ),
-                    ),
-                  ),
-                  items: [
-                    for (final status in VolunteerAttendanceStatus.values)
-                      DropdownMenuItem(
-                        value: status,
-                        child: Text(status.label),
-                      ),
-                  ],
-                  onChanged: isUpdating
-                      ? null
-                      : (value) {
-                          if (value != null) onAttendanceChanged!(value);
-                        },
-                ),
-              ],
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerLeft,
@@ -2342,87 +3542,6 @@ class _CandidateFact extends StatelessWidget {
   }
 }
 
-class _TeamAttendanceSummary extends StatelessWidget {
-  const _TeamAttendanceSummary({required this.counts});
-
-  final TeamAttendanceCounts counts;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Équipe', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
-        Text('${counts.selectedCount} sélectionnés'),
-        const Divider(height: 24),
-        Wrap(
-          spacing: 16,
-          runSpacing: 8,
-          children: [
-            _AttendanceCount(
-              icon: Icons.check_circle_outline,
-              color: Theme.of(context).colorScheme.primary,
-              label: 'Présents : ${counts.presentCount}',
-            ),
-            _AttendanceCount(
-              icon: Icons.cancel_outlined,
-              color: Theme.of(context).colorScheme.error,
-              label: 'Absents : ${counts.absentCount}',
-            ),
-            _AttendanceCount(
-              icon: Icons.schedule_outlined,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              label: 'En attente : ${counts.pendingCount}',
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _AttendanceCount extends StatelessWidget {
-  const _AttendanceCount({
-    required this.icon,
-    required this.color,
-    required this.label,
-  });
-
-  final IconData icon;
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(width: 6),
-        Text(label),
-      ],
-    );
-  }
-}
-
-IconData _attendanceIcon(VolunteerAttendanceStatus status) {
-  return switch (status) {
-    VolunteerAttendanceStatus.pending => Icons.schedule_outlined,
-    VolunteerAttendanceStatus.present => Icons.check_circle_outline,
-    VolunteerAttendanceStatus.absent => Icons.cancel_outlined,
-  };
-}
-
-Color _attendanceColor(BuildContext context, VolunteerAttendanceStatus status) {
-  final colors = Theme.of(context).colorScheme;
-  return switch (status) {
-    VolunteerAttendanceStatus.pending => colors.onSurfaceVariant,
-    VolunteerAttendanceStatus.present => colors.primary,
-    VolunteerAttendanceStatus.absent => colors.error,
-  };
-}
-
 class _VolunteerAvatar extends StatelessWidget {
   const _VolunteerAvatar({required this.profile, this.size = 48});
 
@@ -2457,117 +3576,195 @@ Future<void> _showVolunteerProfileDialog(
 ) {
   final profile = application.profile;
   final statistics = application.statistics;
+  final container = ProviderScope.containerOf(context);
+  Future<Map<String, dynamic>?> fetchPrivateInformation() => container
+      .read(concertVolunteerRepositoryProvider)
+      .fetchPrivateVolunteerInformation(application.userId);
   return showDialog<void>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Profil bénévole'),
-      content: SizedBox(
-        width: 520,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  _VolunteerAvatar(profile: profile, size: 64),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      application.displayName,
-                      style: Theme.of(context).textTheme.titleLarge,
+    builder: (context) => UncontrolledProviderScope(
+      container: container,
+      child: AlertDialog(
+        title: const Text('Profil bénévole'),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    _VolunteerAvatar(profile: profile, size: 64),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        application.displayName,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              _ProfileDetailRow(
-                label: 'Date de naissance',
-                value: profile?.birthDate == null
-                    ? 'Non renseignée'
-                    : formatLongFrenchDate(profile!.birthDate!),
-              ),
-              _ProfileDetailRow(
-                label: 'Téléphone',
-                value: _optionalValue(profile?.phone),
-              ),
-              _ProfileDetailRow(
-                label: 'E-mail',
-                value: _optionalValue(profile?.email),
-              ),
-              _ProfileDetailRow(
-                label: 'Permis',
-                value: _booleanLabel(profile?.hasDrivingLicense),
-              ),
-              _ProfileDetailRow(
-                label: 'Port de charges lourdes',
-                value: _booleanLabel(profile?.canLiftHeavyLoads),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Expérience',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 12),
-              Text(_totalApplicationsLabel(statistics.totalApplications)),
-              const SizedBox(height: 6),
-              Text(_selectedMissionsLabel(statistics.selectedApplications)),
-              const SizedBox(height: 6),
-              Text(
-                _notSelectedMissionsLabel(statistics.notSelectedApplications),
-              ),
-              const SizedBox(height: 6),
-              Text(_withdrawalsLabel(statistics.withdrawnApplications)),
-              const SizedBox(height: 16),
-              _ProfileDetailRow(
-                label: 'Dernière participation',
-                value: statistics.lastSelectedDate == null
-                    ? 'Aucune'
-                    : formatLongFrenchDate(statistics.lastSelectedDate!),
-              ),
-              if (statistics.selectionRate != null) ...[
-                Text('Taux de sélection : ${statistics.selectionRate} %'),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _ProfileDetailRow(
+                  label: 'Date de naissance',
+                  value: profile?.birthDate == null
+                      ? 'Non renseignée'
+                      : formatLongFrenchDate(profile!.birthDate!),
+                ),
+                _ProfileDetailRow(
+                  label: 'Téléphone',
+                  value: _optionalValue(profile?.phone),
+                ),
+                _ProfileDetailRow(
+                  label: 'E-mail',
+                  value: _optionalValue(profile?.email),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Expérience',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                Text(_totalApplicationsLabel(statistics.totalApplications)),
                 const SizedBox(height: 6),
-                Text('Taux de désistement : ${statistics.withdrawalRate} %'),
+                Text(_selectedMissionsLabel(statistics.selectedApplications)),
+                const SizedBox(height: 6),
+                Text(
+                  _notSelectedMissionsLabel(statistics.notSelectedApplications),
+                ),
+                const SizedBox(height: 6),
+                Text(_withdrawalsLabel(statistics.withdrawnApplications)),
+                const SizedBox(height: 16),
+                _ProfileDetailRow(
+                  label: 'Dernière participation',
+                  value: statistics.lastSelectedDate == null
+                      ? 'Aucune'
+                      : formatLongFrenchDate(statistics.lastSelectedDate!),
+                ),
+                if (statistics.selectionRate != null) ...[
+                  Text('Taux de sélection : ${statistics.selectionRate} %'),
+                  const SizedBox(height: 6),
+                  Text('Taux de désistement : ${statistics.withdrawalRate} %'),
+                ],
+                const Divider(height: 32),
+                Text(
+                  'Contact d’urgence',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                _ProfileDetailRow(
+                  label: 'Nom',
+                  value: _optionalValue(profile?.emergencyContactName),
+                ),
+                _ProfileDetailRow(
+                  label: 'Téléphone',
+                  value: _optionalValue(profile?.emergencyContactPhone),
+                  showDivider: false,
+                ),
+                const Divider(height: 32),
+                _PrivateInformationSection(fetch: fetchPrivateInformation),
+                const Divider(height: 32),
+                Text(
+                  'Documents',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                VolunteerDocumentsPanel(userId: application.userId),
+                const Divider(height: 32),
+                Text(
+                  'Historique des maraudes',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                if (statistics.history.isEmpty)
+                  const Text('Aucun historique.')
+                else
+                  for (final entry in statistics.history)
+                    _VolunteerHistoryCard(entry: entry),
               ],
-              const Divider(height: 32),
-              Text(
-                'Contact d’urgence',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 12),
-              _ProfileDetailRow(
-                label: 'Nom',
-                value: _optionalValue(profile?.emergencyContactName),
-              ),
-              _ProfileDetailRow(
-                label: 'Téléphone',
-                value: _optionalValue(profile?.emergencyContactPhone),
-                showDivider: false,
-              ),
-              const Divider(height: 32),
-              Text(
-                'Historique des maraudes',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 12),
-              if (statistics.history.isEmpty)
-                const Text('Aucun historique.')
-              else
-                for (final entry in statistics.history)
-                  _VolunteerHistoryCard(entry: entry),
-            ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Fermer'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Fermer'),
-        ),
-      ],
     ),
   );
+}
+
+class _PrivateInformationSection extends StatefulWidget {
+  const _PrivateInformationSection({required this.fetch});
+
+  final Future<Map<String, dynamic>?> Function() fetch;
+
+  @override
+  State<_PrivateInformationSection> createState() =>
+      _PrivateInformationSectionState();
+}
+
+class _PrivateInformationSectionState
+    extends State<_PrivateInformationSection> {
+  late Future<Map<String, dynamic>?> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = widget.fetch();
+  }
+
+  void _retry() {
+    setState(() => _future = widget.fetch());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const AppLoadingState(label: 'Chargement des informations');
+        }
+        if (snapshot.hasError) {
+          return AppErrorState(
+            message: 'Impossible de charger les informations confidentielles.',
+            onRetry: _retry,
+          );
+        }
+        final data = snapshot.data;
+        if (data == null) {
+          return const Text('Aucune information complémentaire renseignée.');
+        }
+        final certifications =
+            (data['certifications'] as List<dynamic>? ?? const []).join(', ');
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Informations confidentielles',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            _ProfileDetailRow(
+              label: 'Informations complémentaires',
+              value: _optionalValue(data['additional_information'] as String?),
+            ),
+            _ProfileDetailRow(
+              label: 'Certifications',
+              value: certifications.isEmpty
+                  ? 'Non renseignées'
+                  : certifications,
+              showDivider: false,
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _VolunteerHistoryCard extends StatelessWidget {
@@ -2727,14 +3924,6 @@ String _compactDateOrNone(DateTime? value) {
   return '$day/$month';
 }
 
-String _booleanLabel(bool? value) {
-  return switch (value) {
-    true => 'Oui',
-    false => 'Non',
-    null => 'Non renseigné',
-  };
-}
-
 String _optionalValue(String? value) {
   final trimmed = value?.trim();
   return trimmed?.isNotEmpty == true ? trimmed! : 'Non renseigné';
@@ -2747,6 +3936,12 @@ class _ContactsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasCateringContact = [
+      concert.cateringContactName,
+      concert.cateringContactPhone,
+      concert.cateringContactEmail,
+    ].any((value) => value?.trim().isNotEmpty == true);
+
     return _SectionCard(
       title: 'Contacts sur place',
       icon: Icons.contact_phone_outlined,
@@ -2760,14 +3955,16 @@ class _ContactsSection extends StatelessWidget {
             phone: concert.promoterContactPhone,
             email: concert.promoterContactEmail,
           ),
-          const Divider(height: 32),
-          _ContactDetails(
-            title: 'Contact catering',
-            emptyMessage: 'Aucun contact catering renseigné.',
-            name: concert.cateringContactName,
-            phone: concert.cateringContactPhone,
-            email: concert.cateringContactEmail,
-          ),
+          if (hasCateringContact) ...[
+            const Divider(height: 32),
+            _ContactDetails(
+              title: 'Contact catering',
+              emptyMessage: 'Aucun contact catering renseigné.',
+              name: concert.cateringContactName,
+              phone: concert.cateringContactPhone,
+              email: concert.cateringContactEmail,
+            ),
+          ],
         ],
       ),
     );
@@ -2807,6 +4004,265 @@ class _ContactDetails extends StatelessWidget {
         ],
       ],
     );
+  }
+}
+
+class _MaraudeChatSection extends ConsumerStatefulWidget {
+  const _MaraudeChatSection({required this.concertId});
+  final String concertId;
+
+  @override
+  ConsumerState<_MaraudeChatSection> createState() =>
+      _MaraudeChatSectionState();
+}
+
+class _MaraudeChatSectionState extends ConsumerState<_MaraudeChatSection> {
+  static const _refreshInterval = Duration(seconds: 5);
+
+  final _controller = TextEditingController();
+  bool _sending = false;
+  bool _updatingSound = false;
+  Timer? _refreshTimer;
+  Set<String>? _knownMessageIds;
+  String get _lastReadPreferenceKey =>
+      'maraude_chat_last_read_${widget.concertId}';
+  DateTime? _lastReadAt;
+  bool _lastReadRestored = false;
+  int _unreadCount = 0;
+  bool _unreadCountCaptured = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshTimer = Timer.periodic(_refreshInterval, (_) {
+      if (mounted) {
+        ref.invalidate(maraudeMessagesProvider(widget.concertId));
+      }
+    });
+    ref.read(maraudeChatSoundProvider).restore().then((_) {
+      if (mounted) setState(() {});
+    });
+    _restoreLastRead();
+  }
+
+  Future<void> _restoreLastRead() async {
+    try {
+      final stored = await SharedPreferencesAsync().getString(
+        _lastReadPreferenceKey,
+      );
+      if (!mounted) return;
+      setState(() {
+        _lastReadAt = stored == null ? null : DateTime.tryParse(stored);
+        _lastReadRestored = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _lastReadRestored = true);
+    }
+    _maybeCaptureUnreadCount();
+  }
+
+  Future<void> _persistLastRead(DateTime value) async {
+    _lastReadAt = value;
+    try {
+      await SharedPreferencesAsync().setString(
+        _lastReadPreferenceKey,
+        value.toIso8601String(),
+      );
+    } catch (_) {
+      // La discussion reste marquée lue pour la session même si
+      // l’écriture échoue.
+    }
+  }
+
+  /// Unread messages are counted once, the first time both the message
+  /// list and the persisted "last read" marker are available — this is
+  /// what the badge displays for the whole visit. Every list update
+  /// after that keeps the persisted marker current (the user is looking
+  /// at the screen, so anything that arrives is implicitly seen) without
+  /// changing the displayed count.
+  void _maybeCaptureUnreadCount() {
+    if (_unreadCountCaptured || !_lastReadRestored) return;
+    final messages = ref.read(maraudeMessagesProvider(widget.concertId));
+    final items = messages.value;
+    if (items == null) return;
+    final currentUserId = ref.read(currentAuthUserProvider)?.id;
+    final lastReadAt = _lastReadAt;
+    final unread = items.where((message) {
+      return message.userId != currentUserId &&
+          (lastReadAt == null || message.createdAt.isAfter(lastReadAt));
+    }).length;
+    _unreadCountCaptured = true;
+    if (mounted) setState(() => _unreadCount = unread);
+    _persistLatest(items);
+  }
+
+  void _persistLatest(List<MaraudeMessage> messages) {
+    if (messages.isEmpty) return;
+    final latest = messages
+        .map((message) => message.createdAt)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+    if (_lastReadAt == null || latest.isAfter(_lastReadAt!)) {
+      unawaited(_persistLastRead(latest));
+    }
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    if (_sending || _controller.text.trim().isEmpty) return;
+    setState(() => _sending = true);
+    try {
+      await ref
+          .read(maraudeChatRepositoryProvider)
+          .send(widget.concertId, _controller.text);
+      _controller.clear();
+      ref.invalidate(maraudeMessagesProvider(widget.concertId));
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              describeError(error, 'Impossible d’envoyer le message.'),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final messages = ref.watch(maraudeMessagesProvider(widget.concertId));
+    ref.listen(maraudeMessagesProvider(widget.concertId), (_, next) {
+      next.whenData(_notifyForNewMessages);
+    });
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Wrap(
+              spacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Badge(
+                  isLabelVisible: _unreadCount > 0,
+                  label: Text('$_unreadCount'),
+                  child: const Icon(Icons.chat_bubble_outline),
+                ),
+                Text(
+                  'Discussion de l’équipe',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                OutlinedButton.icon(
+                  onPressed: _updatingSound ? null : _toggleSound,
+                  icon: Icon(
+                    ref.watch(maraudeChatSoundProvider).enabled
+                        ? Icons.volume_up_outlined
+                        : Icons.volume_off_outlined,
+                  ),
+                  label: Text(
+                    ref.watch(maraudeChatSoundProvider).enabled
+                        ? 'Son activé'
+                        : 'Activer le son',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            messages.when(
+              loading: () =>
+                  const AppLoadingState(label: 'Chargement de la discussion'),
+              error: (_, _) => AppErrorState(
+                message: 'Impossible de charger la discussion.',
+                onRetry: () =>
+                    ref.invalidate(maraudeMessagesProvider(widget.concertId)),
+              ),
+              data: (items) => items.isEmpty
+                  ? const Text('Aucun message. Lancez la discussion.')
+                  : Column(
+                      children: [
+                        for (final item in items)
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(item.authorName),
+                            subtitle: Text(item.message),
+                            trailing: Text(
+                              '${item.createdAt.hour.toString().padLeft(2, '0')}:'
+                              '${item.createdAt.minute.toString().padLeft(2, '0')}',
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('maraude-chat-message'),
+              controller: _controller,
+              minLines: 1,
+              maxLines: 3,
+              maxLength: 1000,
+              decoration: InputDecoration(
+                labelText: 'Message',
+                suffixIcon: IconButton(
+                  key: const ValueKey('send-maraude-chat-message'),
+                  onPressed: _sending ? null : _send,
+                  icon: _sending
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send),
+                ),
+              ),
+              onSubmitted: (_) => _send(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _notifyForNewMessages(List<MaraudeMessage> messages) {
+    _maybeCaptureUnreadCount();
+
+    final currentIds = messages.map((message) => message.id).toSet();
+    final knownIds = _knownMessageIds;
+    _knownMessageIds = currentIds;
+    if (knownIds != null) {
+      final hasNewMessage = messages.any(
+        (message) => !knownIds.contains(message.id),
+      );
+      if (hasNewMessage) {
+        ref.read(maraudeChatSoundProvider).notify();
+      }
+    }
+
+    if (_unreadCountCaptured) _persistLatest(messages);
+  }
+
+  Future<void> _toggleSound() async {
+    final sound = ref.read(maraudeChatSoundProvider);
+    setState(() => _updatingSound = true);
+    try {
+      if (sound.enabled) {
+        sound.disable();
+      } else {
+        await sound.enable();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _updatingSound = false);
+      }
+    }
   }
 }
 
@@ -2928,27 +4384,9 @@ class _DetailError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48),
-            const SizedBox(height: 16),
-            const Text(
-              'Impossible de charger ce concert.',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Réessayer'),
-            ),
-          ],
-        ),
-      ),
+    return AppErrorState(
+      message: 'Impossible de charger cette maraude.',
+      onRetry: onRetry,
     );
   }
 }
@@ -2958,40 +4396,14 @@ class _ConcertNotFound extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.search_off, size: 56),
-            const SizedBox(height: 16),
-            Text(
-              'Concert introuvable',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Ce concert n’existe pas ou n’est pas accessible.',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: () => context.go('/maraudes'),
-              child: const Text('Retour aux maraudes'),
-            ),
-          ],
-        ),
+    return AppEmptyState(
+      title: 'Maraude introuvable',
+      message: 'Cette maraude n’existe pas ou n’est pas accessible.',
+      icon: Icons.search_off,
+      action: FilledButton(
+        onPressed: () => context.go('/maraudes'),
+        child: const Text('Retour aux maraudes'),
       ),
     );
   }
-}
-
-String _statusLabel(ConcertStatus status) {
-  return switch (status) {
-    ConcertStatus.planned => 'Planifié',
-    ConcertStatus.confirmed => 'Confirmé',
-    ConcertStatus.completed => 'Terminé',
-    ConcertStatus.cancelled => 'Annulé',
-  };
 }

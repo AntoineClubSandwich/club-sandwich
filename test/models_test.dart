@@ -36,12 +36,35 @@ void main() {
     expect(organization.toJson(), {
       ...organizationJson,
       'kind': 'producer',
+      'email_domain': null,
       'contact_email': null,
       'phone': null,
       'address': null,
       'website_url': null,
       'notes': null,
     });
+  });
+
+  test('Organization reconnaît le domaine e-mail d’un compte associé', () {
+    final organization = Organization.fromJson({
+      ...organizationJson,
+      'email_domain': 'auguri.fr',
+    });
+
+    expect(organization.matchesEmailDomain('camille@auguri.fr'), isTrue);
+    expect(organization.matchesEmailDomain('camille@AUGURI.FR'), isTrue);
+    expect(organization.matchesEmailDomain('camille@autre.fr'), isFalse);
+    expect(organization.matchesEmailDomain('adresse-invalide'), isFalse);
+  });
+
+  test('OrganizationDraft normalise le domaine e-mail en minuscules', () {
+    const draft = OrganizationDraft(
+      name: 'Auguri',
+      slug: 'auguri',
+      emailDomain: '  Auguri.FR  ',
+    );
+
+    expect(draft.toJson()['email_domain'], 'auguri.fr');
   });
 
   test('Profile se sérialise depuis et vers JSON', () {
@@ -108,6 +131,7 @@ void main() {
       'artist': 'Artiste',
       'concert_date': '2026-07-24',
       'venue_id': 'eb3127ff-a9af-4968-ac67-cba782488eef',
+      'catering_contact_name': null,
       'catering_closes_at': '23:00:00',
       'notes': null,
       'promoter_contact_name': null,
@@ -118,9 +142,19 @@ void main() {
     expect(draft.toJson(), isNot(contains('concert_time')));
     expect(draft.toJson(), isNot(contains('status')));
     expect(draft.toJson(), isNot(contains('promoter_contact_email')));
-    expect(draft.toJson(), isNot(contains('catering_contact_name')));
     expect(draft.toJson(), isNot(contains('catering_contact_phone')));
     expect(draft.toJson(), isNot(contains('catering_contact_email')));
+  });
+
+  test('ConcertDraft transmet le nom du catering renseigné', () {
+    final draft = ConcertDraft(
+      artist: 'Artiste',
+      date: DateTime(2026, 7, 24),
+      venueId: 'eb3127ff-a9af-4968-ac67-cba782488eef',
+      cateringContactName: '  Traiteur Dupont  ',
+    );
+
+    expect(draft.toJson()['catering_contact_name'], 'Traiteur Dupont');
   });
 
   test('Concert lit les noms de salle et de producteur préchargés', () {
@@ -239,7 +273,7 @@ void main() {
 
   test('MaraudeStatus sérialise les six états et rejette l’inconnu', () {
     expect(MaraudeStatus.draft.label, 'Brouillon');
-    expect(MaraudeStatus.open.label, 'Ouverte');
+    expect(MaraudeStatus.open.label, 'Planifiée');
     expect(MaraudeStatus.teamReady.label, 'Équipe validée');
     expect(MaraudeStatus.inProgress.label, 'En cours');
     expect(MaraudeStatus.completed.label, 'Terminée');

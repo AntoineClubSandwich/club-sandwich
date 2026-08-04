@@ -75,6 +75,30 @@ cross join (
 ) as member_data(profile_id, role)
 where organization.slug = 'club-sandwich';
 
+insert into public.volunteer_documents (
+  user_id, document_type, storage_path, status, reviewed_by, reviewed_at
+)
+select
+  volunteer.profile_id,
+  document_type.value,
+  'seed/' || volunteer.profile_id || '/' || document_type.value,
+  'approved'::public.volunteer_document_status,
+  '31000000-0000-0000-0000-000000000001'::uuid,
+  now()
+from (
+  values
+    ('31000000-0000-0000-0000-000000000002'::uuid),
+    ('31000000-0000-0000-0000-000000000003'::uuid),
+    ('31000000-0000-0000-0000-000000000004'::uuid),
+    ('31000000-0000-0000-0000-000000000005'::uuid),
+    ('31000000-0000-0000-0000-000000000006'::uuid)
+) as volunteer(profile_id)
+cross join (
+  values
+    ('identity'::public.volunteer_document_type),
+    ('social_security'::public.volunteer_document_type)
+) as document_type(value);
+
 insert into public.concerts (
   id,
   organization_id,
@@ -212,9 +236,27 @@ select results_eq(
 
 select lives_ok(
   $$
-    update public.concert_volunteers
-    set team_role = 'communication'
-    where id = '51000000-0000-0000-0000-000000000004'
+    select public.save_maraude_team(
+      '41000000-0000-0000-0000-000000000001',
+      '[
+        {
+          "application_id": "51000000-0000-0000-0000-000000000001",
+          "team_role": "team_leader"
+        },
+        {
+          "application_id": "51000000-0000-0000-0000-000000000002",
+          "team_role": "communication"
+        },
+        {
+          "application_id": "51000000-0000-0000-0000-000000000003",
+          "team_role": "logistics"
+        },
+        {
+          "application_id": "51000000-0000-0000-0000-000000000004",
+          "team_role": "communication"
+        }
+      ]'::jsonb
+    )
   $$,
   'Plusieurs responsables Communication sont autorisés'
 );
@@ -232,14 +274,32 @@ select results_eq(
 
 select lives_ok(
   $$
-    update public.concert_volunteers
-    set team_role = 'logistics'
-    where id = '51000000-0000-0000-0000-000000000004'
+    select public.save_maraude_team(
+      '41000000-0000-0000-0000-000000000001',
+      '[
+        {
+          "application_id": "51000000-0000-0000-0000-000000000001",
+          "team_role": "team_leader"
+        },
+        {
+          "application_id": "51000000-0000-0000-0000-000000000002",
+          "team_role": "communication"
+        },
+        {
+          "application_id": "51000000-0000-0000-0000-000000000003",
+          "team_role": "logistics"
+        },
+        {
+          "application_id": "51000000-0000-0000-0000-000000000004",
+          "team_role": "logistics"
+        }
+      ]'::jsonb
+    )
   $$,
   'Plusieurs responsables Logistique sont autorisés'
 );
 
-select lives_ok(
+select throws_ok(
   $$
     select public.save_maraude_team(
       '41000000-0000-0000-0000-000000000001',
@@ -251,20 +311,24 @@ select lives_ok(
       ]'::jsonb
     )
   $$,
-  'Une équipe d’un bénévole est autorisée'
+  '22023',
+  'L’équipe doit comprendre un chef d’équipe et au moins deux autres bénévoles',
+  'Une équipe d’un bénévole est refusée'
 );
 
-select lives_ok(
+select throws_ok(
   $$
     select public.save_maraude_team(
       '41000000-0000-0000-0000-000000000001',
       '[]'::jsonb
     )
   $$,
-  'Une équipe vide peut être enregistrée'
+  '22023',
+  'L’équipe doit comprendre un chef d’équipe et au moins deux autres bénévoles',
+  'Une équipe vide est refusée'
 );
 
-select lives_ok(
+select throws_ok(
   $$
     select public.save_maraude_team(
       '41000000-0000-0000-0000-000000000001',
@@ -288,7 +352,9 @@ select lives_ok(
       ]'::jsonb
     )
   $$,
-  'Une équipe sans chef est autorisée'
+  '22023',
+  'L’équipe doit avoir exactement un chef d’équipe',
+  'Une équipe sans chef est refusée'
 );
 
 select throws_ok(
@@ -316,7 +382,7 @@ select throws_ok(
     )
   $$,
   '22023',
-  'Une candidature ne peut apparaître qu’une seule fois',
+  'Chaque bénévole doit apparaître une fois avec un rôle',
   'La base refuse une candidature dupliquée dans l’équipe'
 );
 

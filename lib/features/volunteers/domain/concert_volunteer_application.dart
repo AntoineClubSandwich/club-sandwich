@@ -46,7 +46,7 @@ enum MaraudeRole {
 }
 
 enum VolunteerAttendanceStatus {
-  pending('pending', 'En attente'),
+  pending('pending', 'À renseigner'),
   present('present', 'Présent'),
   absent('absent', 'Absent');
 
@@ -60,6 +60,24 @@ enum VolunteerAttendanceStatus {
       (status) => status.databaseValue == value,
       orElse: () =>
           throw FormatException('Statut de présence inconnu : $value'),
+    );
+  }
+}
+
+enum VolunteerConfirmationStatus {
+  pending('pending', 'Confirmation demandée'),
+  confirmed('confirmed', 'Participation confirmée');
+
+  const VolunteerConfirmationStatus(this.databaseValue, this.label);
+
+  final String databaseValue;
+  final String label;
+
+  static VolunteerConfirmationStatus fromDatabase(String value) {
+    return values.firstWhere(
+      (status) => status.databaseValue == value,
+      orElse: () =>
+          throw FormatException('Statut de confirmation inconnu : $value'),
     );
   }
 }
@@ -203,6 +221,14 @@ class ConcertVolunteerApplication {
     this.statistics = const VolunteerStatistics.empty(),
     this.teamRole,
     this.attendanceStatus,
+    this.confirmationStatus,
+    this.confirmationRequestedAt,
+    this.confirmationDueAt,
+    this.confirmationRespondedAt,
+    this.roleAcknowledgedAt,
+    this.attendanceValidatedAt,
+    this.attendanceValidatedBy,
+    this.lastModifiedBy,
   });
 
   factory ConcertVolunteerApplication.fromJson(Map<String, dynamic> json) {
@@ -226,6 +252,28 @@ class ConcertVolunteerApplication {
           : VolunteerAttendanceStatus.fromDatabase(
               json['attendance_status'] as String,
             ),
+      confirmationStatus: json['confirmation_status'] == null
+          ? null
+          : VolunteerConfirmationStatus.fromDatabase(
+              json['confirmation_status'] as String,
+            ),
+      confirmationRequestedAt: json['confirmation_requested_at'] == null
+          ? null
+          : DateTime.parse(json['confirmation_requested_at'] as String),
+      confirmationDueAt: json['confirmation_due_at'] == null
+          ? null
+          : DateTime.parse(json['confirmation_due_at'] as String),
+      confirmationRespondedAt: json['confirmation_responded_at'] == null
+          ? null
+          : DateTime.parse(json['confirmation_responded_at'] as String),
+      roleAcknowledgedAt: json['role_acknowledged_at'] == null
+          ? null
+          : DateTime.parse(json['role_acknowledged_at'] as String),
+      attendanceValidatedAt: json['attendance_validated_at'] == null
+          ? null
+          : DateTime.parse(json['attendance_validated_at'] as String),
+      attendanceValidatedBy: json['attendance_validated_by'] as String?,
+      lastModifiedBy: json['last_modified_by'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       profile: profileJson == null
@@ -245,6 +293,14 @@ class ConcertVolunteerApplication {
   final VolunteerStatistics statistics;
   final MaraudeRole? teamRole;
   final VolunteerAttendanceStatus? attendanceStatus;
+  final VolunteerConfirmationStatus? confirmationStatus;
+  final DateTime? confirmationRequestedAt;
+  final DateTime? confirmationDueAt;
+  final DateTime? confirmationRespondedAt;
+  final DateTime? roleAcknowledgedAt;
+  final DateTime? attendanceValidatedAt;
+  final String? attendanceValidatedBy;
+  final String? lastModifiedBy;
 
   String get displayName => profile?.displayName ?? 'Bénévole';
 
@@ -253,6 +309,11 @@ class ConcertVolunteerApplication {
     return attendanceStatus ?? VolunteerAttendanceStatus.pending;
   }
 
+  bool get confirmationIsOverdue =>
+      confirmationStatus == VolunteerConfirmationStatus.pending &&
+      confirmationDueAt != null &&
+      !confirmationDueAt!.isAfter(DateTime.now());
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'concert_id': concertId,
@@ -260,6 +321,14 @@ class ConcertVolunteerApplication {
     'status': status.databaseValue,
     'team_role': teamRole?.databaseValue,
     'attendance_status': attendanceStatus?.databaseValue,
+    'confirmation_status': confirmationStatus?.databaseValue,
+    'confirmation_requested_at': confirmationRequestedAt?.toIso8601String(),
+    'confirmation_due_at': confirmationDueAt?.toIso8601String(),
+    'confirmation_responded_at': confirmationRespondedAt?.toIso8601String(),
+    'role_acknowledged_at': roleAcknowledgedAt?.toIso8601String(),
+    'attendance_validated_at': attendanceValidatedAt?.toIso8601String(),
+    'attendance_validated_by': attendanceValidatedBy,
+    'last_modified_by': lastModifiedBy,
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
   };
@@ -275,6 +344,14 @@ class ConcertVolunteerApplication {
     VolunteerStatistics? statistics,
     Object? teamRole = _unset,
     Object? attendanceStatus = _unset,
+    Object? confirmationStatus = _unset,
+    Object? confirmationRequestedAt = _unset,
+    Object? confirmationDueAt = _unset,
+    Object? confirmationRespondedAt = _unset,
+    Object? roleAcknowledgedAt = _unset,
+    Object? attendanceValidatedAt = _unset,
+    Object? attendanceValidatedBy = _unset,
+    Object? lastModifiedBy = _unset,
   }) {
     return ConcertVolunteerApplication(
       id: id ?? this.id,
@@ -291,6 +368,30 @@ class ConcertVolunteerApplication {
       attendanceStatus: identical(attendanceStatus, _unset)
           ? this.attendanceStatus
           : attendanceStatus as VolunteerAttendanceStatus?,
+      confirmationStatus: identical(confirmationStatus, _unset)
+          ? this.confirmationStatus
+          : confirmationStatus as VolunteerConfirmationStatus?,
+      confirmationRequestedAt: identical(confirmationRequestedAt, _unset)
+          ? this.confirmationRequestedAt
+          : confirmationRequestedAt as DateTime?,
+      confirmationDueAt: identical(confirmationDueAt, _unset)
+          ? this.confirmationDueAt
+          : confirmationDueAt as DateTime?,
+      confirmationRespondedAt: identical(confirmationRespondedAt, _unset)
+          ? this.confirmationRespondedAt
+          : confirmationRespondedAt as DateTime?,
+      roleAcknowledgedAt: identical(roleAcknowledgedAt, _unset)
+          ? this.roleAcknowledgedAt
+          : roleAcknowledgedAt as DateTime?,
+      attendanceValidatedAt: identical(attendanceValidatedAt, _unset)
+          ? this.attendanceValidatedAt
+          : attendanceValidatedAt as DateTime?,
+      attendanceValidatedBy: identical(attendanceValidatedBy, _unset)
+          ? this.attendanceValidatedBy
+          : attendanceValidatedBy as String?,
+      lastModifiedBy: identical(lastModifiedBy, _unset)
+          ? this.lastModifiedBy
+          : lastModifiedBy as String?,
     );
   }
 
@@ -307,7 +408,15 @@ class ConcertVolunteerApplication {
             profile == other.profile &&
             statistics == other.statistics &&
             teamRole == other.teamRole &&
-            attendanceStatus == other.attendanceStatus;
+            attendanceStatus == other.attendanceStatus &&
+            confirmationStatus == other.confirmationStatus &&
+            confirmationRequestedAt == other.confirmationRequestedAt &&
+            confirmationDueAt == other.confirmationDueAt &&
+            confirmationRespondedAt == other.confirmationRespondedAt &&
+            roleAcknowledgedAt == other.roleAcknowledgedAt &&
+            attendanceValidatedAt == other.attendanceValidatedAt &&
+            attendanceValidatedBy == other.attendanceValidatedBy &&
+            lastModifiedBy == other.lastModifiedBy;
   }
 
   @override
@@ -322,7 +431,99 @@ class ConcertVolunteerApplication {
     statistics,
     teamRole,
     attendanceStatus,
+    confirmationStatus,
+    confirmationRequestedAt,
+    confirmationDueAt,
+    confirmationRespondedAt,
+    roleAcknowledgedAt,
+    attendanceValidatedAt,
+    attendanceValidatedBy,
+    lastModifiedBy,
   );
+}
+
+class MaraudeAttendanceMember {
+  const MaraudeAttendanceMember({
+    required this.applicationId,
+    required this.userId,
+    required this.displayName,
+    required this.teamRole,
+    required this.confirmationStatus,
+    required this.attendanceStatus,
+    required this.lastModifiedAt,
+    required this.canValidate,
+    this.attendanceValidatedAt,
+    this.attendanceValidatedBy,
+    this.lastModifiedByName,
+  });
+
+  factory MaraudeAttendanceMember.fromJson(Map<String, dynamic> json) {
+    return MaraudeAttendanceMember(
+      applicationId: json['application_id'] as String,
+      userId: json['user_id'] as String,
+      displayName: json['display_name'] as String? ?? 'Bénévole',
+      teamRole: json['team_role'] == null
+          ? null
+          : MaraudeRole.fromDatabase(json['team_role'] as String),
+      confirmationStatus: VolunteerConfirmationStatus.fromDatabase(
+        json['confirmation_status'] as String,
+      ),
+      attendanceStatus: VolunteerAttendanceStatus.fromDatabase(
+        json['attendance_status'] as String,
+      ),
+      attendanceValidatedAt: json['attendance_validated_at'] == null
+          ? null
+          : DateTime.parse(json['attendance_validated_at'] as String),
+      attendanceValidatedBy: json['attendance_validated_by'] as String?,
+      lastModifiedAt: DateTime.parse(json['last_modified_at'] as String),
+      lastModifiedByName: json['last_modified_by_name'] as String?,
+      canValidate: json['can_validate'] as bool? ?? false,
+    );
+  }
+
+  final String applicationId;
+  final String userId;
+  final String displayName;
+  final MaraudeRole? teamRole;
+  final VolunteerConfirmationStatus confirmationStatus;
+  final VolunteerAttendanceStatus attendanceStatus;
+  final DateTime? attendanceValidatedAt;
+  final String? attendanceValidatedBy;
+  final DateTime lastModifiedAt;
+  final String? lastModifiedByName;
+  final bool canValidate;
+}
+
+class MaraudeAttendanceData {
+  const MaraudeAttendanceData(this.members);
+
+  final List<MaraudeAttendanceMember> members;
+
+  int get presentCount => members
+      .where(
+        (member) =>
+            member.attendanceStatus == VolunteerAttendanceStatus.present,
+      )
+      .length;
+
+  int get absentCount => members
+      .where(
+        (member) => member.attendanceStatus == VolunteerAttendanceStatus.absent,
+      )
+      .length;
+
+  int get pendingCount => members
+      .where(
+        (member) =>
+            member.attendanceStatus == VolunteerAttendanceStatus.pending,
+      )
+      .length;
+
+  bool get canValidate => members.any((member) => member.canValidate);
+
+  bool get isValidated =>
+      members.isNotEmpty &&
+      members.every((member) => member.attendanceValidatedAt != null);
 }
 
 class TeamAttendanceCounts {
@@ -342,7 +543,11 @@ class TeamAttendanceCounts {
     var pendingCount = 0;
 
     for (final application in applications) {
-      if (application.status != ConcertVolunteerStatus.selected) continue;
+      if (application.status != ConcertVolunteerStatus.selected ||
+          application.confirmationStatus !=
+              VolunteerConfirmationStatus.confirmed) {
+        continue;
+      }
       selectedCount++;
       switch (application.effectiveAttendanceStatus!) {
         case VolunteerAttendanceStatus.pending:
@@ -429,6 +634,68 @@ class ConcertVolunteerSectionData {
 
   TeamAttendanceCounts get attendanceCounts =>
       TeamAttendanceCounts.fromApplications(applications);
+}
+
+/// A read-only, non-sensitive view of one candidacy — no contact or
+/// personal information — used to let a volunteer browse who has already
+/// applied to or been selected for a maraude before applying themselves.
+class ConcertVolunteerRosterEntry {
+  const ConcertVolunteerRosterEntry({
+    required this.id,
+    required this.userId,
+    required this.status,
+    required this.firstName,
+    required this.lastName,
+    this.teamRole,
+  });
+
+  factory ConcertVolunteerRosterEntry.fromJson(Map<String, dynamic> json) {
+    return ConcertVolunteerRosterEntry(
+      id: json['id'] as String,
+      userId: json['user_id'] as String,
+      status: ConcertVolunteerStatus.fromDatabase(json['status'] as String),
+      teamRole: json['team_role'] == null
+          ? null
+          : MaraudeRole.fromDatabase(json['team_role'] as String),
+      firstName: json['first_name'] as String? ?? '',
+      lastName: json['last_name'] as String? ?? '',
+    );
+  }
+
+  final String id;
+  final String userId;
+  final ConcertVolunteerStatus status;
+  final MaraudeRole? teamRole;
+  final String firstName;
+  final String lastName;
+
+  String get displayName => '$firstName $lastName'.trim();
+}
+
+class VolunteerCreditSummary {
+  const VolunteerCreditSummary({
+    required this.earned,
+    required this.consumed,
+    required this.available,
+  });
+
+  factory VolunteerCreditSummary.fromJson(Map<String, dynamic> json) {
+    return VolunteerCreditSummary(
+      earned: (json['earned'] as num).toInt(),
+      consumed: (json['consumed'] as num).toInt(),
+      available: (json['available'] as num).toInt(),
+    );
+  }
+
+  static const empty = VolunteerCreditSummary(
+    earned: 0,
+    consumed: 0,
+    available: 0,
+  );
+
+  final int earned;
+  final int consumed;
+  final int available;
 }
 
 bool _listEquals<T>(List<T> first, List<T> second) {

@@ -5,8 +5,10 @@ import 'package:club_sandwich/features/collections/domain/maraude_collection.dar
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/data/concert_repository.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
+import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_report.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
+import 'package:club_sandwich/features/concerts/presentation/maraude_operational_report_card.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_report_pdf_service.dart';
 import 'package:club_sandwich/features/distributions/domain/maraude_distribution.dart';
 import 'package:club_sandwich/features/venues/domain/venue.dart';
@@ -28,6 +30,7 @@ void main() {
     final report = MaraudeReport.fromConcert(_completedConcert(), _counts);
 
     expect(report.actualDuration, const Duration(hours: 1, minutes: 53));
+    expect(report.promoterName, 'Tourneur test');
     expect(formatMaraudeDuration(report.actualDuration), '1 h 53');
     expect(report.collectionSummary.lotCount, 2);
     expect(report.collectionSummary.totalWeightKg, 30.5);
@@ -141,13 +144,22 @@ void main() {
     final store = _ReportStore(_completedConcert());
     await _pumpReport(tester, store, isAdmin: true);
 
-    expect(find.text('Bilan'), findsOneWidget);
+    expect(find.text('Bilan'), findsWidgets);
     expect(find.text('Durée réelle'), findsOneWidget);
+    expect(find.text('Tourneur'), findsOneWidget);
     expect(find.text('1 h 53'), findsOneWidget);
-    expect(find.text('Nombre de lots'), findsNWidgets(2));
+    expect(find.text('Nombre de lots'), findsOneWidget);
     expect(find.text('30.5 kg'), findsOneWidget);
     expect(find.text('Quantité totale de pièces'), findsOneWidget);
-    expect(find.text('Place de la République'), findsNWidgets(2));
+    expect(find.text('Présents'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+    expect(find.text('Absents'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Distribution'), findsOneWidget);
+    expect(find.text('Place de la République'), findsOneWidget);
+    expect(find.text('42'), findsOneWidget);
+    expect(find.text('35'), findsOneWidget);
+    expect(find.text('Photos'), findsOneWidget);
     expect(find.text('Belle maraude.'), findsOneWidget);
     expect(find.text('Exporter le bilan'), findsOneWidget);
   });
@@ -174,7 +186,7 @@ void main() {
     expect(find.text('Commentaire mis à jour'), findsOneWidget);
   });
 
-  testWidgets('le bénévole présent consulte un bilan entièrement en lecture', (
+  testWidgets('le bénévole confirmé consulte un bilan entièrement en lecture', (
     tester,
   ) async {
     final store = _ReportStore(_completedConcert());
@@ -185,14 +197,12 @@ void main() {
       ownApplication: _application(VolunteerAttendanceStatus.present),
     );
 
-    expect(find.text('Bilan'), findsOneWidget);
+    expect(find.text('Bilan'), findsWidgets);
     expect(find.text('Exporter le bilan'), findsOneWidget);
     expect(find.byKey(const ValueKey('edit-closing-comment')), findsNothing);
   });
 
-  testWidgets('le bilan reste inaccessible avant clôture ou sans présence', (
-    tester,
-  ) async {
+  testWidgets('le bilan reste inaccessible avant clôture', (tester) async {
     final startedStore = _ReportStore(
       buildConcert(
         maraudeStatus: MaraudeStatus.inProgress,
@@ -200,16 +210,194 @@ void main() {
       ),
     );
     await _pumpReport(tester, startedStore, isAdmin: true);
-    expect(find.text('Bilan'), findsNothing);
-
-    final completedStore = _ReportStore(_completedConcert());
-    await _pumpReport(
-      tester,
-      completedStore,
-      isAdmin: false,
-      ownApplication: _application(VolunteerAttendanceStatus.absent),
+    expect(
+      find.byKey(const ValueKey('maraude-workspace-report')),
+      findsNothing,
     );
-    expect(find.text('Bilan'), findsNothing);
+  });
+
+  testWidgets(
+    'actualise le poids calculé lorsque les collections sont modifiées',
+    (tester) async {
+      Widget app(Concert concert) => ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: MaraudeOperationalReportCard(
+              concert: concert,
+              canEdit: true,
+              canEditPhoto: false,
+              canManagePhotoGallery: true,
+              currentUserId: 'admin-id',
+              isAdmin: true,
+            ),
+          ),
+        ),
+      );
+
+      final initial = buildConcert(
+        collections: [
+          _collection(
+            id: 'meal',
+            quantity: 10,
+            unit: CollectionUnit.piece,
+            weightKg: 5,
+          ),
+        ],
+      );
+      await tester.pumpWidget(app(initial));
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey('report-weight')))
+            .controller
+            ?.text,
+        '5,0',
+      );
+
+      final updated = buildConcert(
+        collections: [
+          _collection(
+            id: 'meal',
+            quantity: 20,
+            unit: CollectionUnit.piece,
+            weightKg: 12,
+          ),
+        ],
+      );
+      await tester.pumpWidget(app(updated));
+      await tester.pump();
+
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey('report-weight')))
+            .controller
+            ?.text,
+        '12,0',
+      );
+    },
+  );
+
+  testWidgets('ignore l’ancien poids si aucun plat n’est renseigné', (
+    tester,
+  ) async {
+    final concert = buildConcert(
+      operationalReport: MaraudeOperationalReport(
+        concertId: 'concert-id',
+        totalWeightKg: 300,
+        estimatedMeals: 0,
+        createdAt: DateTime(2026, 7, 28),
+        updatedAt: DateTime(2026, 7, 28),
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: MaraudeOperationalReportCard(
+              concert: concert,
+              canEdit: true,
+              canEditPhoto: false,
+              canManagePhotoGallery: true,
+              currentUserId: 'admin-id',
+              isAdmin: true,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      tester
+          .widget<TextFormField>(find.byKey(const ValueKey('report-weight')))
+          .controller
+          ?.text,
+      '0,0',
+    );
+  });
+
+  testWidgets('propose un téléversement de photo sans champ URL', (
+    tester,
+  ) async {
+    final store = _ReportStore(buildConcert());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          concertRepositoryProvider.overrideWithValue(store.repository),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: MaraudeOperationalReportCard(
+                concert: store.concert,
+                canEdit: true,
+                canEditPhoto: false,
+                canManagePhotoGallery: true,
+                currentUserId: 'admin-id',
+                isAdmin: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Lien vers le dossier de photos'), findsNothing);
+    expect(find.byKey(const ValueKey('upload-maraude-photo')), findsOneWidget);
+  });
+
+  testWidgets('seul l’auteur ou un administrateur peut supprimer une photo', (
+    tester,
+  ) async {
+    final store = _ReportStore(buildConcert());
+    store.repository.photos = [
+      MaraudePhoto(
+        id: 'photo-own',
+        concertId: store.concert.id,
+        uploadedBy: 'admin-id',
+        storagePath: 'own.jpg',
+        createdAt: DateTime(2026, 7, 30),
+      ),
+      MaraudePhoto(
+        id: 'photo-other',
+        concertId: store.concert.id,
+        uploadedBy: 'someone-else-id',
+        storagePath: 'other.jpg',
+        createdAt: DateTime(2026, 7, 30),
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          concertRepositoryProvider.overrideWithValue(store.repository),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: MaraudeOperationalReportCard(
+                concert: store.concert,
+                canEdit: true,
+                canEditPhoto: false,
+                canManagePhotoGallery: true,
+                currentUserId: 'admin-id',
+                isAdmin: false,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byIcon(Icons.close), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Supprimer'));
+    await tester.pumpAndSettle();
+
+    expect(store.repository.lastDeletedPhotoId, 'photo-own');
   });
 }
 
@@ -223,6 +411,7 @@ const _counts = ConcertVolunteerCounts(
 Concert _completedConcert() {
   return buildConcert(
     artist: 'The Blaze',
+    promoterOrganizationName: 'Tourneur test',
     venue: testVenue,
     maraudeStatus: MaraudeStatus.completed,
     actualStartAt: DateTime(2026, 7, 27, 21, 12),
@@ -284,6 +473,7 @@ ConcertVolunteerApplication _application(
     concertId: 'concert-id',
     userId: 'user-id',
     status: ConcertVolunteerStatus.selected,
+    confirmationStatus: VolunteerConfirmationStatus.confirmed,
     attendanceStatus: attendanceStatus,
     createdAt: DateTime(2026, 7, 27),
     updatedAt: DateTime(2026, 7, 27),
@@ -318,6 +508,14 @@ Future<void> _pumpReport(
     ),
   );
   await tester.pumpAndSettle();
+  final reportWorkspace = find.byKey(
+    const ValueKey('maraude-workspace-report'),
+  );
+  if (reportWorkspace.evaluate().isNotEmpty) {
+    await tester.ensureVisible(reportWorkspace);
+    await tester.tap(reportWorkspace);
+    await tester.pumpAndSettle();
+  }
 }
 
 class _ReportStore {
@@ -340,6 +538,24 @@ class _FakeReportConcertRepository extends ConcertRepository {
       );
 
   final _ReportStore store;
+  List<MaraudePhoto> photos = const [];
+  String? lastDeletedPhotoId;
+
+  @override
+  Future<List<MaraudePhoto>> fetchMaraudePhotos(String concertId) async {
+    return photos;
+  }
+
+  @override
+  Future<String> maraudePhotoUrl(String storagePath) async {
+    return 'https://example.test/$storagePath';
+  }
+
+  @override
+  Future<void> deleteMaraudePhoto(String photoId, String storagePath) async {
+    lastDeletedPhotoId = photoId;
+    photos = photos.where((photo) => photo.id != photoId).toList();
+  }
 
   @override
   Future<void> updateClosingComment(

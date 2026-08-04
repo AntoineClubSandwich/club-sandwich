@@ -1,5 +1,7 @@
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
+import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
+import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -50,15 +52,28 @@ class _ActivationScreenState extends ConsumerState<ActivationScreen> {
             lastName: _lastName.text,
             phone: _phone.text,
           );
-      ref.invalidate(currentUserContextProvider);
+      final activatedContext = await ref.refresh(
+        currentUserContextProvider.future,
+      );
+      if (activatedContext?.status != UserAccountStatus.active) {
+        throw StateError('Le compte n’est pas actif après son activation.');
+      }
       ref.invalidate(currentProfileProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Compte activé.')));
+      await Future<void>.delayed(const Duration(milliseconds: 900));
       if (mounted) context.go('/dashboard');
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'L’activation a échoué. Le lien est peut-être expiré.',
+              describeError(
+                error,
+                'L’activation a échoué. Le lien est peut-être expiré.',
+              ),
             ),
           ),
         );

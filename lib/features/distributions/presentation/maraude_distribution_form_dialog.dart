@@ -1,5 +1,6 @@
 import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
 import 'package:club_sandwich/features/distributions/domain/maraude_distribution.dart';
+import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:flutter/material.dart';
 
 class MaraudeDistributionFormDialog extends StatefulWidget {
@@ -298,9 +299,12 @@ class _MaraudeDistributionFormDialogState
       if (!mounted) return;
       setState(() {
         _isSubmitting = false;
-        _errorMessage = widget.isEditing
-            ? 'Impossible d’enregistrer les modifications.'
-            : 'Impossible d’ajouter la distribution.';
+        _errorMessage = describeError(
+          error,
+          widget.isEditing
+              ? 'Impossible d’enregistrer les modifications.'
+              : 'Impossible d’ajouter la distribution.',
+        );
       });
     }
   }

@@ -11,9 +11,14 @@ class MaraudeCollectionRepository {
     MaraudeCollectionDraft draft,
   ) async {
     final row = await _client
-        .from('maraude_collections')
-        .insert({...draft.toJson(), 'concert_id': concertId})
-        .select()
+        .rpc(
+          'save_maraude_collection',
+          params: {
+            'requested_concert_id': concertId,
+            'requested_collection_id': null,
+            ..._rpcDraft(draft),
+          },
+        )
         .single();
     return MaraudeCollection.fromJson(row);
   }
@@ -23,10 +28,14 @@ class MaraudeCollectionRepository {
     MaraudeCollectionDraft draft,
   ) async {
     final row = await _client
-        .from('maraude_collections')
-        .update(draft.toJson())
-        .eq('id', collectionId)
-        .select()
+        .rpc(
+          'save_maraude_collection',
+          params: {
+            'requested_concert_id': null,
+            'requested_collection_id': collectionId,
+            ..._rpcDraft(draft),
+          },
+        )
         .single();
     return MaraudeCollection.fromJson(row);
   }
@@ -35,3 +44,12 @@ class MaraudeCollectionRepository {
     await _client.from('maraude_collections').delete().eq('id', collectionId);
   }
 }
+
+Map<String, dynamic> _rpcDraft(MaraudeCollectionDraft draft) => {
+  'requested_category': draft.category.databaseValue,
+  'requested_description': draft.description,
+  'requested_quantity': draft.quantity,
+  'requested_unit': draft.unit.databaseValue,
+  'requested_average_weight_kg': draft.averageWeightKg,
+  'requested_comment': draft.comment,
+};

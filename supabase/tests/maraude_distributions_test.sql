@@ -30,6 +30,16 @@ values
     'b0000000-0000-0000-0000-000000000003',
     'distribution-admin@example.test',
     '{"first_name":"Admin","last_name":"Distribution"}'::jsonb
+  ),
+  (
+    'b0000000-0000-0000-0000-000000000004',
+    'distribution-member2@example.test',
+    '{"first_name":"Sacha","last_name":"Membre"}'::jsonb
+  ),
+  (
+    'b0000000-0000-0000-0000-000000000005',
+    'distribution-member3@example.test',
+    '{"first_name":"Lou","last_name":"Membre"}'::jsonb
   );
 
 insert into public.memberships (
@@ -55,6 +65,14 @@ cross join (
     (
       'b0000000-0000-0000-0000-000000000003'::uuid,
       'admin'
+    ),
+    (
+      'b0000000-0000-0000-0000-000000000004'::uuid,
+      'volunteer'
+    ),
+    (
+      'b0000000-0000-0000-0000-000000000005'::uuid,
+      'volunteer'
     )
 ) as member_data(profile_id, role)
 where o.slug = 'club-sandwich';
@@ -95,6 +113,40 @@ values (
   'selected',
   'present'
 );
+
+update public.concert_volunteers
+set team_role = 'team_leader'
+where concert_id = 'b1000000-0000-0000-0000-000000000001';
+
+insert into public.concert_volunteers (
+  concert_id,
+  user_id,
+  status,
+  team_role
+)
+values
+  (
+    'b1000000-0000-0000-0000-000000000001',
+    'b0000000-0000-0000-0000-000000000004',
+    'selected',
+    'logistics'
+  ),
+  (
+    'b1000000-0000-0000-0000-000000000001',
+    'b0000000-0000-0000-0000-000000000005',
+    'selected',
+    'communication'
+  );
+
+update public.concert_volunteers
+set
+  role_acknowledged_at = clock_timestamp(),
+  confirmation_status = 'confirmed'
+where concert_id = 'b1000000-0000-0000-0000-000000000001';
+
+update public.concert_volunteers
+set attendance_status = 'present'
+where concert_id = 'b1000000-0000-0000-0000-000000000001';
 
 set local role authenticated;
 select set_config(

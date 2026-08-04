@@ -23,7 +23,7 @@ enum ConcertStatus {
 
 enum MaraudeStatus {
   draft('draft', 'Brouillon'),
-  open('open', 'Ouverte'),
+  open('open', 'Planifiée'),
   teamReady('team_ready', 'Équipe validée'),
   inProgress('in_progress', 'En cours'),
   completed('completed', 'Terminée'),
@@ -182,8 +182,10 @@ class Concert {
               'concert_id': operationalReport!.concertId,
               'total_weight_kg': operationalReport!.totalWeightKg,
               'estimated_meals': operationalReport!.estimatedMeals,
+              'distance_km': operationalReport!.distanceKm,
+              'quantities_unavailable':
+                  operationalReport!.quantitiesUnavailable,
               'comment': operationalReport!.comment,
-              'photo_folder_url': operationalReport!.photoFolderUrl,
               'last_modified_by': operationalReport!.lastModifiedBy,
               'created_at': operationalReport!.createdAt.toIso8601String(),
               'updated_at': operationalReport!.updatedAt.toIso8601String(),
@@ -251,6 +253,7 @@ class ConcertDraft {
     required this.date,
     required this.venueId,
     this.promoterOrganizationId,
+    this.cateringContactName,
     this.cateringClosesAt,
     this.notes,
     this.promoterContactName,
@@ -261,6 +264,7 @@ class ConcertDraft {
   final DateTime date;
   final String venueId;
   final String? promoterOrganizationId;
+  final String? cateringContactName;
   final String? cateringClosesAt;
   final String? notes;
   final String? promoterContactName;
@@ -271,6 +275,7 @@ class ConcertDraft {
       'artist': artist,
       'concert_date': _dateToJson(date),
       'venue_id': venueId,
+      'catering_contact_name': _nullIfBlank(cateringContactName),
       'catering_closes_at': cateringClosesAt,
       'notes': notes,
       'promoter_contact_name': _nullIfBlank(promoterContactName),

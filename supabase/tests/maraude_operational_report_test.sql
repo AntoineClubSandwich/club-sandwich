@@ -13,7 +13,7 @@ select has_table(
 select has_function(
   'public',
   'save_maraude_report',
-  array['uuid', 'numeric', 'integer', 'text', 'text', 'boolean'],
+  array['uuid', 'numeric', 'integer', 'text', 'boolean'],
   'La sauvegarde transactionnelle du compte rendu existe'
 );
 
@@ -112,6 +112,12 @@ values
     'team_leader'
   );
 
+update public.concert_volunteers
+set
+  role_acknowledged_at = clock_timestamp(),
+  confirmation_status = 'confirmed'
+where status = 'selected';
+
 set local role authenticated;
 select set_config(
   'request.jwt.claim.sub',
@@ -126,7 +132,6 @@ select lives_ok(
       0,
       0,
       'Aucune collecte',
-      null,
       true
     )
   $$,
@@ -162,7 +167,6 @@ select lives_ok(
       12.5,
       30,
       'Correction administrative',
-      'https://example.test/photos',
       true
     )
   $$,
@@ -179,7 +183,7 @@ select results_eq(
   'La correction administrative est enregistrée'
 );
 
-select lives_ok(
+select throws_ok(
   $$
     select public.set_maraude_status(
       '43000000-0000-0000-0000-000000000001',
@@ -187,7 +191,9 @@ select lives_ok(
       null
     )
   $$,
-  'L’administrateur rouvre la maraude'
+  '22023',
+  'Cette maraude ne peut pas être démarrée',
+  'L’administrateur ne rouvre pas une maraude terminée'
 );
 
 reset role;
@@ -198,18 +204,19 @@ select set_config(
   true
 );
 
-select lives_ok(
+select throws_ok(
   $$
     select public.save_maraude_report(
       '43000000-0000-0000-0000-000000000001',
       8.75,
       18,
       'Saisi sur le terrain',
-      null,
       false
     )
   $$,
-  'Un chef d’équipe sélectionné saisit le compte rendu'
+  '42501',
+  'Vous ne pouvez pas modifier ce compte rendu',
+  'Le chef ne modifie plus le compte rendu après la clôture'
 );
 
 select results_eq(
@@ -218,8 +225,8 @@ select results_eq(
     from public.maraude_operational_reports
     where concert_id = '43000000-0000-0000-0000-000000000001'
   $$,
-  $$ values ('8.75'::text, 18) $$,
-  'La saisie du chef est enregistrée'
+  $$ values ('12.5'::text, 30) $$,
+  'La correction administrative reste inchangée'
 );
 
 reset role;
@@ -236,7 +243,6 @@ select throws_ok(
       '43000000-0000-0000-0000-000000000001',
       1,
       1,
-      null,
       null,
       false
     )
@@ -261,7 +267,6 @@ select throws_ok(
       1,
       1,
       null,
-      null,
       false
     )
   $$,
@@ -280,22 +285,24 @@ select set_config(
 
 select lives_ok(
   $$
-    select public.update_maraude_photo_link(
+    select public.add_maraude_photo(
       '43000000-0000-0000-0000-000000000001',
-      'https://example.test/communication'
+      '43000000-0000-0000-0000-000000000001/'
+        '33000000-0000-0000-0000-000000000003/1.jpg'
     )
   $$,
-  'La personne chargée de communication enregistre le lien photo'
+  'La personne chargée de communication ajoute une photo'
 );
 
 select results_eq(
   $$
-    select photo_folder_url
-    from public.maraude_operational_reports
+    select count(*)::bigint
+    from public.maraude_photos
     where concert_id = '43000000-0000-0000-0000-000000000001'
+      and uploaded_by = '33000000-0000-0000-0000-000000000003'
   $$,
-  array['https://example.test/communication'::text],
-  'Le lien photo est mis à jour sans modifier le reste'
+  array[1::bigint],
+  'La photo est enregistrée dans la galerie de la maraude'
 );
 
 select throws_ok(
@@ -304,7 +311,6 @@ select throws_ok(
       '43000000-0000-0000-0000-000000000001',
       -1,
       0,
-      null,
       null,
       false
     )

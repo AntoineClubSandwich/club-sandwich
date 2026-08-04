@@ -54,6 +54,7 @@ class MaraudeCollection {
     required this.updatedAt,
     this.description,
     this.weightKg,
+    this.averageWeightKg,
     this.comment,
   });
 
@@ -66,6 +67,7 @@ class MaraudeCollection {
       quantity: (json['quantity'] as num).toDouble(),
       unit: CollectionUnit.fromJson(json['unit'] as String),
       weightKg: (json['weight_kg'] as num?)?.toDouble(),
+      averageWeightKg: (json['average_weight_kg'] as num?)?.toDouble(),
       comment: json['comment'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
@@ -79,6 +81,7 @@ class MaraudeCollection {
   final double quantity;
   final CollectionUnit unit;
   final double? weightKg;
+  final double? averageWeightKg;
   final String? comment;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -91,6 +94,7 @@ class MaraudeCollection {
     'quantity': quantity,
     'unit': unit.databaseValue,
     'weight_kg': weightKg,
+    'average_weight_kg': averageWeightKg,
     'comment': comment,
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
@@ -107,6 +111,7 @@ class MaraudeCollection {
             quantity == other.quantity &&
             unit == other.unit &&
             weightKg == other.weightKg &&
+            averageWeightKg == other.averageWeightKg &&
             comment == other.comment &&
             createdAt == other.createdAt &&
             updatedAt == other.updatedAt;
@@ -121,6 +126,7 @@ class MaraudeCollection {
     quantity,
     unit,
     weightKg,
+    averageWeightKg,
     comment,
     createdAt,
     updatedAt,
@@ -134,6 +140,7 @@ class MaraudeCollectionDraft {
     required this.unit,
     this.description,
     this.weightKg,
+    this.averageWeightKg,
     this.comment,
   });
 
@@ -142,6 +149,7 @@ class MaraudeCollectionDraft {
   final double quantity;
   final CollectionUnit unit;
   final double? weightKg;
+  final double? averageWeightKg;
   final String? comment;
 
   Map<String, dynamic> toJson() => {
@@ -150,6 +158,7 @@ class MaraudeCollectionDraft {
     'quantity': quantity,
     'unit': unit.databaseValue,
     'weight_kg': weightKg,
+    'average_weight_kg': averageWeightKg,
     'comment': _nullIfBlank(comment),
   };
 }

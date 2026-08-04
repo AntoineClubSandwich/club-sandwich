@@ -1,4 +1,5 @@
 import 'package:club_sandwich/features/collections/domain/maraude_collection.dart';
+import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:flutter/material.dart';
 
 class MaraudeCollectionFormDialog extends StatefulWidget {
@@ -45,9 +46,9 @@ class _MaraudeCollectionFormDialogState
           : formatCollectionNumber(collection.quantity),
     );
     _weightController = TextEditingController(
-      text: collection?.weightKg == null
+      text: collection?.averageWeightKg == null
           ? ''
-          : formatCollectionNumber(collection!.weightKg!),
+          : formatCollectionNumber(collection!.averageWeightKg!),
     );
     _commentController = TextEditingController(text: collection?.comment ?? '');
   }
@@ -92,32 +93,18 @@ class _MaraudeCollectionFormDialogState
                   ],
                 ),
                 const SizedBox(height: 20),
-                DropdownButtonFormField<CollectionCategory>(
-                  initialValue: _category,
-                  decoration: const InputDecoration(labelText: 'Catégorie'),
-                  items: [
-                    for (final category in CollectionCategory.values)
-                      DropdownMenuItem(
-                        value: category,
-                        child: Text(category.label),
-                      ),
-                  ],
-                  onChanged: _isSubmitting
-                      ? null
-                      : (category) {
-                          if (category != null) _category = category;
-                        },
-                ),
-                const SizedBox(height: 16),
                 TextFormField(
                   controller: _descriptionController,
                   enabled: !_isSubmitting,
                   autofocus: true,
                   textInputAction: TextInputAction.next,
                   decoration: const InputDecoration(
-                    labelText: 'Description',
-                    hintText: 'Optionnelle',
+                    labelText: 'Type de plat',
+                    hintText: 'Ex. : lasagnes, salade composée…',
                   ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Le type de plat est obligatoire.'
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -127,7 +114,10 @@ class _MaraudeCollectionFormDialogState
                     decimal: true,
                   ),
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(labelText: 'Quantité'),
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre total de plats',
+                  ),
+                  onChanged: (_) => setState(() {}),
                   validator: (value) {
                     final quantity = _parseNumber(value);
                     if (quantity == null) return 'La quantité est obligatoire.';
@@ -138,20 +128,6 @@ class _MaraudeCollectionFormDialogState
                   },
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<CollectionUnit>(
-                  initialValue: _unit,
-                  decoration: const InputDecoration(labelText: 'Unité'),
-                  items: [
-                    for (final unit in CollectionUnit.values)
-                      DropdownMenuItem(value: unit, child: Text(unit.label)),
-                  ],
-                  onChanged: _isSubmitting
-                      ? null
-                      : (unit) {
-                          if (unit != null) _unit = unit;
-                        },
-                ),
-                const SizedBox(height: 16),
                 TextFormField(
                   controller: _weightController,
                   enabled: !_isSubmitting,
@@ -160,18 +136,26 @@ class _MaraudeCollectionFormDialogState
                   ),
                   textInputAction: TextInputAction.next,
                   decoration: const InputDecoration(
-                    labelText: 'Poids (kg)',
-                    hintText: 'Optionnel',
+                    labelText: 'Poids moyen d’un plat (kg)',
+                    hintText: 'Ex. : 0,45',
                   ),
+                  onChanged: (_) => setState(() {}),
                   validator: (value) {
                     final text = value?.trim() ?? '';
-                    if (text.isEmpty) return null;
+                    if (text.isEmpty) {
+                      return 'Le poids moyen est obligatoire.';
+                    }
                     final weight = _parseNumber(text);
-                    if (weight == null || weight < 0) {
-                      return 'Le poids doit être positif ou nul.';
+                    if (weight == null || weight <= 0) {
+                      return 'Le poids moyen doit être supérieur à zéro.';
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Poids total calculé : ${_calculatedWeightLabel()}',
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -247,7 +231,10 @@ class _MaraudeCollectionFormDialogState
           description: _descriptionController.text,
           quantity: _parseNumber(_quantityController.text)!,
           unit: _unit,
-          weightKg: _parseNumber(_weightController.text),
+          averageWeightKg: _parseNumber(_weightController.text),
+          weightKg:
+              _parseNumber(_quantityController.text)! *
+              _parseNumber(_weightController.text)!,
           comment: _commentController.text,
         ),
       );
@@ -256,11 +243,21 @@ class _MaraudeCollectionFormDialogState
       if (!mounted) return;
       setState(() {
         _isSubmitting = false;
-        _errorMessage = widget.isEditing
-            ? 'Impossible d’enregistrer les modifications.'
-            : 'Impossible d’ajouter ce lot.';
+        _errorMessage = describeError(
+          error,
+          widget.isEditing
+              ? 'Impossible d’enregistrer les modifications.'
+              : 'Impossible d’ajouter ce lot.',
+        );
       });
     }
+  }
+
+  String _calculatedWeightLabel() {
+    final quantity = _parseNumber(_quantityController.text);
+    final average = _parseNumber(_weightController.text);
+    if (quantity == null || average == null) return '—';
+    return '${formatCollectionNumber(quantity * average)} kg';
   }
 }
 

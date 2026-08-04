@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:club_sandwich/features/concerts/data/concert_repository.dart';
+import 'package:club_sandwich/features/invitations/data/invitation_repository.dart';
 import 'package:club_sandwich/features/organizations/data/organization_repository.dart';
 import 'package:club_sandwich/features/venues/data/venue_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -129,6 +130,73 @@ void main() {
   });
 
   test(
+    'InvitationRepository précharge la salle avec chaque campagne',
+    () async {
+      late Request capturedRequest;
+      final client = SupabaseClient(
+        'http://localhost',
+        'test-key',
+        httpClient: MockClient((request) async {
+          capturedRequest = request;
+          return Response(
+            jsonEncode([
+              {
+                'id': 'campaign-id',
+                'organization_id': 'organization-id',
+                'organization': {'name': 'Auguri'},
+                'venue_id': 'venue-id',
+                'venue': {
+                  'id': 'venue-id',
+                  'name': 'Point Éphémère',
+                  'public_address_line1': '200 quai de Valmy',
+                  'public_address_line2': null,
+                  'postal_code': '75010',
+                  'city': 'Paris',
+                },
+                'title': 'Places concert',
+                'available_places': 2,
+                'status': 'open',
+                'created_by': 'promoter-id',
+                'created_at': '2026-07-28T10:00:00Z',
+                'updated_at': '2026-07-28T10:00:00Z',
+                'applications': [
+                  {
+                    'id': 'pending-id',
+                    'user_id': 'volunteer-id',
+                    'status': 'pending',
+                    'created_at': '2026-07-28T11:00:00Z',
+                  },
+                  {
+                    'id': 'selected-id',
+                    'user_id': 'other-volunteer-id',
+                    'status': 'selected',
+                    'created_at': '2026-07-28T12:00:00Z',
+                  },
+                ],
+              },
+            ]),
+            200,
+            headers: jsonHeaders,
+            request: request,
+          );
+        }),
+      );
+      addTearDown(client.dispose);
+
+      final campaigns = await InvitationRepository(client).fetchCampaigns();
+
+      expect(campaigns.single.venue?.name, 'Point Éphémère');
+      expect(campaigns.single.applicationCount, 2);
+      expect(campaigns.single.pendingCount, 1);
+      expect(campaigns.single.selectedCount, 1);
+      expect(
+        capturedRequest.url.queryParameters['select'],
+        contains('venue:venues!invitation_campaigns_venue_id_fkey'),
+      );
+    },
+  );
+
+  test(
     'ConcertRepository appelle les RPC transactionnelles de maraude',
     () async {
       final requests = <Request>[];
@@ -152,4 +220,20 @@ void main() {
       });
     },
   );
+
+  test('ConcertRepository utilise la suppression transactionnelle', () async {
+    late Request capturedRequest;
+    final client = clientFor((request) async {
+      capturedRequest = request;
+      return Response('null', 200, headers: jsonHeaders, request: request);
+    });
+    addTearDown(client.dispose);
+
+    await ConcertRepository(client).deleteConcert('concert-id');
+
+    expect(capturedRequest.url.path, endsWith('/rpc/delete_concert'));
+    expect(jsonDecode(capturedRequest.body), {
+      'requested_concert_id': 'concert-id',
+    });
+  });
 }

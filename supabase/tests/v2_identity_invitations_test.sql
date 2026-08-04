@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(40);
+select plan(47);
 
 select has_table(
   'public',
@@ -18,6 +18,28 @@ select has_table(
   'public',
   'invitation_applications',
   'Les candidatures aux invitations sont stockées'
+);
+select has_column(
+  'public',
+  'invitation_campaigns',
+  'venue_id',
+  'Une campagne référence sa salle'
+);
+select col_is_fk(
+  'public',
+  'invitation_campaigns',
+  'venue_id',
+  'La salle d’une campagne référence venues'
+);
+select ok(
+  exists (
+    select 1
+    from pg_constraint
+    where conname = 'invitation_campaigns_venue_required'
+      and conrelid = 'public.invitation_campaigns'::regclass
+      and contype = 'c'
+  ),
+  'Toute nouvelle campagne doit posséder une salle'
 );
 select has_table(
   'public',
@@ -151,6 +173,109 @@ values
     'contact-b@example.test'
   );
 
+insert into public.venues (
+  id,
+  name,
+  public_address_line1,
+  postal_code,
+  city
+)
+values (
+  '77000000-0000-0000-0000-000000000001',
+  'Salle invitations V2',
+  '1 rue de la Recette',
+  '75001',
+  'Paris'
+);
+
+insert into public.concerts (
+  id,
+  organization_id,
+  artist,
+  concert_date,
+  venue_id,
+  created_by
+)
+select
+  credit_concert.id,
+  organization.id,
+  credit_concert.artist,
+  credit_concert.concert_date,
+  '77000000-0000-0000-0000-000000000001',
+  '71000000-0000-0000-0000-000000000001'
+from public.organizations organization
+cross join (
+  values
+    (
+      '78000000-0000-0000-0000-000000000001'::uuid,
+      'Crédit 1',
+      '2026-01-01'::date
+    ),
+    (
+      '78000000-0000-0000-0000-000000000002'::uuid,
+      'Crédit 2',
+      '2026-01-02'::date
+    ),
+    (
+      '78000000-0000-0000-0000-000000000003'::uuid,
+      'Crédit 3',
+      '2026-01-03'::date
+    )
+) as credit_concert(id, artist, concert_date)
+where organization.slug = 'club-sandwich';
+
+insert into public.concert_volunteers (
+  id,
+  concert_id,
+  user_id,
+  status
+)
+values
+  (
+    '79000000-0000-0000-0000-000000000001',
+    '78000000-0000-0000-0000-000000000001',
+    '71000000-0000-0000-0000-000000000003',
+    'pending'
+  ),
+  (
+    '79000000-0000-0000-0000-000000000002',
+    '78000000-0000-0000-0000-000000000002',
+    '71000000-0000-0000-0000-000000000003',
+    'pending'
+  ),
+  (
+    '79000000-0000-0000-0000-000000000003',
+    '78000000-0000-0000-0000-000000000003',
+    '71000000-0000-0000-0000-000000000003',
+    'pending'
+  );
+
+insert into public.volunteer_credits (
+  concert_id,
+  application_id,
+  user_id,
+  awarded_by
+)
+values
+  (
+    '78000000-0000-0000-0000-000000000001',
+    '79000000-0000-0000-0000-000000000001',
+    '71000000-0000-0000-0000-000000000003',
+    '71000000-0000-0000-0000-000000000001'
+  ),
+  (
+    '78000000-0000-0000-0000-000000000002',
+    '79000000-0000-0000-0000-000000000002',
+    '71000000-0000-0000-0000-000000000003',
+    '71000000-0000-0000-0000-000000000001'
+  ),
+  (
+    '78000000-0000-0000-0000-000000000003',
+    '79000000-0000-0000-0000-000000000003',
+    '71000000-0000-0000-0000-000000000003',
+    '71000000-0000-0000-0000-000000000001'
+  );
+
 select is(
   (
     select string_agg(enumlabel::text, ',' order by enumsortorder)
@@ -210,6 +335,7 @@ select lives_ok(
     insert into public.invitation_campaigns (
       id,
       organization_id,
+      venue_id,
       title,
       available_places,
       status,
@@ -218,6 +344,7 @@ select lives_ok(
     values (
       '74000000-0000-0000-0000-000000000001',
       '72000000-0000-0000-0000-000000000001',
+      '77000000-0000-0000-0000-000000000001',
       'Invitations ouvertes',
       2,
       'open',
@@ -232,6 +359,7 @@ select lives_ok(
     insert into public.invitation_campaigns (
       id,
       organization_id,
+      venue_id,
       title,
       status,
       created_by
@@ -239,6 +367,7 @@ select lives_ok(
     values (
       '74000000-0000-0000-0000-000000000002',
       '72000000-0000-0000-0000-000000000001',
+      '77000000-0000-0000-0000-000000000001',
       'Brouillon privé',
       'draft',
       '71000000-0000-0000-0000-000000000002'
@@ -256,7 +385,29 @@ select throws_ok(
       created_by
     )
     values (
+      '72000000-0000-0000-0000-000000000001',
+      'Campagne sans salle',
+      'open',
+      '71000000-0000-0000-0000-000000000002'
+    )
+  $$,
+  '23514',
+  'new row for relation "invitation_campaigns" violates check constraint "invitation_campaigns_venue_required"',
+  'Une nouvelle campagne sans salle est refusée'
+);
+
+select throws_ok(
+  $$
+    insert into public.invitation_campaigns (
+      organization_id,
+      venue_id,
+      title,
+      status,
+      created_by
+    )
+    values (
       '72000000-0000-0000-0000-000000000002',
+      '77000000-0000-0000-0000-000000000001',
       'Campagne interdite',
       'open',
       '71000000-0000-0000-0000-000000000002'
@@ -352,6 +503,17 @@ select is(
   (select count(*) from public.invitation_campaigns),
   1::bigint,
   'Le bénévole voit uniquement les campagnes ouvertes'
+);
+
+select is(
+  (
+    select count(*)
+    from public.invitation_campaigns campaign
+    join public.venues venue on venue.id = campaign.venue_id
+    where venue.name = 'Salle invitations V2'
+  ),
+  1::bigint,
+  'Le bénévole voit la salle de la campagne ouverte'
 );
 
 select is(
@@ -490,6 +652,37 @@ select lives_ok(
   'L’administrateur attribue une invitation'
 );
 
+update public.invitation_campaigns
+set available_places = 1
+where id = '74000000-0000-0000-0000-000000000001';
+
+insert into public.invitation_applications (
+  id,
+  campaign_id,
+  user_id
+)
+values (
+  '75000000-0000-0000-0000-000000000002',
+  '74000000-0000-0000-0000-000000000001',
+  '71000000-0000-0000-0000-000000000005'
+);
+
+select throws_ok(
+  $$
+    select public.set_invitation_application_status(
+      '75000000-0000-0000-0000-000000000002',
+      'selected'
+    )
+  $$,
+  '22023',
+  'Toutes les places ont déjà été attribuées',
+  'Le quota interdit une attribution supplémentaire'
+);
+
+update public.invitation_campaigns
+set status = 'closed'::public.invitation_campaign_status
+where id = '74000000-0000-0000-0000-000000000001';
+
 select is(
   (
     select count(*)
@@ -504,6 +697,16 @@ select set_config(
   'request.jwt.claim.sub',
   '71000000-0000-0000-0000-000000000003',
   true
+);
+
+select is(
+  (
+    select count(*)
+    from public.invitation_campaigns
+    where id = '74000000-0000-0000-0000-000000000001'
+  ),
+  1::bigint,
+  'Le bénévole conserve l’accès à son invitation après la clôture'
 );
 
 select results_eq(

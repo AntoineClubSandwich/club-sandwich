@@ -2,7 +2,10 @@ import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/organizations/data/organization_providers.dart';
 import 'package:club_sandwich/features/organizations/domain/organization.dart';
+import 'package:club_sandwich/shared/utils/error_messages.dart';
+import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class AdministrationScreen extends ConsumerWidget {
@@ -29,20 +32,17 @@ class AdministrationScreen extends ConsumerWidget {
           const Text('Utilisateurs et accès à la plateforme.'),
           const SizedBox(height: 20),
           users.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) => Center(
-              child: FilledButton.icon(
-                onPressed: () => ref.invalidate(managedUsersProvider),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Réessayer'),
-              ),
+            loading: () =>
+                const AppLoadingState(label: 'Chargement des utilisateurs'),
+            error: (_, _) => AppErrorState(
+              message: 'Impossible de charger les utilisateurs.',
+              onRetry: () => ref.invalidate(managedUsersProvider),
             ),
             data: (items) => items.isEmpty
-                ? const Card(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text('Aucun utilisateur.'),
-                    ),
+                ? const AppEmptyState(
+                    title: 'Aucun utilisateur',
+                    message: 'Aucun utilisateur n’est encore enregistré.',
+                    icon: Icons.manage_accounts_outlined,
                   )
                 : LayoutBuilder(
                     builder: (context, constraints) =>
@@ -71,32 +71,106 @@ class AdministrationScreen extends ConsumerWidget {
             .toList(growable: false),
       ),
     );
-    if (draft == null) return;
+    if (draft == null || !context.mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _SendingInvitationDialog(),
+    );
     try {
-      await ref
+      final delivery = await ref
           .read(userAccountRepositoryProvider)
           .inviteUser(
             draft,
             redirectTo: Uri.base.resolve('/activate').toString(),
           );
       ref.invalidate(managedUsersProvider);
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
       if (context.mounted) {
+        if (!delivery.emailSent && delivery.activationUrl != null) {
+          await _showActivationLink(context, delivery.activationUrl!);
+          return;
+        }
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Invitation envoyée.')));
       }
-    } catch (_) {
+    } catch (error) {
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Impossible d’envoyer l’invitation. Vérifiez l’adresse et réessayez.',
+              describeError(
+                error,
+                'Impossible d’envoyer l’invitation. '
+                'Vérifiez l’adresse et réessayez.',
+              ),
             ),
           ),
         );
       }
     }
   }
+
+  Future<void> _showActivationLink(
+    BuildContext context,
+    String activationUrl,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Compte créé'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'La limite temporaire d’envoi d’e-mails est atteinte. '
+              'Transmettez ce lien d’activation au bénévole :',
+            ),
+            const SizedBox(height: 12),
+            SelectableText(activationUrl),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Fermer'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: activationUrl));
+              if (dialogContext.mounted) {
+                Navigator.of(dialogContext).pop();
+              }
+            },
+            icon: const Icon(Icons.copy),
+            label: const Text('Copier le lien'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SendingInvitationDialog extends StatelessWidget {
+  const _SendingInvitationDialog();
+
+  @override
+  Widget build(BuildContext context) => const AlertDialog(
+    content: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox.square(
+          dimension: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        SizedBox(width: 16),
+        Text('Envoi de l’invitation…'),
+      ],
+    ),
+  );
 }
 
 class _UsersTable extends StatelessWidget {
@@ -222,10 +296,12 @@ class _UserActionsState extends ConsumerState<_UserActions> {
           );
       }
       ref.invalidate(managedUsersProvider);
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cette action n’a pas abouti.')),
+          SnackBar(
+            content: Text(describeError(error, 'Cette action n’a pas abouti.')),
+          ),
         );
       }
     } finally {
@@ -271,13 +347,40 @@ class _InviteUserDialogState extends State<_InviteUserDialog> {
   final _email = TextEditingController();
   AppUserRole _role = AppUserRole.volunteer;
   String? _organizationId;
+  bool _organizationAutoMatched = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _email.addListener(_maybeAutoSelectOrganization);
+  }
 
   @override
   void dispose() {
+    _email.removeListener(_maybeAutoSelectOrganization);
     _lastName.dispose();
     _firstName.dispose();
     _email.dispose();
     super.dispose();
+  }
+
+  void _maybeAutoSelectOrganization() {
+    if (_role != AppUserRole.promoter) return;
+    // Only auto-fill: never override an organization the admin picked
+    // themselves, whether or not it came from a previous auto-match.
+    if (_organizationId != null && !_organizationAutoMatched) return;
+    final email = _email.text.trim();
+    Organization? match;
+    for (final organization in widget.organizations) {
+      if (organization.matchesEmailDomain(email)) {
+        match = organization;
+        break;
+      }
+    }
+    setState(() {
+      _organizationId = match?.id;
+      _organizationAutoMatched = match != null;
+    });
   }
 
   @override
@@ -329,17 +432,31 @@ class _InviteUserDialogState extends State<_InviteUserDialog> {
                   child: Text('Tourneur'),
                 ),
               ],
-              onChanged: (value) => setState(() {
-                _role = value!;
-                if (_role != AppUserRole.promoter) _organizationId = null;
-              }),
+              onChanged: (value) {
+                setState(() {
+                  _role = value!;
+                  if (_role != AppUserRole.promoter) {
+                    _organizationId = null;
+                    _organizationAutoMatched = false;
+                  }
+                });
+                if (_role == AppUserRole.promoter) {
+                  _maybeAutoSelectOrganization();
+                }
+              },
             ),
             if (_role == AppUserRole.promoter) ...[
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 key: const ValueKey('invite-organization'),
                 initialValue: _organizationId,
-                decoration: const InputDecoration(labelText: 'Organisation'),
+                decoration: InputDecoration(
+                  labelText: 'Organisation',
+                  helperText: _organizationAutoMatched
+                      ? 'Pré-sélectionnée d’après le domaine de l’adresse '
+                            'e-mail.'
+                      : null,
+                ),
                 items: [
                   for (final organization in widget.organizations)
                     DropdownMenuItem(
@@ -347,7 +464,10 @@ class _InviteUserDialogState extends State<_InviteUserDialog> {
                       child: Text(organization.name),
                     ),
                 ],
-                onChanged: (value) => setState(() => _organizationId = value),
+                onChanged: (value) => setState(() {
+                  _organizationId = value;
+                  _organizationAutoMatched = false;
+                }),
                 validator: (value) => value == null
                     ? 'L’organisation est obligatoire pour un tourneur.'
                     : null,

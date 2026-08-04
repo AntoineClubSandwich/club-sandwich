@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:club_sandwich/core/supabase/supabase_provider.dart';
+import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/concerts/data/concert_repository.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
@@ -11,19 +12,38 @@ final concertRepositoryProvider = Provider<ConcertRepository>(
   (ref) => ConcertRepository(ref.watch(supabaseClientProvider)),
 );
 
-final concertsProvider = FutureProvider<List<Concert>>(
-  (ref) => ref.watch(concertRepositoryProvider).fetchConcerts(),
-);
+final concertsProvider = FutureProvider<List<Concert>>((ref) {
+  ref.watch(authStateProvider);
+  return ref.watch(concertRepositoryProvider).fetchConcerts();
+});
 
-final concertDetailsProvider = FutureProvider.family<Concert?, String>(
-  (ref, concertId) =>
-      ref.watch(concertRepositoryProvider).fetchConcert(concertId),
-);
+final concertDetailsProvider = FutureProvider.family<Concert?, String>((
+  ref,
+  concertId,
+) {
+  ref.watch(authStateProvider);
+  return ref.watch(concertRepositoryProvider).fetchConcert(concertId);
+});
 
 final maraudeOverviewProvider =
-    FutureProvider.autoDispose<List<MaraudeOverview>>(
-      (ref) => ref.watch(concertRepositoryProvider).fetchMaraudeOverview(),
-    );
+    FutureProvider.autoDispose<List<MaraudeOverview>>((ref) {
+      ref.watch(authStateProvider);
+      return ref.watch(concertRepositoryProvider).fetchMaraudeOverview();
+    });
+
+final maraudePhotosProvider = FutureProvider.family<List<MaraudePhoto>, String>(
+  (ref, concertId) {
+    ref.watch(authStateProvider);
+    return ref.watch(concertRepositoryProvider).fetchMaraudePhotos(concertId);
+  },
+);
+
+final maraudePhotoUrlProvider = FutureProvider.family<String, String>((
+  ref,
+  storagePath,
+) {
+  return ref.watch(concertRepositoryProvider).maraudePhotoUrl(storagePath);
+});
 
 enum ConcertViewMode { list, agenda }
 

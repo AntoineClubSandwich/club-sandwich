@@ -9,14 +9,20 @@ readonly FLUTTER_SDK_DIR="${BUILD_CACHE_ROOT}/flutter-${FLUTTER_VERSION}"
 
 mkdir -p "${BUILD_CACHE_ROOT}"
 
-if [[ ! -x "${FLUTTER_SDK_DIR}/bin/flutter" ]]; then
-  if [[ -e "${FLUTTER_SDK_DIR}" ]]; then
-    printf 'Erreur : le cache Flutter existe mais il est incomplet : %s\n' \
-      "${FLUTTER_SDK_DIR}" >&2
-    printf '%s\n' 'Videz uniquement ce dossier de cache puis relancez le build.' >&2
-    exit 1
-  fi
+flutter_cache_is_complete() {
+  [[ -x "${FLUTTER_SDK_DIR}/bin/flutter" ]] &&
+    [[ -f "${FLUTTER_SDK_DIR}/bin/cache/dart-sdk/lib/libraries.json" ]] &&
+    [[ -f "${FLUTTER_SDK_DIR}/bin/cache/dart-sdk/lib/_internal/dart2wasm_platform.dill" ]] &&
+    [[ -f "${FLUTTER_SDK_DIR}/bin/cache/dart-sdk/bin/resources/devtools/version.json" ]]
+}
 
+if [[ -e "${FLUTTER_SDK_DIR}" ]] && ! flutter_cache_is_complete; then
+  printf 'Le cache Flutter %s est incomplet, réinstallation locale.\n' \
+    "${FLUTTER_VERSION}"
+  rm -rf -- "${FLUTTER_SDK_DIR}"
+fi
+
+if [[ ! -x "${FLUTTER_SDK_DIR}/bin/flutter" ]]; then
   clone_root="$(mktemp -d "${BUILD_CACHE_ROOT}/flutter-clone.XXXXXX")"
   cleanup_clone() {
     rm -rf -- "${clone_root}"
@@ -45,6 +51,7 @@ if [[ "${flutter_version_output}" != *"Flutter ${FLUTTER_VERSION} "* ]]; then
   exit 1
 fi
 
+flutter precache --web --no-universal --force
 flutter config --enable-web
 flutter pub get
 

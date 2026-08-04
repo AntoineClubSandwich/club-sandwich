@@ -1,9 +1,8 @@
-import 'dart:async';
-
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/organizations/domain/organization.dart';
-import 'package:club_sandwich/features/venues/data/venue_providers.dart';
 import 'package:club_sandwich/features/venues/domain/venue.dart';
+import 'package:club_sandwich/features/venues/presentation/venue_search_field.dart';
+import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -27,29 +26,26 @@ class ConcertForm extends ConsumerStatefulWidget {
 
 class _ConcertFormState extends ConsumerState<ConcertForm> {
   final _formKey = GlobalKey<FormState>();
-  final _venueFieldKey = GlobalKey<FormFieldState<Venue>>();
   late final TextEditingController _artistController;
-  late final TextEditingController _venueController;
   late final TextEditingController _notesController;
+  late final TextEditingController _cateringContactNameController;
   late final TextEditingController _promoterContactNameController;
   late final TextEditingController _promoterContactPhoneController;
-  Timer? _searchDebounce;
   late DateTime _date;
   TimeOfDay? _cateringClosesAt;
   Venue? _selectedVenue;
   String? _promoterOrganizationId;
-  List<Venue> _venueResults = const [];
-  bool _isSearchingVenues = false;
   bool _isSubmitting = false;
-  String? _venueSearchError;
 
   @override
   void initState() {
     super.initState();
     final concert = widget.initialConcert;
     _artistController = TextEditingController(text: concert?.artist);
-    _venueController = TextEditingController(text: concert?.venueName);
     _notesController = TextEditingController(text: concert?.notes);
+    _cateringContactNameController = TextEditingController(
+      text: concert?.cateringContactName,
+    );
     _promoterContactNameController = TextEditingController(
       text: concert?.promoterContactName,
     );
@@ -64,10 +60,9 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
     _artistController.dispose();
-    _venueController.dispose();
     _notesController.dispose();
+    _cateringContactNameController.dispose();
     _promoterContactNameController.dispose();
     _promoterContactPhoneController.dispose();
     super.dispose();
@@ -138,15 +133,10 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
                   ),
                 ],
                 const SizedBox(height: 16),
-                _VenueField(
-                  fieldKey: _venueFieldKey,
-                  controller: _venueController,
-                  selectedVenue: _selectedVenue,
-                  results: _venueResults,
-                  isSearching: _isSearchingVenues,
-                  searchError: _venueSearchError,
-                  onChanged: _onVenueChanged,
-                  onSelected: _selectVenue,
+                VenueSearchField(
+                  inputKey: const ValueKey('concert-venue-field'),
+                  initialVenue: _selectedVenue,
+                  onChanged: (venue) => setState(() => _selectedVenue = venue),
                 ),
                 if (_selectedVenue != null) ...[
                   const SizedBox(height: 12),
@@ -167,6 +157,15 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
                     alignment: Alignment.centerLeft,
                     child: Text(_formatDate(_date)),
                   ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  key: const ValueKey('concert-catering-name-field'),
+                  controller: _cateringContactNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nom du catering (optionnel)',
+                  ),
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -256,71 +255,6 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
     );
   }
 
-  void _onVenueChanged(String value) {
-    if (_selectedVenue?.name != value) {
-      _selectedVenue = null;
-      _venueFieldKey.currentState?.didChange(null);
-    }
-    _scheduleVenueSearch(value);
-    setState(() {});
-  }
-
-  void _selectVenue(Venue venue) {
-    _searchDebounce?.cancel();
-    setState(() {
-      _selectedVenue = venue;
-      _venueController.text = venue.name;
-      _venueResults = const [];
-      _venueSearchError = null;
-    });
-    _venueFieldKey.currentState?.didChange(venue);
-  }
-
-  void _scheduleVenueSearch(String query) {
-    _searchDebounce?.cancel();
-    final normalizedQuery = query.trim();
-    if (normalizedQuery.length < 2) {
-      setState(() {
-        _venueResults = const [];
-        _venueSearchError = null;
-        _isSearchingVenues = false;
-      });
-      return;
-    }
-    _searchDebounce = Timer(
-      const Duration(milliseconds: 250),
-      () => _searchVenues(normalizedQuery),
-    );
-  }
-
-  Future<void> _searchVenues(String query) async {
-    setState(() {
-      _isSearchingVenues = true;
-      _venueSearchError = null;
-    });
-    try {
-      final results = await ref
-          .read(venueRepositoryProvider)
-          .searchActiveVenues(query);
-      if (!mounted ||
-          _selectedVenue != null ||
-          _venueController.text.trim() != query) {
-        return;
-      }
-      setState(() => _venueResults = results);
-    } on Exception {
-      if (!mounted || _venueController.text.trim() != query) return;
-      setState(() {
-        _venueResults = const [];
-        _venueSearchError = 'Impossible de rechercher les salles.';
-      });
-    } finally {
-      if (mounted && _venueController.text.trim() == query) {
-        setState(() => _isSearchingVenues = false);
-      }
-    }
-  }
-
   Future<void> _selectDate() async {
     final selected = await showDatePicker(
       context: context,
@@ -355,6 +289,9 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
           date: _date,
           venueId: venue.id,
           promoterOrganizationId: _promoterOrganizationId,
+          cateringContactName: _optionalValue(
+            _cateringContactNameController.text,
+          ),
           cateringClosesAt: _cateringClosesAt == null
               ? null
               : _timeToDatabase(_cateringClosesAt!),
@@ -368,103 +305,22 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
         ),
       );
       if (mounted) Navigator.of(context).pop(true);
-    } on Exception {
+    } catch (error) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            widget.isEditing
-                ? 'Impossible d’enregistrer les modifications.'
-                : 'Impossible d’ouvrir la maraude.',
+            describeError(
+              error,
+              widget.isEditing
+                  ? 'Impossible d’enregistrer les modifications.'
+                  : 'Impossible d’ouvrir la maraude.',
+            ),
           ),
         ),
       );
     }
-  }
-}
-
-class _VenueField extends StatelessWidget {
-  const _VenueField({
-    required this.fieldKey,
-    required this.controller,
-    required this.selectedVenue,
-    required this.results,
-    required this.isSearching,
-    required this.searchError,
-    required this.onChanged,
-    required this.onSelected,
-  });
-
-  final GlobalKey<FormFieldState<Venue>> fieldKey;
-  final TextEditingController controller;
-  final Venue? selectedVenue;
-  final List<Venue> results;
-  final bool isSearching;
-  final String? searchError;
-  final ValueChanged<String> onChanged;
-  final ValueChanged<Venue> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return FormField<Venue>(
-      key: fieldKey,
-      initialValue: selectedVenue,
-      validator: (value) => value == null ? 'Ce champ est requis.' : null,
-      builder: (field) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            key: const ValueKey('concert-venue-field'),
-            controller: controller,
-            textInputAction: TextInputAction.next,
-            decoration: InputDecoration(
-              labelText: 'Salle',
-              hintText: 'Saisissez au moins 2 caractères',
-              errorText: field.errorText,
-              suffixIcon: isSearching
-                  ? const Padding(
-                      padding: EdgeInsets.all(14),
-                      child: SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : const Icon(Icons.search),
-            ),
-            onChanged: onChanged,
-          ),
-          if (searchError != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                searchError!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ),
-          if (results.isNotEmpty)
-            Card(
-              margin: const EdgeInsets.only(top: 4),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 240),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: results.length,
-                  itemBuilder: (context, index) {
-                    final venue = results[index];
-                    return ListTile(
-                      dense: true,
-                      title: Text(venue.name),
-                      subtitle: Text(venue.formattedAddress),
-                      onTap: () => onSelected(venue),
-                    );
-                  },
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
   }
 }
 

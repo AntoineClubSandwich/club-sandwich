@@ -51,6 +51,11 @@ values
     '30000000-0000-0000-0000-000000000003',
     'team-admin@example.test',
     '{"first_name":"Admin","last_name":"Equipe"}'::jsonb
+  ),
+  (
+    '30000000-0000-0000-0000-000000000004',
+    'team-volunteer-three@example.test',
+    '{"first_name":"Nour","last_name":"Petit"}'::jsonb
   );
 
 insert into public.memberships (
@@ -76,9 +81,35 @@ cross join (
     (
       '30000000-0000-0000-0000-000000000003'::uuid,
       'admin'
+    ),
+    (
+      '30000000-0000-0000-0000-000000000004'::uuid,
+      'volunteer'
     )
 ) as member_data(profile_id, role)
 where o.slug = 'club-sandwich';
+
+insert into public.volunteer_documents (
+  user_id, document_type, storage_path, status, reviewed_by, reviewed_at
+)
+select
+  volunteer.profile_id,
+  document_type.value,
+  'seed/' || volunteer.profile_id || '/' || document_type.value,
+  'approved'::public.volunteer_document_status,
+  '30000000-0000-0000-0000-000000000003'::uuid,
+  now()
+from (
+  values
+    ('30000000-0000-0000-0000-000000000001'::uuid),
+    ('30000000-0000-0000-0000-000000000002'::uuid),
+    ('30000000-0000-0000-0000-000000000004'::uuid)
+) as volunteer(profile_id)
+cross join (
+  values
+    ('identity'::public.volunteer_document_type),
+    ('social_security'::public.volunteer_document_type)
+) as document_type(value);
 
 insert into public.concerts (
   id,
@@ -128,6 +159,12 @@ values
     '40000000-0000-0000-0000-000000000001',
     '30000000-0000-0000-0000-000000000003',
     'selected'
+  ),
+  (
+    '50000000-0000-0000-0000-000000000004',
+    '40000000-0000-0000-0000-000000000001',
+    '30000000-0000-0000-0000-000000000004',
+    'pending'
   );
 
 select results_eq(
@@ -175,27 +212,71 @@ select results_eq(
 
 select lives_ok(
   $$
-    update public.concert_volunteers
-    set team_role = 'team_leader'
-    where id = '50000000-0000-0000-0000-000000000001'
+    select public.save_maraude_team(
+      '40000000-0000-0000-0000-000000000001',
+      '[
+        {
+          "application_id": "50000000-0000-0000-0000-000000000001",
+          "team_role": "team_leader"
+        },
+        {
+          "application_id": "50000000-0000-0000-0000-000000000002",
+          "team_role": "collection_distribution"
+        },
+        {
+          "application_id": "50000000-0000-0000-0000-000000000004",
+          "team_role": "logistics"
+        }
+      ]'::jsonb
+    )
   $$,
   'Un administrateur peut désigner un chef d’équipe'
 );
 
-select lives_ok(
+select throws_ok(
   $$
-    update public.concert_volunteers
-    set team_role = 'team_leader'
-    where id = '50000000-0000-0000-0000-000000000002'
+    select public.save_maraude_team(
+      '40000000-0000-0000-0000-000000000001',
+      '[
+        {
+          "application_id": "50000000-0000-0000-0000-000000000001",
+          "team_role": "team_leader"
+        },
+        {
+          "application_id": "50000000-0000-0000-0000-000000000002",
+          "team_role": "team_leader"
+        },
+        {
+          "application_id": "50000000-0000-0000-0000-000000000004",
+          "team_role": "logistics"
+        }
+      ]'::jsonb
+    )
   $$,
-  'Un concert peut avoir plusieurs chefs d’équipe'
+  '23505',
+  'Un seul chef d''équipe est autorisé',
+  'Un concert ne peut avoir qu’un chef d’équipe'
 );
 
 select lives_ok(
   $$
-    update public.concert_volunteers
-    set team_role = 'logistics'
-    where id = '50000000-0000-0000-0000-000000000002'
+    select public.save_maraude_team(
+      '40000000-0000-0000-0000-000000000001',
+      '[
+        {
+          "application_id": "50000000-0000-0000-0000-000000000001",
+          "team_role": "team_leader"
+        },
+        {
+          "application_id": "50000000-0000-0000-0000-000000000002",
+          "team_role": "logistics"
+        },
+        {
+          "application_id": "50000000-0000-0000-0000-000000000004",
+          "team_role": "collection_distribution"
+        }
+      ]'::jsonb
+    )
   $$,
   'Un administrateur peut désigner un responsable logistique'
 );
@@ -224,7 +305,7 @@ select throws_ok(
     where id = '50000000-0000-0000-0000-000000000001'
   $$,
   '42501',
-  'new row violates row-level security policy for table "concert_volunteers"',
+  'permission denied for table concert_volunteers',
   'Un bénévole ne peut pas modifier son rôle'
 );
 
@@ -261,7 +342,10 @@ select lives_ok(
   $$
     update public.concert_volunteers
     set status = 'not_selected'
-    where id = '50000000-0000-0000-0000-000000000002'
+    where id in (
+      '50000000-0000-0000-0000-000000000002',
+      '50000000-0000-0000-0000-000000000004'
+    )
   $$,
   'Un administrateur peut ne pas sélectionner un bénévole'
 );
@@ -270,11 +354,14 @@ select results_eq(
   $$
     select count(*)::bigint
     from public.concert_volunteers
-    where id = '50000000-0000-0000-0000-000000000002'
-      and status = 'not_selected'
-      and team_role is null
+    where id in (
+      '50000000-0000-0000-0000-000000000002',
+      '50000000-0000-0000-0000-000000000004'
+    )
+    and status = 'not_selected'
+    and team_role is null
   $$,
-  array[1::bigint],
+  array[2::bigint],
   'La non-sélection retire automatiquement le rôle'
 );
 

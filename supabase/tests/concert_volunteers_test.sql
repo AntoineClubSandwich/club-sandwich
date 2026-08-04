@@ -410,8 +410,8 @@ select results_eq(
     select count(*)::bigint
     from public.volunteer_profiles
   $$,
-  array[2::bigint],
-  'Un administrateur voit les profils bénévoles des candidats'
+  array[3::bigint],
+  'Un administrateur voit les profils bénévoles gérés'
 );
 
 select results_eq(
@@ -420,8 +420,8 @@ select results_eq(
     from public.volunteer_profiles
     where user_id = '10000000-0000-0000-0000-000000000004'
   $$,
-  array[0::bigint],
-  'Un administrateur ne voit pas un profil sans candidature'
+  array[1::bigint],
+  'Un administrateur voit aussi un profil sans candidature'
 );
 
 select lives_ok(

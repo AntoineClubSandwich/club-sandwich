@@ -54,6 +54,11 @@ values
     'a0000000-0000-0000-0000-000000000003',
     'collection-admin@example.test',
     '{"first_name":"Admin","last_name":"Collecte"}'::jsonb
+  ),
+  (
+    'a0000000-0000-0000-0000-000000000004',
+    'collection-member2@example.test',
+    '{"first_name":"Nour","last_name":"Petit"}'::jsonb
   );
 
 insert into public.memberships (
@@ -79,6 +84,10 @@ cross join (
     (
       'a0000000-0000-0000-0000-000000000003'::uuid,
       'admin'
+    ),
+    (
+      'a0000000-0000-0000-0000-000000000004'::uuid,
+      'volunteer'
     )
 ) as member_data(profile_id, role)
 where o.slug = 'club-sandwich';
@@ -119,6 +128,70 @@ values (
   'selected',
   'present'
 );
+
+update public.concert_volunteers
+set team_role = 'collection_distribution'
+where concert_id = 'a1000000-0000-0000-0000-000000000001';
+
+update public.concert_volunteers
+set
+  role_acknowledged_at = clock_timestamp(),
+  confirmation_status = 'confirmed'
+where concert_id = 'a1000000-0000-0000-0000-000000000001';
+
+update public.concert_volunteers
+set attendance_status = 'present'
+where concert_id = 'a1000000-0000-0000-0000-000000000001';
+
+insert into public.concert_volunteers (
+  concert_id,
+  user_id,
+  status,
+  team_role
+)
+values (
+  'a1000000-0000-0000-0000-000000000001',
+  'a0000000-0000-0000-0000-000000000003',
+  'selected',
+  'team_leader'
+);
+
+update public.concert_volunteers
+set
+  role_acknowledged_at = clock_timestamp(),
+  confirmation_status = 'confirmed'
+where concert_id = 'a1000000-0000-0000-0000-000000000001'
+  and user_id = 'a0000000-0000-0000-0000-000000000003';
+
+update public.concert_volunteers
+set attendance_status = 'present'
+where concert_id = 'a1000000-0000-0000-0000-000000000001'
+  and user_id = 'a0000000-0000-0000-0000-000000000003';
+
+insert into public.concert_volunteers (
+  concert_id,
+  user_id,
+  status,
+  team_role
+)
+values (
+  'a1000000-0000-0000-0000-000000000001',
+  'a0000000-0000-0000-0000-000000000004',
+  'selected',
+  'logistics'
+);
+
+update public.concert_volunteers
+set
+  role_acknowledged_at = clock_timestamp(),
+  confirmation_status = 'confirmed'
+where concert_id = 'a1000000-0000-0000-0000-000000000001'
+  and user_id = 'a0000000-0000-0000-0000-000000000004';
+
+update public.concert_volunteers
+set attendance_status = 'present'
+where concert_id = 'a1000000-0000-0000-0000-000000000001'
+  and user_id = 'a0000000-0000-0000-0000-000000000004';
 
 set local role authenticated;
 select set_config(
@@ -408,7 +481,7 @@ select lives_ok(
   'L’administrateur termine la maraude'
 );
 
-select throws_ok(
+select lives_ok(
   $$
     insert into public.maraude_collections (
       concert_id,
@@ -423,9 +496,7 @@ select throws_ok(
       'crate'
     )
   $$,
-  '22023',
-  'La collecte est modifiable uniquement pendant la maraude',
-  'La création est refusée après la clôture'
+  'Un administrateur peut ajouter une correction après la clôture'
 );
 
 select lives_ok(
@@ -434,7 +505,7 @@ select lives_ok(
     set quantity = 31
     where id = 'a2000000-0000-0000-0000-000000000001'
   $$,
-  'La RLS filtre la modification administrateur après la clôture'
+  'Un administrateur corrige un lot après la clôture'
 );
 
 select lives_ok(
@@ -442,41 +513,42 @@ select lives_ok(
     delete from public.maraude_collections
     where id = 'a2000000-0000-0000-0000-000000000001'
   $$,
-  'La RLS filtre la suppression administrateur après la clôture'
+  'Un administrateur supprime un lot après la clôture'
 );
 
 select results_eq(
   $$
     select count(*)::bigint
     from public.maraude_collections
-    where id = 'a2000000-0000-0000-0000-000000000001'
-      and quantity = 30
+    where concert_id = 'a1000000-0000-0000-0000-000000000001'
+      and category = 'dairy'
   $$,
   array[1::bigint],
-  'La collecte terminée reste lisible et inchangée'
+  'La correction ajoutée après clôture reste lisible'
 );
 
 reset role;
+select set_config('request.jwt.claim.sub', '', true);
 
 select throws_ok(
   $$
     update public.maraude_collections
     set quantity = 31
-    where id = 'a2000000-0000-0000-0000-000000000001'
+    where concert_id = 'a1000000-0000-0000-0000-000000000001'
   $$,
   '22023',
-  'La collecte est modifiable uniquement pendant la maraude',
-  'Le trigger interdit toute modification après la clôture'
+  'La collecte n’est plus modifiable',
+  'Le trigger interdit une modification anonyme après la clôture'
 );
 
 select throws_ok(
   $$
     delete from public.maraude_collections
-    where id = 'a2000000-0000-0000-0000-000000000001'
+    where concert_id = 'a1000000-0000-0000-0000-000000000001'
   $$,
   '22023',
-  'La collecte est modifiable uniquement pendant la maraude',
-  'Le trigger interdit toute suppression après la clôture'
+  'La collecte n’est plus modifiable',
+  'Le trigger interdit une suppression anonyme après la clôture'
 );
 
 select * from finish();

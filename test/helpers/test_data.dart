@@ -1,4 +1,5 @@
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
+import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
 import 'package:club_sandwich/features/collections/domain/maraude_collection.dart';
 import 'package:club_sandwich/features/distributions/domain/maraude_distribution.dart';
 import 'package:club_sandwich/features/venues/domain/venue.dart';
@@ -23,6 +24,7 @@ Concert buildConcert({
   DateTime? actualStartAt,
   DateTime? actualEndAt,
   String? closingComment,
+  MaraudeOperationalReport? operationalReport,
   List<MaraudeCollection> collections = const [],
   MaraudeDistribution? distribution,
   int selectedVolunteerCount = 0,
@@ -38,6 +40,7 @@ Concert buildConcert({
     actualStartAt: actualStartAt,
     actualEndAt: actualEndAt,
     closingComment: closingComment,
+    operationalReport: operationalReport,
     collections: collections,
     distribution: distribution,
     createdBy: 'profile-id',

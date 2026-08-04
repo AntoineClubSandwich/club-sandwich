@@ -79,6 +79,7 @@ void main() {
 
     expect(find.text('Aucune maraude'), findsOneWidget);
     expect(find.text('Ouvrez votre première maraude.'), findsOneWidget);
+    expect(find.text('Nouvelle maraude'), findsNothing);
 
     await tester.tap(find.text('Ouvrir une maraude'));
     await tester.pumpAndSettle();
@@ -212,10 +213,9 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Contact catering'), findsNothing);
-    expect(find.byKey(const ValueKey('catering-contact-name')), findsNothing);
     expect(find.byKey(const ValueKey('catering-contact-phone')), findsNothing);
     expect(find.byKey(const ValueKey('catering-contact-email')), findsNothing);
-    expect(find.text('Alex'), findsNothing);
+    expect(_fieldText(tester, 'concert-catering-name-field'), 'Alex');
   });
 
   testWidgets('valide uniquement les champs obligatoires du formulaire', (
@@ -349,7 +349,7 @@ void main() {
     expect(repository.createdDraft?.venueId, testVenue.id);
     expect(repository.createdDraft?.promoterContactName, 'Camille Martin');
     expect(repository.createdDraft?.promoterContactPhone, '06 00 00 00 00');
-    expect(find.text('Concert créé.'), findsOneWidget);
+    expect(find.text('Maraude créée.'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -429,14 +429,21 @@ void main() {
     expect(repository.updatedConcertId, 'concert-id');
     expect(repository.updatedDraft?.artist, 'Artiste modifié');
     expect(repository.updatedDraft?.venueId, testVenue.id);
-    expect(find.text('Concert modifié.'), findsOneWidget);
+    expect(find.text('Maraude modifiée.'), findsOneWidget);
   });
 
   testWidgets('confirme puis supprime un concert', (tester) async {
     final repository = _FakeConcertRepository();
-    await pumpConcerts(tester, [
-      buildConcert(id: 'concert-id'),
-    ], concertRepository: repository);
+    await pumpConcerts(
+      tester,
+      [buildConcert(id: 'concert-id')],
+      concertRepository: repository,
+      userContext: const CurrentUserContext(
+        profileId: 'admin-profile-id',
+        role: AppUserRole.admin,
+        status: UserAccountStatus.active,
+      ),
+    );
 
     await tester.tap(find.byTooltip('Actions'));
     await tester.pumpAndSettle();
@@ -448,7 +455,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.deletedConcertId, 'concert-id');
-    expect(find.text('Concert supprimé.'), findsOneWidget);
+    expect(find.text('Maraude supprimée.'), findsOneWidget);
+  });
+
+  testWidgets('le tourneur peut modifier sans voir la suppression', (
+    tester,
+  ) async {
+    await pumpConcerts(tester, [buildConcert(id: 'concert-id')]);
+
+    await tester.tap(find.byTooltip('Actions'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Modifier'), findsOneWidget);
+    expect(find.text('Supprimer'), findsNothing);
   });
 
   testWidgets('affiche l’agenda et ouvre un concert du calendrier', (
@@ -471,7 +490,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('month-agenda')), findsOneWidget);
     expect(find.text('Artiste agenda'), findsOneWidget);
-    expect(find.text('3/4 bénévoles'), findsOneWidget);
+    expect(find.text('3/3 bénévoles'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('agenda-concert-agenda-id')));
     await tester.pumpAndSettle();
@@ -581,6 +600,72 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('VICTOR'), findsOneWidget);
     expect(find.text('Autre artiste'), findsNothing);
+  });
+
+  testWidgets('combine salle, organisation, contact et statuts puis efface', (
+    tester,
+  ) async {
+    await pumpConcerts(tester, [
+      buildConcert(
+        id: 'matching',
+        artist: 'Artiste correspondant',
+        venue: testVenue,
+        promoterOrganizationName: 'Organisation Alpha',
+        promoterContactName: 'Camille Martin',
+        status: ConcertStatus.confirmed,
+        maraudeStatus: MaraudeStatus.open,
+      ),
+      buildConcert(
+        id: 'other',
+        artist: 'Autre artiste',
+        venue: const Venue(
+          id: 'other-venue',
+          name: 'Olympia',
+          city: 'Paris',
+          postalCode: '75009',
+          publicAddressLine1: '28 boulevard des Capucines',
+        ),
+        promoterOrganizationName: 'Organisation Beta',
+        promoterContactName: 'Autre contact',
+        status: ConcertStatus.planned,
+        maraudeStatus: MaraudeStatus.draft,
+      ),
+    ]);
+
+    await tester.tap(find.text('Filtres'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('concert-filter-venue')),
+      'pleyel',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('concert-filter-producer')),
+      'alpha',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('concert-filter-promoter')),
+      'camille',
+    );
+    await tester.tap(find.byKey(const ValueKey('concert-filter-status')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirmé').last);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('concert-filter-maraude')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('concert-filter-maraude')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Planifiée').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Artiste correspondant'), findsOneWidget);
+    expect(find.text('Autre artiste'), findsNothing);
+
+    await tester.tap(find.text('Effacer les filtres'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Artiste correspondant'), findsOneWidget);
+    expect(find.text('Autre artiste'), findsOneWidget);
   });
 }
 

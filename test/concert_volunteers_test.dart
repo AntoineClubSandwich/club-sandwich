@@ -1,7 +1,9 @@
 import 'dart:convert';
 
+import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
+import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_repository.dart';
@@ -78,6 +80,14 @@ void main() {
         'withdrawn_applications': 1,
         'team_role': 'logistics',
         'attendance_status': 'present',
+        'confirmation_status': 'confirmed',
+        'confirmation_requested_at': '2026-07-20T10:00:00.000Z',
+        'confirmation_due_at': '2026-07-21T10:00:00.000Z',
+        'confirmation_responded_at': '2026-07-20T11:00:00.000Z',
+        'role_acknowledged_at': '2026-07-20T11:00:00.000Z',
+        'attendance_validated_at': '2026-07-20T12:00:00.000Z',
+        'attendance_validated_by': 'admin-id',
+        'last_modified_by': 'leader-id',
         'last_selected_date': '2026-07-15',
         'history': [
           {
@@ -111,8 +121,20 @@ void main() {
       expect(application.statistics.history.last.artist, 'Aupinard');
       expect(application.teamRole, MaraudeRole.logistics);
       expect(application.attendanceStatus, VolunteerAttendanceStatus.present);
+      expect(
+        application.confirmationStatus,
+        VolunteerConfirmationStatus.confirmed,
+      );
+      expect(
+        application.confirmationRespondedAt,
+        DateTime.utc(2026, 7, 20, 11),
+      );
+      expect(application.confirmationDueAt, DateTime.utc(2026, 7, 21, 10));
+      expect(application.roleAcknowledgedAt, DateTime.utc(2026, 7, 20, 11));
+      expect(application.attendanceValidatedBy, 'admin-id');
       expect(application.toJson()['team_role'], 'logistics');
       expect(application.toJson()['attendance_status'], 'present');
+      expect(application.toJson()['confirmation_status'], 'confirmed');
       expect(application.profile!.toJson()['birth_date'], '1992-04-12');
       expect(MaraudeRole.communication.label, 'Chargé.e de communication');
       expect(
@@ -151,6 +173,11 @@ void main() {
       final counts = TeamAttendanceCounts.fromApplications([
         _application(status: ConcertVolunteerStatus.pending),
         _application(
+          id: 'confirmation-pending',
+          status: ConcertVolunteerStatus.selected,
+          confirmationStatus: VolunteerConfirmationStatus.pending,
+        ),
+        _application(
           id: 'legacy-selected',
           status: ConcertVolunteerStatus.selected,
         ),
@@ -171,6 +198,43 @@ void main() {
       expect(counts.presentCount, 1);
       expect(counts.absentCount, 1);
     });
+
+    test('parse et synthétise les présences préchargées', () {
+      final data = MaraudeAttendanceData([
+        MaraudeAttendanceMember.fromJson({
+          'application_id': 'first',
+          'user_id': 'first-user',
+          'display_name': 'Camille Martin',
+          'team_role': 'team_leader',
+          'confirmation_status': 'confirmed',
+          'attendance_status': 'present',
+          'attendance_validated_at': '2026-07-25T22:00:00.000Z',
+          'attendance_validated_by': 'admin-id',
+          'last_modified_at': '2026-07-25T21:00:00.000Z',
+          'last_modified_by_name': 'Antoine',
+          'can_validate': true,
+        }),
+        MaraudeAttendanceMember.fromJson({
+          'application_id': 'second',
+          'user_id': 'second-user',
+          'display_name': 'Hugo Durand',
+          'team_role': null,
+          'confirmation_status': 'confirmed',
+          'attendance_status': 'absent',
+          'attendance_validated_at': '2026-07-25T22:00:00.000Z',
+          'attendance_validated_by': 'admin-id',
+          'last_modified_at': '2026-07-25T21:05:00.000Z',
+          'can_validate': true,
+        }),
+      ]);
+
+      expect(data.presentCount, 1);
+      expect(data.absentCount, 1);
+      expect(data.pendingCount, 0);
+      expect(data.canValidate, isTrue);
+      expect(data.isValidated, isTrue);
+      expect(data.members.last.teamRole, isNull);
+    });
   });
 
   group('ConcertVolunteerRepository', () {
@@ -181,6 +245,9 @@ void main() {
         final client = await _authenticatedClient((request) async {
           requests.add(request);
           final path = request.url.path;
+          if (path.endsWith('/expire_volunteer_confirmations')) {
+            return Response('0', 200, headers: _jsonHeaders, request: request);
+          }
           if (path.endsWith('/get_concert_volunteer_counts')) {
             return Response(
               jsonEncode([
@@ -248,6 +315,21 @@ void main() {
               request: request,
             );
           }
+          if (path.endsWith('/concert_volunteers')) {
+            return Response(
+              jsonEncode([
+                {
+                  'id': 'application-id',
+                  'confirmation_status': 'confirmed',
+                  'confirmation_requested_at': '2026-07-25T10:00:00.000Z',
+                  'confirmation_responded_at': '2026-07-25T10:05:00.000Z',
+                },
+              ]),
+              200,
+              headers: _jsonHeaders,
+              request: request,
+            );
+          }
           return Response('Not found', 404, request: request);
         });
         addTearDown(client.dispose);
@@ -267,7 +349,7 @@ void main() {
           section.applications.single.attendanceStatus,
           VolunteerAttendanceStatus.present,
         );
-        expect(requests, hasLength(4));
+        expect(requests, hasLength(6));
         expect(
           requests
               .where(
@@ -288,6 +370,9 @@ void main() {
         final client = await _authenticatedClient((request) async {
           requests.add(request);
           final path = request.url.path;
+          if (path.endsWith('/expire_volunteer_confirmations')) {
+            return Response('0', 200, headers: _jsonHeaders, request: request);
+          }
           if (path.endsWith('/get_concert_volunteer_counts')) {
             return Response(
               jsonEncode([
@@ -388,12 +473,7 @@ void main() {
             expect(body['concert_id'], 'concert-id');
             expect(body['user_id'], 'user-id');
             expect(body['status'], 'pending');
-            return Response(
-              jsonEncode(_applicationJson()),
-              201,
-              headers: _jsonHeaders,
-              request: request,
-            );
+            return Response('', 201, request: request);
           }
           return Response(
             jsonEncode({
@@ -410,9 +490,8 @@ void main() {
         addTearDown(client.dispose);
         final repository = ConcertVolunteerRepository(client);
 
-        final created = await repository.apply('concert-id');
+        await repository.apply('concert-id');
 
-        expect(created.status, ConcertVolunteerStatus.pending);
         expect(
           repository.apply('concert-id'),
           throwsA(isA<PostgrestException>()),
@@ -452,6 +531,31 @@ void main() {
         'requested_concert_id': 'concert-id',
       });
     });
+
+    test(
+      'confirme explicitement la participation sélectionnée par RPC',
+      () async {
+        late Request capturedRequest;
+        final client = await _authenticatedClient((request) async {
+          capturedRequest = request;
+          return Response('null', 200, headers: _jsonHeaders, request: request);
+        });
+        addTearDown(client.dispose);
+
+        await ConcertVolunteerRepository(
+          client,
+        ).confirmParticipation('concert-id', roleAcknowledged: true);
+
+        expect(
+          capturedRequest.url.path,
+          endsWith('/rpc/confirm_concert_participation'),
+        );
+        expect(jsonDecode(capturedRequest.body), {
+          'requested_concert_id': 'concert-id',
+          'requested_role_acknowledged': true,
+        });
+      },
+    );
 
     test(
       'limite le changement administrateur aux deux statuts prévus',
@@ -561,16 +665,69 @@ void main() {
       }
 
       expect(requests.map((request) => jsonDecode(request.body)), [
-        {'attendance_status': 'pending'},
-        {'attendance_status': 'present'},
-        {'attendance_status': 'absent'},
+        {
+          'requested_application_id': 'application-id',
+          'requested_status': 'pending',
+        },
+        {
+          'requested_application_id': 'application-id',
+          'requested_status': 'present',
+        },
+        {
+          'requested_application_id': 'application-id',
+          'requested_status': 'absent',
+        },
       ]);
       expect(
         requests.every(
-          (request) => request.url.queryParameters['id'] == 'eq.application-id',
+          (request) =>
+              request.url.path.endsWith('/rpc/set_volunteer_attendance'),
         ),
         isTrue,
       );
+    });
+
+    test('précharge, valide les présences et lit les crédits', () async {
+      final client = await _authenticatedClient((request) async {
+        final path = request.url.path;
+        if (path.endsWith('/get_maraude_attendance')) {
+          return Response(
+            jsonEncode([
+              {
+                'application_id': 'application-id',
+                'user_id': 'volunteer-id',
+                'display_name': 'Camille Martin',
+                'team_role': 'team_leader',
+                'confirmation_status': 'confirmed',
+                'attendance_status': 'present',
+                'attendance_validated_at': null,
+                'attendance_validated_by': null,
+                'last_modified_at': '2026-07-25T21:00:00.000Z',
+                'last_modified_by_name': 'Antoine',
+                'can_validate': true,
+              },
+            ]),
+            200,
+            headers: _jsonHeaders,
+            request: request,
+          );
+        }
+        if (path.endsWith('/validate_maraude_attendance')) {
+          return Response('1', 200, headers: _jsonHeaders, request: request);
+        }
+        if (path.endsWith('/get_my_volunteer_credit_count')) {
+          return Response('3', 200, headers: _jsonHeaders, request: request);
+        }
+        return Response('Not found', 404, request: request);
+      });
+      addTearDown(client.dispose);
+      final repository = ConcertVolunteerRepository(client);
+
+      final attendance = await repository.fetchAttendance('concert-id');
+
+      expect(attendance.presentCount, 1);
+      expect(await repository.validateAttendance('concert-id'), 1);
+      expect(await repository.fetchCreditCount(), 3);
     });
   });
 
@@ -616,6 +773,66 @@ void main() {
     expect(repository.fetchCount, greaterThanOrEqualTo(2));
   });
 
+  testWidgets('masque les détails techniques d’une erreur de candidature', (
+    tester,
+  ) async {
+    final repository = _FakeConcertVolunteerRepository(
+      applyError: const PostgrestException(
+        message: 'duplicate key value violates unique constraint',
+        code: '23505',
+      ),
+    );
+    await _pumpDetail(tester, repository);
+
+    await tester.ensureVisible(find.text('Je me propose'));
+    await tester.tap(find.text('Je me propose'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Impossible d’enregistrer votre candidature. Veuillez réessayer.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('duplicate key value violates unique constraint'),
+      findsNothing,
+    );
+    expect(find.text('Je me propose'), findsOneWidget);
+  });
+
+  testWidgets('affiche les candidatures déposées sans donnée personnelle', (
+    tester,
+  ) async {
+    final repository = _FakeConcertVolunteerRepository(
+      ownApplication: _application(),
+      roster: const [
+        ConcertVolunteerRosterEntry(
+          id: 'roster-selected',
+          userId: 'other-user-id',
+          status: ConcertVolunteerStatus.selected,
+          teamRole: MaraudeRole.logistics,
+          firstName: 'Alex',
+          lastName: 'Un',
+        ),
+        ConcertVolunteerRosterEntry(
+          id: 'roster-pending',
+          userId: 'third-user-id',
+          status: ConcertVolunteerStatus.pending,
+          firstName: 'Blaise',
+          lastName: 'Deux',
+        ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
+
+    expect(find.text('Qui s’est déjà positionné'), findsOneWidget);
+    expect(find.text('Déjà sélectionnés'), findsOneWidget);
+    expect(find.text('Alex Un — Chargé.e de logistique'), findsOneWidget);
+    expect(find.text('Candidatures en attente'), findsOneWidget);
+    expect(find.text('Blaise Deux'), findsOneWidget);
+  });
+
   testWidgets('conserve la ligne lors du désistement', (tester) async {
     final repository = _FakeConcertVolunteerRepository(
       ownApplication: _application(),
@@ -635,6 +852,47 @@ void main() {
     expect(repository.ownApplication!.status, ConcertVolunteerStatus.withdrawn);
   });
 
+  testWidgets('un bénévole sélectionné confirme sa participation', (
+    tester,
+  ) async {
+    final repository = _FakeConcertVolunteerRepository(
+      ownApplication: _application(
+        status: ConcertVolunteerStatus.selected,
+        confirmationStatus: VolunteerConfirmationStatus.pending,
+        teamRole: MaraudeRole.collectionDistribution,
+      ),
+    );
+    await _pumpDetail(tester, repository);
+
+    expect(find.text('Confirmation demandée'), findsOneWidget);
+    expect(find.text('Je confirme ma participation'), findsOneWidget);
+    expect(find.text('Je ne suis plus disponible'), findsOneWidget);
+    expect(find.textContaining('Présence :'), findsNothing);
+
+    await tester.ensureVisible(find.text('Je confirme ma participation'));
+    await tester.tap(find.text('Je confirme ma participation'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Fiche de mission'), findsOneWidget);
+    final confirmationButton = find.byKey(
+      const ValueKey('submit-participation-confirmation'),
+    );
+    expect(tester.widget<FilledButton>(confirmationButton).onPressed, isNull);
+    await tester.tap(find.byKey(const ValueKey('acknowledge-mission-role')));
+    await tester.pump();
+    expect(
+      tester.widget<FilledButton>(confirmationButton).onPressed,
+      isNotNull,
+    );
+    await tester.tap(confirmationButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Participation confirmée'), findsOneWidget);
+    expect(find.textContaining('Présence :'), findsOneWidget);
+    expect(find.text('Je me désiste'), findsOneWidget);
+    expect(find.text('Participation confirmée.'), findsOneWidget);
+  });
+
   testWidgets('permet un nouveau positionnement après un désistement', (
     tester,
   ) async {
@@ -650,10 +908,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.ownApplication?.status, ConcertVolunteerStatus.pending);
-    expect(find.text('Votre disponibilité a été transmise.'), findsOneWidget);
+    expect(find.text('Disponibilité transmise.'), findsOneWidget);
   });
 
-  testWidgets('le bénévole ouvre son propre historique', (tester) async {
+  testWidgets('le bénévole agit sans passer par son profil', (tester) async {
     final repository = _FakeConcertVolunteerRepository(
       ownApplication: _application(
         status: ConcertVolunteerStatus.selected,
@@ -678,15 +936,43 @@ void main() {
     );
     await _pumpDetail(tester, repository);
 
-    await tester.ensureVisible(find.text('Voir mon profil'));
-    await tester.tap(find.text('Voir mon profil'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Historique des maraudes'), findsOneWidget);
-    expect(find.text('The Blaze'), findsOneWidget);
-    expect(find.text('Olympia'), findsOneWidget);
+    expect(find.text('Voir mon profil'), findsNothing);
+    expect(find.text('Préparer le démarrage de la maraude'), findsOneWidget);
+    expect(find.text('Suivre votre candidature'), findsNothing);
     expect(find.text('Rôle : Chef.fe d’équipe'), findsOneWidget);
-    expect(find.text('Présence : En attente'), findsOneWidget);
+    expect(find.textContaining('Présence :'), findsOneWidget);
+    expect(find.text('Je me désiste'), findsOneWidget);
+    final operations = find.byKey(
+      const ValueKey('maraude-workspace-operations'),
+    );
+    await tester.ensureVisible(operations);
+    await tester.tap(operations);
+    await tester.pumpAndSettle();
+    expect(find.text('Démarrer la maraude'), findsOneWidget);
+  });
+
+  testWidgets('un bénévole ne peut plus se désister après la clôture', (
+    tester,
+  ) async {
+    final repository = _FakeConcertVolunteerRepository(
+      ownApplication: _application(
+        status: ConcertVolunteerStatus.selected,
+        teamRole: MaraudeRole.teamLeader,
+      ),
+    );
+
+    await _pumpDetail(
+      tester,
+      repository,
+      maraudeStatus: MaraudeStatus.completed,
+    );
+
+    expect(find.text('Sélectionné'), findsWidgets);
+    expect(find.text('Rôle : Chef.fe d’équipe'), findsOneWidget);
+    expect(find.text('Je me désiste'), findsNothing);
+    expect(find.text('Je ne suis plus disponible'), findsNothing);
+    expect(find.text('Je confirme ma participation'), findsNothing);
+    expect(repository.ownApplication?.status, ConcertVolunteerStatus.selected);
   });
 
   testWidgets(
@@ -713,6 +999,42 @@ void main() {
       expect(find.text('Refuser'), findsOneWidget);
       expect(find.text('Voir mon profil'), findsNothing);
       expect(find.text('Je me désiste'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'un contexte bénévole bloque une section administrateur restée en cache',
+    (tester) async {
+      final pendingApplication = _application(
+        id: 'pending-id',
+        userId: 'volunteer-id',
+        profile: const VolunteerProfile(
+          userId: 'volunteer-id',
+          firstName: 'Camille',
+          lastName: 'Martin',
+        ),
+      );
+      final repository = _FakeConcertVolunteerRepository(
+        isAdmin: true,
+        ownApplication: pendingApplication,
+        applications: [pendingApplication],
+      );
+      await _pumpDetail(
+        tester,
+        repository,
+        settle: false,
+        userContext: const CurrentUserContext(
+          profileId: 'user-id',
+          role: AppUserRole.volunteer,
+          status: UserAccountStatus.active,
+        ),
+      );
+
+      expect(find.text('Candidatures'), findsNothing);
+      expect(find.text('Équipe retenue'), findsNothing);
+      expect(find.text('Sélectionner'), findsNothing);
+      expect(find.text('Refuser'), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsWidgets);
     },
   );
 
@@ -840,7 +1162,7 @@ void main() {
     await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
     await tester.tap(find.text('Équipe').last);
     await tester.pump();
-    expect(find.text('2 / 4 bénévoles'), findsOneWidget);
+    expect(find.text('2 / 3 bénévoles'), findsOneWidget);
     expect(find.text('Camille Martin'), findsWidgets);
     expect(find.text('Récolte & distribution'), findsWidgets);
     expect(
@@ -884,7 +1206,42 @@ void main() {
     expect(repository.saveTeamCount, 0);
   });
 
-  testWidgets('enregistre une équipe d’un bénévole sans chef', (tester) async {
+  testWidgets('verrouille la composition de l’équipe après le démarrage', (
+    tester,
+  ) async {
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [
+        _application(
+          status: ConcertVolunteerStatus.selected,
+          teamRole: MaraudeRole.teamLeader,
+          profile: const VolunteerProfile(
+            userId: 'user-id',
+            firstName: 'Camille',
+            lastName: 'Martin',
+          ),
+        ),
+      ],
+    );
+
+    await _pumpDetail(
+      tester,
+      repository,
+      maraudeStatus: MaraudeStatus.completed,
+    );
+
+    expect(find.byKey(const ValueKey('locked-maraude-team')), findsOneWidget);
+    expect(find.text('Camille Martin'), findsOneWidget);
+    expect(find.text('Chef.fe d’équipe'), findsOneWidget);
+    expect(find.text('Retirer de l’équipe'), findsNothing);
+    expect(find.byKey(const ValueKey('save-maraude-team')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('team-role-application-id-teamLeader')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('refuse une équipe d’un bénévole sans chef', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1440, 900);
     addTearDown(() {
@@ -911,23 +1268,12 @@ void main() {
     await tester.tap(select);
     await tester.pump();
     final save = find.byKey(const ValueKey('save-maraude-team'));
-    expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
-    expect(
-      find.textContaining('Cette recommandation ne bloque pas'),
-      findsOneWidget,
-    );
-    await tester.ensureVisible(save);
-    await tester.tap(save);
-    await tester.pumpAndSettle();
-
-    expect(repository.saveTeamCount, 1);
-    expect(
-      repository.applications.single.status,
-      ConcertVolunteerStatus.selected,
-    );
+    expect(tester.widget<FilledButton>(save).onPressed, isNull);
+    expect(find.text('Ajoutez au moins 3 bénévoles.'), findsOneWidget);
+    expect(repository.saveTeamCount, 0);
   });
 
-  testWidgets('enregistre une équipe vide après le retrait du dernier membre', (
+  testWidgets('refuse une équipe vide après le retrait du dernier membre', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -959,16 +1305,11 @@ void main() {
     await tester.pump();
 
     final save = find.byKey(const ValueKey('save-maraude-team'));
-    expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
-    await tester.ensureVisible(save);
-    await tester.tap(save);
-    await tester.pumpAndSettle();
-
-    expect(repository.saveTeamCount, 1);
-    expect(repository.lastSavedTeam, isEmpty);
+    expect(tester.widget<FilledButton>(save).onPressed, isNull);
+    expect(repository.saveTeamCount, 0);
   });
 
-  testWidgets('autorise plusieurs chefs d’équipe dans le brouillon', (
+  testWidgets('empêche plusieurs chefs d’équipe dans le brouillon', (
     tester,
   ) async {
     final repository = _FakeConcertVolunteerRepository(
@@ -1015,7 +1356,7 @@ void main() {
       find.byKey(const ValueKey('team-role-second-teamLeader')),
     );
 
-    expect(secondLeader.enabled, isTrue);
+    expect(secondLeader.enabled, isFalse);
   });
 
   testWidgets('valide atomiquement une équipe complète avec un chef', (
@@ -1053,7 +1394,7 @@ void main() {
     var saveButton = tester.widget<FilledButton>(
       find.byKey(const ValueKey('save-maraude-team')),
     );
-    expect(saveButton.onPressed, isNotNull);
+    expect(saveButton.onPressed, isNull);
 
     final leaderRole = find.byKey(
       const ValueKey('team-role-candidate-1-teamLeader'),
@@ -1179,8 +1520,8 @@ void main() {
     await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
     await tester.tap(find.text('Équipe').last);
     await tester.pump();
-    expect(find.text('1 / 4 bénévoles'), findsOneWidget);
-    expect(find.textContaining('généralement recommandés'), findsOneWidget);
+    expect(find.text('1 / 3 bénévoles'), findsOneWidget);
+    expect(find.text('Ajoutez au moins 3 bénévoles.'), findsOneWidget);
     await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
     await tester.tap(find.text('Candidatures').last);
     await tester.pump();
@@ -1274,8 +1615,11 @@ void main() {
 
     expect(find.byKey(const ValueKey('team-builder-desktop')), findsOneWidget);
     expect(find.byType(DataTable), findsNothing);
-    expect(find.text('4 / 4 bénévoles'), findsOneWidget);
-    expect(find.text('Équipe enregistrable'), findsOneWidget);
+    expect(find.text('4 / 3 bénévoles'), findsOneWidget);
+    expect(
+      find.text('Équipe complète : un chef et au moins deux autres bénévoles.'),
+      findsOneWidget,
+    );
     expect(find.text('Équipe retenue'), findsOneWidget);
     expect(find.text('Chargé.e de communication'), findsWidgets);
     expect(find.text('Chargé.e de logistique'), findsWidgets);
@@ -1284,9 +1628,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('affiche et met à jour la synthèse des présences', (
-    tester,
-  ) async {
+  testWidgets('affiche, modifie et synthétise les présences', (tester) async {
     final repository = _FakeConcertVolunteerRepository(
       isAdmin: true,
       applications: [
@@ -1316,44 +1658,93 @@ void main() {
         ),
       ],
     );
-    await _pumpDetail(tester, repository);
+    final attendance = MaraudeAttendanceData([
+      MaraudeAttendanceMember(
+        applicationId: 'pending-attendance',
+        userId: 'user-1',
+        displayName: 'Julie Martin',
+        teamRole: MaraudeRole.collectionDistribution,
+        confirmationStatus: VolunteerConfirmationStatus.confirmed,
+        attendanceStatus: VolunteerAttendanceStatus.pending,
+        lastModifiedAt: DateTime.utc(2026, 7, 25, 20),
+        lastModifiedByName: 'Pierre',
+        canValidate: true,
+      ),
+      MaraudeAttendanceMember(
+        applicationId: 'present-attendance',
+        userId: 'user-2',
+        displayName: 'Hugo Durand',
+        teamRole: MaraudeRole.logistics,
+        confirmationStatus: VolunteerConfirmationStatus.confirmed,
+        attendanceStatus: VolunteerAttendanceStatus.present,
+        lastModifiedAt: DateTime.utc(2026, 7, 25, 20, 5),
+        canValidate: true,
+      ),
+      MaraudeAttendanceMember(
+        applicationId: 'absent-attendance',
+        userId: 'user-3',
+        displayName: 'Inès Robert',
+        teamRole: MaraudeRole.communication,
+        confirmationStatus: VolunteerConfirmationStatus.confirmed,
+        attendanceStatus: VolunteerAttendanceStatus.absent,
+        lastModifiedAt: DateTime.utc(2026, 7, 25, 20, 10),
+        canValidate: true,
+      ),
+    ]);
+    await _pumpDetail(
+      tester,
+      repository,
+      attendance: attendance,
+      maraudeStatus: MaraudeStatus.completed,
+      workspace: 'attendance',
+    );
 
-    await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
-    await tester.tap(find.text('Équipe').last);
-    await tester.pump();
-    expect(find.text('3 sélectionnés'), findsOneWidget);
     expect(find.text('Présents : 1'), findsOneWidget);
     expect(find.text('Absents : 1'), findsOneWidget);
     expect(find.text('En attente : 1'), findsOneWidget);
-
-    await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
-    await tester.tap(find.text('Candidatures').last);
-    await tester.pump();
-    final dropdown = find.byKey(
-      const ValueKey(
-        'attendance-pending-attendance-'
-        'VolunteerAttendanceStatus.pending',
-      ),
+    expect(
+      find.textContaining('Dernière modification par Pierre'),
+      findsOneWidget,
     );
-    await tester.ensureVisible(dropdown);
-    await tester.tap(dropdown);
+    final selector = find.byKey(
+      const ValueKey('attendance-pending-attendance'),
+    );
+    await tester.ensureVisible(selector);
+    await tester.tap(selector);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Présent').last);
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
-    await tester.tap(find.text('Équipe').last);
-    await tester.pump();
-    expect(find.text('Présents : 2'), findsOneWidget);
-    expect(find.text('En attente : 0'), findsOneWidget);
-    expect(
-      repository.applications
-          .firstWhere((application) => application.id == 'pending-attendance')
-          .attendanceStatus,
-      VolunteerAttendanceStatus.present,
-    );
-    expect(repository.fetchCount, greaterThanOrEqualTo(2));
+    expect(repository.lastAttendanceStatus, VolunteerAttendanceStatus.present);
   });
+
+  testWidgets(
+    'masque les présences et crédits à l’administrateur avant la clôture',
+    (tester) async {
+      final repository = _FakeConcertVolunteerRepository(
+        isAdmin: true,
+        applications: [
+          _application(
+            id: 'confirmed-member',
+            status: ConcertVolunteerStatus.selected,
+            teamRole: MaraudeRole.teamLeader,
+          ),
+        ],
+      );
+
+      await _pumpDetail(
+        tester,
+        repository,
+        maraudeStatus: MaraudeStatus.inProgress,
+      );
+
+      expect(find.text('Présences et crédits'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('validate-maraude-attendance')),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets('affiche les informations utiles à la décision sur la carte', (
     tester,
@@ -1393,7 +1784,7 @@ void main() {
     expect(find.text('Désistements'), findsOneWidget);
     expect(find.text('1'), findsOneWidget);
     expect(find.text('Disponibilité'), findsOneWidget);
-    expect(find.text('Confirmée'), findsOneWidget);
+    expect(find.text('Disponible'), findsOneWidget);
     expect(find.text('+33 6 00 00 00 00'), findsNothing);
     expect(find.text('Permis : Oui'), findsNothing);
     expect(find.text('Sophie Martin'), findsNothing);
@@ -1452,7 +1843,8 @@ void main() {
 
     expect(find.text('Profil bénévole'), findsOneWidget);
     expect(find.text('12 avril 1992'), findsOneWidget);
-    expect(find.text('Port de charges lourdes'), findsOneWidget);
+    expect(find.text('Permis'), findsNothing);
+    expect(find.text('Port de charges lourdes'), findsNothing);
     expect(find.text('Contact d’urgence'), findsOneWidget);
     expect(find.text('Sophie Martin'), findsOneWidget);
     expect(find.text('+33 6 99 99 99 99'), findsOneWidget);
@@ -1492,7 +1884,7 @@ void main() {
     expect(find.descendant(of: card, matching: find.text('0')), findsOneWidget);
     expect(find.text('Dernière participation'), findsOneWidget);
     expect(find.text('Aucune'), findsOneWidget);
-    expect(find.text('Confirmée'), findsOneWidget);
+    expect(find.text('Disponible'), findsOneWidget);
     expect(find.byIcon(Icons.person_outline), findsWidgets);
 
     await tester.ensureVisible(card);
@@ -1559,6 +1951,7 @@ ConcertVolunteerApplication _application({
   VolunteerStatistics statistics = const VolunteerStatistics.empty(),
   MaraudeRole? teamRole,
   VolunteerAttendanceStatus? attendanceStatus,
+  VolunteerConfirmationStatus? confirmationStatus,
 }) {
   return ConcertVolunteerApplication(
     id: id,
@@ -1571,27 +1964,57 @@ ConcertVolunteerApplication _application({
     statistics: statistics,
     teamRole: teamRole,
     attendanceStatus: attendanceStatus,
+    confirmationStatus:
+        confirmationStatus ??
+        (status == ConcertVolunteerStatus.selected
+            ? VolunteerConfirmationStatus.confirmed
+            : null),
   );
 }
 
 Future<void> _pumpDetail(
   WidgetTester tester,
-  _FakeConcertVolunteerRepository repository,
-) async {
+  _FakeConcertVolunteerRepository repository, {
+  CurrentUserContext? userContext,
+  MaraudeAttendanceData attendance = const MaraudeAttendanceData([]),
+  MaraudeStatus maraudeStatus = MaraudeStatus.open,
+  bool settle = true,
+  String workspace = 'team',
+}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         concertDetailsProvider.overrideWith(
-          (ref, concertId) async => buildConcert(),
+          (ref, concertId) async => buildConcert(maraudeStatus: maraudeStatus),
         ),
         concertVolunteerRepositoryProvider.overrideWithValue(repository),
+        maraudeAttendanceProvider.overrideWith(
+          (ref, concertId) async => attendance,
+        ),
+        if (userContext != null)
+          currentUserContextProvider.overrideWith((ref) async => userContext),
       ],
       child: const MaterialApp(
         home: ConcertDetailScreen(concertId: 'concert-id'),
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+    await tester.pump();
+  }
+  final workspaceButton = find.byKey(ValueKey('maraude-workspace-$workspace'));
+  if (workspaceButton.evaluate().isNotEmpty) {
+    await tester.ensureVisible(workspaceButton);
+    await tester.tap(workspaceButton);
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  }
 }
 
 class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
@@ -1600,7 +2023,9 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
     this.isAdmin = false,
     this.activeRole,
     this.currentUserId = 'user-id',
+    this.applyError,
     List<ConcertVolunteerApplication> applications = const [],
+    this.roster = const [],
   }) : applications = [...applications],
        super(
          SupabaseClient(
@@ -1614,10 +2039,13 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
   final bool isAdmin;
   final AppUserRole? activeRole;
   final String currentUserId;
+  final Object? applyError;
   final List<ConcertVolunteerApplication> applications;
+  final List<ConcertVolunteerRosterEntry> roster;
   int fetchCount = 0;
   int saveTeamCount = 0;
   List<MaraudeTeamMemberDraft> lastSavedTeam = const [];
+  VolunteerAttendanceStatus? lastAttendanceStatus;
 
   @override
   Future<ConcertVolunteerSectionData> fetchSection(String concertId) async {
@@ -1667,12 +2095,19 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
   }
 
   @override
-  Future<ConcertVolunteerApplication> apply(String concertId) async {
+  Future<List<ConcertVolunteerRosterEntry>> fetchRoster(
+    String concertId,
+  ) async {
+    return roster;
+  }
+
+  @override
+  Future<void> apply(String concertId) async {
+    if (applyError != null) throw applyError!;
     if (ownApplication != null) {
       throw StateError('Une candidature existe déjà.');
     }
     ownApplication = _application();
-    return ownApplication!;
   }
 
   @override
@@ -1700,6 +2135,21 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
       status: ConcertVolunteerStatus.pending,
       teamRole: null,
       attendanceStatus: null,
+    );
+  }
+
+  @override
+  Future<void> confirmParticipation(
+    String concertId, {
+    required bool roleAcknowledged,
+  }) async {
+    if (!roleAcknowledged) {
+      throw StateError('La fiche de mission doit être reconnue.');
+    }
+    ownApplication = ownApplication?.copyWith(
+      confirmationStatus: VolunteerConfirmationStatus.confirmed,
+      confirmationRespondedAt: DateTime.utc(2026, 7, 25, 11),
+      roleAcknowledgedAt: DateTime.utc(2026, 7, 25, 11),
     );
   }
 
@@ -1786,6 +2236,7 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
     String applicationId,
     VolunteerAttendanceStatus status,
   ) async {
+    lastAttendanceStatus = status;
     final index = applications.indexWhere(
       (application) => application.id == applicationId,
     );

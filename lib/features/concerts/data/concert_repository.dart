@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -78,7 +80,10 @@ class ConcertRepository {
   }
 
   Future<void> deleteConcert(String concertId) async {
-    await _client.from('concerts').delete().eq('id', concertId);
+    await _client.rpc<void>(
+      'delete_concert',
+      params: {'requested_concert_id': concertId},
+    );
   }
 
   Future<void> startMaraude(String concertId) async {
@@ -100,6 +105,13 @@ class ConcertRepository {
     MaraudeStatus status, {
     String? cancellationReason,
   }) async {
+    if (status == MaraudeStatus.completed) {
+      await _client.rpc<void>(
+        'complete_maraude_flexible',
+        params: {'requested_concert_id': concertId},
+      );
+      return;
+    }
     await _client.rpc<void>(
       'set_maraude_status',
       params: {
@@ -116,14 +128,29 @@ class ConcertRepository {
     bool complete = true,
   }) async {
     await _client.rpc<void>(
-      'save_maraude_report',
+      'save_maraude_operational_report_v2',
       params: {
         'requested_concert_id': concertId,
         'requested_total_weight_kg': draft.totalWeightKg,
-        'requested_estimated_meals': draft.estimatedMeals,
+        'requested_distance_km': draft.distanceKm,
+        'requested_quantities_unavailable': draft.quantitiesUnavailable,
         'requested_comment': draft.comment,
-        'requested_photo_folder_url': draft.photoFolderUrl,
-        'requested_complete': complete,
+      },
+    );
+    if (complete) await completeMaraude(concertId);
+  }
+
+  Future<void> correctMaraudeTiming(
+    String concertId, {
+    DateTime? startAt,
+    DateTime? endAt,
+  }) async {
+    await _client.rpc<void>(
+      'correct_maraude_timing',
+      params: {
+        'requested_concert_id': concertId,
+        'requested_start_at': startAt?.toUtc().toIso8601String(),
+        'requested_end_at': endAt?.toUtc().toIso8601String(),
       },
     );
   }
@@ -138,17 +165,55 @@ class ConcertRepository {
         .toList(growable: false);
   }
 
-  Future<void> updateMaraudePhotoLink(
-    String concertId,
-    String? photoFolderUrl,
-  ) async {
+  Future<List<MaraudePhoto>> fetchMaraudePhotos(String concertId) async {
+    final rows = await _client
+        .from('maraude_photos')
+        .select()
+        .eq('concert_id', concertId)
+        .order('created_at');
+    return rows
+        .map((row) => MaraudePhoto.fromJson(row))
+        .toList(growable: false);
+  }
+
+  Future<String> maraudePhotoUrl(String storagePath) {
+    return _client.storage
+        .from('maraude-photos')
+        .createSignedUrl(storagePath, 300);
+  }
+
+  Future<void> uploadMaraudePhoto({
+    required String concertId,
+    required String extension,
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw const AuthException('Utilisateur non connecté.');
+    final timestamp = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final path = '$concertId/$userId/$timestamp.$extension';
+    await _client.storage
+        .from('maraude-photos')
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType),
+        );
     await _client.rpc<void>(
-      'update_maraude_photo_link',
+      'add_maraude_photo',
       params: {
         'requested_concert_id': concertId,
-        'requested_photo_folder_url': photoFolderUrl,
+        'requested_storage_path': path,
       },
     );
+  }
+
+  Future<void> deleteMaraudePhoto(String photoId, String storagePath) async {
+    await _client.rpc<void>(
+      'delete_maraude_photo',
+      params: {'requested_photo_id': photoId},
+    );
+    await _client.storage.from('maraude-photos').remove([storagePath]);
   }
 
   Future<void> updateClosingComment(

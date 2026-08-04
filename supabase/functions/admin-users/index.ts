@@ -72,20 +72,41 @@ Deno.serve(async (request) => {
 async function inviteUser(client: ReturnType<typeof createClient>, body: any) {
   validateIdentity(body);
   const redirectTo = requiredString(body.redirectTo, "URL d’activation");
+  const email = body.email.trim().toLowerCase();
+  const metadata = {
+    first_name: body.firstName.trim(),
+    last_name: body.lastName.trim(),
+  };
   const { data, error } = await client.auth.admin.inviteUserByEmail(
-    body.email.trim().toLowerCase(),
+    email,
     {
       redirectTo,
-      data: {
-        first_name: body.firstName.trim(),
-        last_name: body.lastName.trim(),
-      },
+      data: metadata,
     },
   );
-  if (error || !data.user) throw error ?? new Error("Invitation impossible.");
+  let user = data.user;
+  let activationUrl: string | null = null;
+  let emailSent = true;
+
+  if (error) {
+    if (!isEmailRateLimit(error.message)) throw error;
+    const { data: generated, error: generationError } = await client.auth.admin
+      .generateLink({
+        type: "invite",
+        email,
+        options: { redirectTo, data: metadata },
+      });
+    if (generationError || !generated.user) {
+      throw generationError ?? new Error("Invitation impossible.");
+    }
+    user = generated.user;
+    activationUrl = generated.properties.action_link;
+    emailSent = false;
+  }
+  if (!user) throw new Error("Invitation impossible.");
 
   const { error: accountError } = await client.from("user_accounts").upsert({
-    profile_id: data.user.id,
+    profile_id: user.id,
     role: body.role,
     organization_id: body.role === "promoter" ? body.organizationId : null,
     status: "invited",
@@ -94,10 +115,18 @@ async function inviteUser(client: ReturnType<typeof createClient>, body: any) {
     disabled_at: null,
   });
   if (accountError) {
-    await client.auth.admin.deleteUser(data.user.id);
+    await client.auth.admin.deleteUser(user.id);
     throw accountError;
   }
-  return json({ profileId: data.user.id }, 201);
+  return json({
+    profileId: user.id,
+    emailSent,
+    activationUrl,
+  }, 201);
+}
+
+function isEmailRateLimit(message: string): boolean {
+  return /rate.?limit|over_email_send_rate_limit/i.test(message);
 }
 
 async function resendInvitation(

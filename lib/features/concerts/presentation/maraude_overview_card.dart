@@ -8,18 +8,22 @@ class MaraudeOverviewCard extends StatelessWidget {
   const MaraudeOverviewCard({
     required this.maraude,
     this.actionLabel,
+    this.canOpen = true,
     super.key,
   });
 
   final MaraudeOverview maraude;
   final String? actionLabel;
+  final bool canOpen;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => context.go('/maraudes/${maraude.concertId}'),
+        onTap: canOpen
+            ? () => context.go('/maraudes/${maraude.concertId}')
+            : null,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -69,6 +73,38 @@ class MaraudeOverviewCard extends StatelessWidget {
                   '${_time(maraude.recommendedArrival)}',
                 ),
               ],
+              if (maraude.isAdmin &&
+                  maraude.maraudeStatus != MaraudeStatus.completed &&
+                  maraude.maraudeStatus != MaraudeStatus.cancelled) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  children: [
+                    Text(
+                      maraude.selectedCount == 0
+                          ? 'Équipe non constituée'
+                          : '${maraude.selectedCount} bénévole'
+                                '${maraude.selectedCount > 1 ? 's' : ''} '
+                                'sélectionné'
+                                '${maraude.selectedCount > 1 ? 's' : ''}',
+                    ),
+                    if (maraude.pendingApplicationCount > 0)
+                      Text(
+                        '${maraude.pendingApplicationCount} candidature'
+                        '${maraude.pendingApplicationCount > 1 ? 's' : ''} '
+                        'à examiner',
+                      ),
+                    if (maraude.pendingConfirmationCount > 0)
+                      Text(
+                        '${maraude.pendingConfirmationCount} confirmation'
+                        '${maraude.pendingConfirmationCount > 1 ? 's' : ''} '
+                        'attendue'
+                        '${maraude.pendingConfirmationCount > 1 ? 's' : ''}',
+                      ),
+                  ],
+                ),
+              ],
               if (maraude.maraudeStatus == MaraudeStatus.completed ||
                   maraude.maraudeStatus == MaraudeStatus.cancelled) ...[
                 const SizedBox(height: 10),
@@ -84,11 +120,6 @@ class MaraudeOverviewCard extends StatelessWidget {
                       maraude.totalWeightKg == null
                           ? 'Poids : —'
                           : '${_number(maraude.totalWeightKg!)} kg',
-                    ),
-                    Text(
-                      maraude.estimatedMeals == null
-                          ? 'Repas : —'
-                          : '${maraude.estimatedMeals} repas',
                     ),
                   ],
                 ),
@@ -118,7 +149,7 @@ String _shortTime(String value) {
 
 String _number(double value) {
   if (value == value.roundToDouble()) return value.toInt().toString();
-  return value.toString().replaceAll('.', ',');
+  return value.toStringAsFixed(1).replaceAll('.', ',');
 }
 
 String _time(DateTime value) {
