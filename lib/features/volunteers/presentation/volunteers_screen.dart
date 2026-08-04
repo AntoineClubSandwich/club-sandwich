@@ -6,6 +6,7 @@ import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_calendar.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_list_section.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
+import 'package:club_sandwich/features/volunteers/presentation/volunteer_documents_panel.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -142,6 +143,11 @@ class _VolunteerDirectory extends StatelessWidget {
                       '${volunteer.email}\n${volunteer.status.label}',
                     ),
                     isThreeLine: true,
+                    trailing: OutlinedButton.icon(
+                      onPressed: () => _showDocuments(context, volunteer),
+                      icon: const Icon(Icons.folder_outlined),
+                      label: const Text('Documents'),
+                    ),
                   ),
                 ),
           ],
@@ -149,6 +155,30 @@ class _VolunteerDirectory extends StatelessWidget {
       },
     ),
   );
+
+  void _showDocuments(BuildContext context, ManagedUser volunteer) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => UncontrolledProviderScope(
+        container: ProviderScope.containerOf(context),
+        child: AlertDialog(
+          title: Text('Documents — ${volunteer.displayName}'),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: VolunteerDocumentsPanel(userId: volunteer.profileId),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Fermer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _VolunteerMaraudes extends StatelessWidget {

@@ -2,8 +2,12 @@ import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/organizations/data/organization_providers.dart';
 import 'package:club_sandwich/features/organizations/domain/organization.dart';
+import 'package:club_sandwich/shared/data/document_template_providers.dart';
+import 'package:club_sandwich/shared/data/document_template_repository.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
+import 'package:club_sandwich/shared/widgets/document_template_download_link.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -55,6 +59,8 @@ class AdministrationScreen extends ConsumerWidget {
                           ),
                   ),
           ),
+          const SizedBox(height: 24),
+          const _DocumentTemplatesSection(),
         ],
       ),
     );
@@ -171,6 +177,118 @@ class _SendingInvitationDialog extends StatelessWidget {
       ],
     ),
   );
+}
+
+class _DocumentTemplatesSection extends StatelessWidget {
+  const _DocumentTemplatesSection();
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Modèles de documents',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Modèles vierges consultables par les bénévoles et les tourneurs.',
+          ),
+          const SizedBox(height: 12),
+          const _TemplateRow(
+            templateKey: DocumentTemplateKey.volunteerContract,
+          ),
+          const SizedBox(height: 8),
+          const _TemplateRow(
+            templateKey: DocumentTemplateKey.organizationConvention,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _TemplateRow extends ConsumerStatefulWidget {
+  const _TemplateRow({required this.templateKey});
+  final DocumentTemplateKey templateKey;
+
+  @override
+  ConsumerState<_TemplateRow> createState() => _TemplateRowState();
+}
+
+class _TemplateRowState extends ConsumerState<_TemplateRow> {
+  bool _uploading = false;
+
+  Future<void> _replace() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf'],
+      withData: true,
+    );
+    final file = result?.files.single;
+    if (file?.bytes == null || !mounted) return;
+    setState(() => _uploading = true);
+    try {
+      final repository = ref.read(documentTemplateRepositoryProvider);
+      final path = await repository.uploadFile(
+        key: widget.templateKey,
+        bytes: file!.bytes!,
+        extension: 'pdf',
+        contentType: 'application/pdf',
+      );
+      await repository.setTemplate(key: widget.templateKey, storagePath: path);
+      ref.invalidate(documentTemplateProvider(widget.templateKey));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Modèle enregistré.')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              describeError(error, 'Impossible d’enregistrer ce modèle.'),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final template = ref.watch(documentTemplateProvider(widget.templateKey));
+    final hasTemplate = template.maybeWhen(
+      data: (value) => value != null,
+      orElse: () => false,
+    );
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 12,
+      runSpacing: 8,
+      children: [
+        SizedBox(width: 280, child: Text(widget.templateKey.label)),
+        if (hasTemplate)
+          DocumentTemplateDownloadLink(templateKey: widget.templateKey),
+        OutlinedButton.icon(
+          onPressed: _uploading ? null : _replace,
+          icon: _uploading
+              ? const SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.upload_file),
+          label: Text(hasTemplate ? 'Remplacer' : 'Déposer'),
+        ),
+      ],
+    );
+  }
 }
 
 class _UsersTable extends StatelessWidget {

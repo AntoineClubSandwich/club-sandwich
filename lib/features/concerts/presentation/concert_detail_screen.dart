@@ -1713,6 +1713,12 @@ class _MaraudeReportSectionState extends ConsumerState<_MaraudeReportSection> {
             label: 'Durée réelle',
             value: formatMaraudeDuration(report.actualDuration),
           ),
+          if (report.cateringContactName != null &&
+              report.cateringContactName!.trim().isNotEmpty)
+            _DetailRow(
+              label: 'Contact catering',
+              value: report.cateringContactName!,
+            ),
           const SizedBox(height: 8),
           Text('Équipe', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),

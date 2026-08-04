@@ -265,6 +265,45 @@ void main() {
     );
   });
 
+  testWidgets('le bilan affiche le contact catering quand renseigné', (
+    tester,
+  ) async {
+    final concert = buildConcert(
+      maraudeStatus: MaraudeStatus.completed,
+      cateringContactName: 'Alex',
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          concertDetailsProvider.overrideWith(
+            (ref, concertId) async => concert,
+          ),
+          concertVolunteerSectionProvider.overrideWith(
+            (ref, concertId) async => const ConcertVolunteerSectionData(
+              counts: ConcertVolunteerCounts.empty(),
+              isAdmin: false,
+              isPromoter: true,
+              canManageConcert: true,
+              activeRole: AppUserRole.promoter,
+              currentUserId: 'promoter-id',
+              applications: [],
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          home: ConcertDetailScreen(concertId: 'concert-id'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('maraude-workspace-report')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Contact catering'), findsOneWidget);
+    expect(find.text('Alex'), findsOneWidget);
+  });
+
   testWidgets(
     'le bilan Tourneur affiche l’équipe nominative avec rôle et présence',
     (tester) async {

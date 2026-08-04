@@ -1,6 +1,7 @@
 enum VolunteerDocumentType {
   identity('identity', 'Pièce d’identité'),
   socialSecurity('social_security', 'Carte de sécurité sociale'),
+  contract('contract', 'Contrat de bénévolat'),
   other('other', 'Autre document');
 
   const VolunteerDocumentType(this.databaseValue, this.label);

@@ -30,6 +30,9 @@ class VolunteerDocumentsPanel extends ConsumerWidget {
         final other = items
             .where((item) => item.type == VolunteerDocumentType.other)
             .toList(growable: false);
+        final contract = items
+            .where((item) => item.type == VolunteerDocumentType.contract)
+            .firstOrNull;
         final missing = [
           if (identity?.status != VolunteerDocumentStatus.approved)
             VolunteerDocumentType.identity.label,
@@ -61,6 +64,12 @@ class VolunteerDocumentsPanel extends ConsumerWidget {
                 document: document,
               ),
             ],
+            const SizedBox(height: 8),
+            _AdminDocumentTile(
+              userId: userId,
+              type: VolunteerDocumentType.contract,
+              document: contract,
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -380,21 +389,18 @@ class _AdminDocumentTileState extends ConsumerState<_AdminDocumentTile> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.upload_file),
-                  label: Text(
-                    document?.hasFile == true
-                        ? 'Remplacer'
-                        : 'Ajouter pour le bénévole',
-                  ),
+                  label: Text(_uploadButtonLabel(document)),
                 ),
                 if (document?.hasFile == true &&
                     document?.status == VolunteerDocumentStatus.pending) ...[
-                  FilledButton.tonalIcon(
-                    onPressed: _busy
-                        ? null
-                        : () => _review(VolunteerDocumentStatus.approved),
-                    icon: const Icon(Icons.check),
-                    label: const Text('Valider'),
-                  ),
+                  if (widget.type != VolunteerDocumentType.contract)
+                    FilledButton.tonalIcon(
+                      onPressed: _busy
+                          ? null
+                          : () => _review(VolunteerDocumentStatus.approved),
+                      icon: const Icon(Icons.check),
+                      label: const Text('Valider'),
+                    ),
                   OutlinedButton.icon(
                     onPressed: _busy
                         ? null
@@ -409,5 +415,12 @@ class _AdminDocumentTileState extends ConsumerState<_AdminDocumentTile> {
         ),
       ),
     );
+  }
+
+  String _uploadButtonLabel(VolunteerDocument? document) {
+    if (widget.type == VolunteerDocumentType.contract) {
+      return 'Déposer la version contresignée';
+    }
+    return document?.hasFile == true ? 'Remplacer' : 'Ajouter pour le bénévole';
   }
 }

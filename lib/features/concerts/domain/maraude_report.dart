@@ -18,6 +18,7 @@ class MaraudeReport {
     this.actualEndAt,
     this.distribution,
     this.closingComment,
+    this.cateringContactName,
   });
 
   factory MaraudeReport.fromConcert(
@@ -40,6 +41,7 @@ class MaraudeReport {
       collections: concert.collections,
       distribution: concert.distribution,
       closingComment: concert.closingComment,
+      cateringContactName: concert.cateringContactName,
     );
   }
 
@@ -56,6 +58,7 @@ class MaraudeReport {
   final List<MaraudeCollection> collections;
   final MaraudeDistribution? distribution;
   final String? closingComment;
+  final String? cateringContactName;
 
   Duration? get actualDuration {
     final start = actualStartAt;

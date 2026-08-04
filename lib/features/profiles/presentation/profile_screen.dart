@@ -9,8 +9,10 @@ import 'package:club_sandwich/features/volunteers/data/volunteer_document_provid
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart'
     show VolunteerCreditSummary;
 import 'package:club_sandwich/features/volunteers/domain/volunteer_document.dart';
+import 'package:club_sandwich/shared/data/document_template_repository.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
+import 'package:club_sandwich/shared/widgets/document_template_download_link.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -261,26 +263,50 @@ class _MyDocumentsSection extends ConsumerWidget {
         final socialSecurity = items
             .where((item) => item.type == VolunteerDocumentType.socialSecurity)
             .firstOrNull;
+        final contract = items
+            .where((item) => item.type == VolunteerDocumentType.contract)
+            .firstOrNull;
         final other = items
             .where((item) => item.type == VolunteerDocumentType.other)
             .toList(growable: false);
-        return Wrap(
-          spacing: 10,
-          runSpacing: 10,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _MyDocumentTile(
-              type: VolunteerDocumentType.identity,
-              document: identity,
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _MyDocumentTile(
+                  type: VolunteerDocumentType.identity,
+                  document: identity,
+                ),
+                _MyDocumentTile(
+                  type: VolunteerDocumentType.socialSecurity,
+                  document: socialSecurity,
+                ),
+                for (final document in other)
+                  _MyDocumentTile(
+                    type: VolunteerDocumentType.other,
+                    document: document,
+                  ),
+              ],
             ),
-            _MyDocumentTile(
-              type: VolunteerDocumentType.socialSecurity,
-              document: socialSecurity,
+            const SizedBox(height: 14),
+            const Divider(height: 1),
+            const SizedBox(height: 14),
+            Text(
+              'Contrat de bénévolat',
+              style: Theme.of(context).textTheme.titleSmall,
             ),
-            for (final document in other)
-              _MyDocumentTile(
-                type: VolunteerDocumentType.other,
-                document: document,
-              ),
+            const SizedBox(height: 8),
+            const DocumentTemplateDownloadLink(
+              templateKey: DocumentTemplateKey.volunteerContract,
+            ),
+            const SizedBox(height: 4),
+            _MyDocumentTile(
+              type: VolunteerDocumentType.contract,
+              document: contract,
+            ),
           ],
         );
       },
@@ -381,7 +407,7 @@ class _MyDocumentTileState extends ConsumerState<_MyDocumentTile> {
               : Icon(icon, color: color),
           label: Text(
             document?.hasFile == true
-                ? '$label — ${document!.status.label}'
+                ? '$label — ${_statusLabel(document!)}'
                 : 'Joindre $label',
           ),
         ),
@@ -398,6 +424,14 @@ class _MyDocumentTileState extends ConsumerState<_MyDocumentTile> {
           ),
       ],
     );
+  }
+
+  String _statusLabel(VolunteerDocument document) {
+    if (widget.type == VolunteerDocumentType.contract &&
+        document.status == VolunteerDocumentStatus.pending) {
+      return 'En attente de contre-signature';
+    }
+    return document.status.label;
   }
 }
 

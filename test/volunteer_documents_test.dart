@@ -70,6 +70,58 @@ void main() {
   });
 
   testWidgets(
+    'le profil bénévole affiche le contrat en attente de contre-signature',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserContextProvider.overrideWith(
+              (ref) async => const CurrentUserContext(
+                profileId: 'volunteer-id',
+                role: AppUserRole.volunteer,
+                status: UserAccountStatus.active,
+              ),
+            ),
+            currentProfileProvider.overrideWith(
+              (ref) async => Profile(
+                id: 'volunteer-id',
+                firstName: 'Camille',
+                lastName: 'Martin',
+                createdAt: DateTime.utc(2025, 1, 15),
+              ),
+            ),
+            currentVolunteerPrivateProfileProvider.overrideWith(
+              (ref) async => const VolunteerPrivateProfile(),
+            ),
+            myVolunteerDocumentsProvider.overrideWith(
+              (ref) async => [
+                const VolunteerDocument(
+                  id: 'doc-contract',
+                  type: VolunteerDocumentType.contract,
+                  status: VolunteerDocumentStatus.pending,
+                  storagePath: 'volunteer-id/contract-signed.pdf',
+                ),
+              ],
+            ),
+          ],
+          child: const MaterialApp(home: ProfileScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.dragUntilVisible(
+        find.text('Contrat de bénévolat — En attente de contre-signature'),
+        find.byType(ListView),
+        const Offset(0, -200),
+      );
+
+      expect(
+        find.text('Contrat de bénévolat — En attente de contre-signature'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
     'l’administrateur valide un document depuis le panneau du bénévole',
     (tester) async {
       final repository = _FakeVolunteerDocumentRepository();
@@ -143,6 +195,50 @@ void main() {
       expect(repository.reviewedDocumentIds, ['doc-identity']);
       expect(repository.reviewedStatuses, [VolunteerDocumentStatus.rejected]);
       expect(repository.reviewedReasons, ['Photo floue']);
+    },
+  );
+
+  testWidgets(
+    'l’administrateur voit le bouton de contre-signature pour un contrat et pas de validation en un clic',
+    (tester) async {
+      final repository = _FakeVolunteerDocumentRepository();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            volunteerDocumentRepositoryProvider.overrideWithValue(repository),
+            volunteerDocumentsProvider('volunteer-id').overrideWith(
+              (ref) async => [
+                const VolunteerDocument(
+                  id: 'doc-contract',
+                  type: VolunteerDocumentType.contract,
+                  status: VolunteerDocumentStatus.pending,
+                  storagePath: 'volunteer-id/contract-signed.pdf',
+                ),
+              ],
+            ),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: VolunteerDocumentsPanel(userId: 'volunteer-id'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Déposer la version contresignée'), findsOneWidget);
+      expect(find.text('Valider'), findsNothing);
+      expect(find.text('Refuser'), findsOneWidget);
+
+      await tester.tap(find.text('Refuser'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Signature manquante');
+      await tester.tap(find.widgetWithText(FilledButton, 'Refuser'));
+      await tester.pumpAndSettle();
+
+      expect(repository.reviewedDocumentIds, ['doc-contract']);
+      expect(repository.reviewedStatuses, [VolunteerDocumentStatus.rejected]);
+      expect(repository.reviewedReasons, ['Signature manquante']);
     },
   );
 

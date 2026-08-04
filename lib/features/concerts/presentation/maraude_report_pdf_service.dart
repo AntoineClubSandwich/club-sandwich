@@ -55,6 +55,9 @@ class MaraudeReportPdfService {
               'Durée réelle',
               formatMaraudeDuration(report.actualDuration).replaceAll('—', '-'),
             ),
+            if (report.cateringContactName != null &&
+                report.cateringContactName!.trim().isNotEmpty)
+              _row('Contact catering', report.cateringContactName!),
           ]),
           _section('Équipe', [
             _row('Bénévoles sélectionnés', '${report.selectedCount}'),

@@ -1,5 +1,6 @@
 import 'package:club_sandwich/features/organizations/data/organization_providers.dart';
 import 'package:club_sandwich/features/organizations/domain/organization.dart';
+import 'package:club_sandwich/features/organizations/presentation/organization_convention_panel.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
 import 'package:flutter/material.dart';
@@ -376,6 +377,12 @@ class _OrganizationDetailsPane extends ConsumerWidget {
                           subtitle: SelectableText(document.url),
                         ),
                     ],
+            ),
+            _SectionCard(
+              title: 'Convention de partenariat',
+              children: [
+                OrganizationConventionPanel(organizationId: organization.id),
+              ],
             ),
             _SectionCard(
               title: 'Concerts, historique et statistiques',
