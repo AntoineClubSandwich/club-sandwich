@@ -1,3 +1,4 @@
+import 'package:club_sandwich/design_system/style_guide/style_guide_screen.dart';
 import 'package:club_sandwich/features/administration/presentation/administration_screen.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
@@ -29,6 +30,12 @@ abstract final class AppRoutes {
   static const administration = '/administration';
   static const profile = '/profile';
   static const account = '/account';
+
+  /// Design-system showcase — admin-only, deliberately absent from
+  /// `AppShell`'s navigation menu (see `_destinationsFor` in
+  /// `lib/shared/widgets/app_shell.dart`). Reachable only by typing the
+  /// URL directly; never linked to from any real user flow.
+  static const styleGuide = '/style-guide';
 }
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -97,6 +104,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.activate,
         builder: (context, state) => const ActivationScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.styleGuide,
+        builder: (context, state) => const StyleGuideScreen(),
       ),
       GoRoute(path: '/concerts', redirect: (_, _) => AppRoutes.maraudes),
       GoRoute(
@@ -167,6 +178,7 @@ bool _isAllowed(AppUserRole role, String location) {
       AppRoutes.organizations,
       AppRoutes.volunteers,
       AppRoutes.administration,
+      AppRoutes.styleGuide,
     },
     AppUserRole.promoter => {
       AppRoutes.dashboard,

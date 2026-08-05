@@ -45,6 +45,7 @@ dependencies:
   audioplayers: ^6.8.1
   csv: ^8.0.0
   file_saver: ^0.4.0
+  lucide_icons_flutter: ^3.1.15
 
 dev_dependencies:
   flutter_test:
@@ -100,3 +101,7 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Variable.ttf
