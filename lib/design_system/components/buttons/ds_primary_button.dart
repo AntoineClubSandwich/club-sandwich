@@ -53,7 +53,7 @@ class DsPrimaryButton extends StatelessWidget {
             width: isFullWidth ? double.infinity : null,
             padding: const EdgeInsets.symmetric(horizontal: DsSpacing.lg),
             height: 44,
-            alignment: Alignment.center,
+            alignment: isFullWidth ? Alignment.center : null,
             decoration: BoxDecoration(
               color: background,
               borderRadius: DsRadius.lgRadius,
