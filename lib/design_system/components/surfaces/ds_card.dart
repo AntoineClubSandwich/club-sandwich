@@ -54,7 +54,11 @@ class DsCard extends StatelessWidget {
     return DsPressable(
       onTap: onTap,
       builder: (context, state) => AnimatedScale(
-        scale: state.pressed ? 0.99 : 1,
+        scale: state.pressed
+            ? 0.99
+            : state.hovered
+            ? 1.01
+            : 1,
         duration: DsMotion.standard,
         curve: DsMotion.curve,
         child: buildSurface(state.hovered),

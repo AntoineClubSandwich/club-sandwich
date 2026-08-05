@@ -1,11 +1,26 @@
+import 'package:club_sandwich/design_system/components/feedback/ds_empty_state.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_status_chip.dart';
+import 'package:club_sandwich/design_system/components/navigation/ds_section_header.dart';
+import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
+import 'package:club_sandwich/design_system/components/surfaces/ds_metric_card.dart';
+import 'package:club_sandwich/design_system/icons/ds_icons.dart';
+import 'package:club_sandwich/design_system/illustrations/ds_illustration.dart';
+import 'package:club_sandwich/design_system/tokens/ds_motion.dart';
+import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
+import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
+import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
+import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
+import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_list_section.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_overview_card.dart';
 import 'package:club_sandwich/features/exports/presentation/maraude_export_dialog.dart';
+import 'package:club_sandwich/features/organizations/data/organization_providers.dart';
+import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
 import 'package:club_sandwich/features/volunteers/data/volunteer_document_providers.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
@@ -83,17 +98,10 @@ class _DashboardContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 48),
       children: [
-        Text(
-          role == AppUserRole.admin ? 'Tableau de bord' : 'Accueil',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        const SizedBox(height: 6),
-        Text(
-          role == AppUserRole.admin
-              ? 'Ce qui nécessite votre attention maintenant.'
-              : 'Votre impact et vos prochaines actions.',
-        ),
         if (role != AppUserRole.admin) ...[
+          Text('Accueil', style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 6),
+          const Text('Votre impact et vos prochaines actions.'),
           const SizedBox(height: 24),
           _AchievementSummary(
             role: role,
@@ -373,14 +381,14 @@ class _PromoterDashboard extends StatelessWidget {
   }
 }
 
-class _AdminDashboard extends StatelessWidget {
+class _AdminDashboard extends ConsumerWidget {
   const _AdminDashboard({required this.items, required this.invitations});
 
   final List<MaraudeOverview> items;
   final List<InvitationCampaign> invitations;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final today = _day(DateTime.now());
     final todayMaraudes = items
         .where(
@@ -474,76 +482,864 @@ class _AdminDashboard extends StatelessWidget {
         .take(5)
         .toList();
 
-    return Column(
-      children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            key: const ValueKey('open-export-dialog-button'),
-            onPressed: () =>
-                showMaraudeExportDialog(context, AppUserRole.admin),
-            icon: const Icon(Icons.file_download_outlined),
-            label: const Text('Exporter les indicateurs'),
+    final now = DateTime.now();
+    final monthItems = items
+        .where(
+          (item) => item.date.year == now.year && item.date.month == now.month,
+        )
+        .toList();
+    final monthCompleted = monthItems
+        .where((item) => item.maraudeStatus == MaraudeStatus.completed)
+        .length;
+    final lastMonthDate = DateTime(now.year, now.month - 1, 1);
+    final lastMonthItems = items
+        .where(
+          (item) =>
+              item.date.year == lastMonthDate.year &&
+              item.date.month == lastMonthDate.month,
+        )
+        .toList();
+    final mealsThisMonth = monthItems
+        .where((item) => item.maraudeStatus == MaraudeStatus.completed)
+        .fold<int>(0, (sum, item) => sum + (item.estimatedMeals ?? 0));
+    final mealsLastMonth = lastMonthItems
+        .where((item) => item.maraudeStatus == MaraudeStatus.completed)
+        .fold<int>(0, (sum, item) => sum + (item.estimatedMeals ?? 0));
+
+    final firstName = ref.watch(currentProfileProvider).value?.firstName;
+    final organizationsCount =
+        ref.watch(organizationsProvider).value?.length ?? 0;
+    final volunteersCount =
+        ref
+            .watch(managedUsersProvider)
+            .value
+            ?.where((user) => user.role == AppUserRole.volunteer)
+            .length ??
+        0;
+
+    return Theme(
+      data: DsTheme.light,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _FadeIn(
+            child: _DashboardHero(
+              firstName: firstName,
+              todayCount: todayMaraudes.length,
+            ),
           ),
+          const SizedBox(height: DsSpacing.xxl),
+          _InvitationDashboardSection(
+            role: AppUserRole.admin,
+            campaigns: invitations
+                .where(
+                  (campaign) =>
+                      campaign.status == InvitationCampaignStatus.open ||
+                      campaign.status == InvitationCampaignStatus.draft ||
+                      campaign.awaitingConfirmationCount > 0,
+                )
+                .toList(growable: false),
+          ),
+          const _PendingDocumentsSection(),
+          _FadeIn(
+            child: _AdminKpiGrid(
+              monthlyMaraudes: monthItems.length,
+              monthlyMaraudesDelta: monthItems.length - lastMonthItems.length,
+              volunteersCount: volunteersCount,
+              invitationsCount: invitations.length,
+              mealsSaved: mealsThisMonth,
+              mealsSavedDelta: mealsThisMonth - mealsLastMonth,
+              organizationsCount: organizationsCount,
+            ),
+          ),
+          const SizedBox(height: DsSpacing.xxl),
+          _FadeIn(
+            child: _QuickActionsSection(
+              onExport: () =>
+                  showMaraudeExportDialog(context, AppUserRole.admin),
+            ),
+          ),
+          const SizedBox(height: DsSpacing.xxl),
+          _FadeIn(child: _ActivityTimeline(history: history)),
+          const SizedBox(height: DsSpacing.xxl),
+          _FadeIn(
+            child: _MonthlyGoalCard(
+              completed: monthCompleted,
+              total: monthItems.length,
+            ),
+          ),
+          const SizedBox(height: DsSpacing.xxl),
+          _PremiumMaraudeSection(
+            title: 'Prochaines maraudes',
+            items: upcoming.take(5).toList(),
+            actionLabel: 'Ouvrir la fiche opérationnelle',
+          ),
+          _PremiumMaraudeSection(
+            title: 'Candidatures à examiner',
+            items: openWithApplications,
+            actionLabel: 'Constituer l’équipe',
+          ),
+          _PremiumMaraudeSection(
+            title: 'Équipes non validées',
+            items: teamNotValidated,
+            actionLabel: 'Valider l’organisation retenue',
+          ),
+          _PremiumMaraudeSection(
+            title: 'Confirmations bénévoles en attente',
+            items: confirmationsPending,
+            actionLabel: 'Suivre les confirmations',
+          ),
+          _PremiumMaraudeSection(
+            title: 'Aujourd’hui',
+            items: todayMaraudes,
+            actionLabelFor: _adminTodayAction,
+          ),
+          _PremiumMaraudeSection(
+            title: 'Maraudes passées non clôturées',
+            items: pastNotClosed,
+            actionLabel: 'Saisir le compte rendu',
+          ),
+          _PremiumMaraudeSection(
+            title: 'Présences et crédits à valider',
+            items: creditsToValidate,
+            actionLabelFor: (item) =>
+                '${item.pendingCreditValidationCount} '
+                '${item.pendingCreditValidationCount == 1 ? 'crédit à valider' : 'crédits à valider'}',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Fades new dashboard sections in on first build — the only entrance
+/// micro-interaction requested, no gadget animations.
+class _FadeIn extends StatelessWidget {
+  const _FadeIn({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: DsMotion.standard,
+      curve: DsMotion.curve,
+      builder: (context, value, child) => Opacity(opacity: value, child: child),
+      child: child,
+    );
+  }
+}
+
+class _DashboardHero extends StatelessWidget {
+  const _DashboardHero({required this.firstName, required this.todayCount});
+
+  final String? firstName;
+  final int todayCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<DsTokens>()!;
+    final colors = tokens.colors;
+    final name = firstName?.trim();
+    final greeting = (name == null || name.isEmpty)
+        ? 'Bonjour'
+        : 'Bonjour $name';
+    final summary = todayCount == 0
+        ? 'Aucune maraude aujourd’hui'
+        : '$todayCount maraude${todayCount > 1 ? 's' : ''} prévue'
+              '${todayCount > 1 ? 's' : ''} aujourd’hui';
+
+    return DsCard(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 560;
+          final illustration = SizedBox(
+            width: 88,
+            height: 88,
+            child: DsAllDoneIllustration(color: colors.secondary),
+          );
+          final text = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                greeting,
+                style: DsTypography.h1.copyWith(color: colors.textPrimary),
+              ),
+              const SizedBox(height: DsSpacing.sm),
+              Text(
+                summary,
+                style: DsTypography.body.copyWith(color: colors.textSecondary),
+              ),
+            ],
+          );
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                illustration,
+                const SizedBox(height: DsSpacing.lg),
+                text,
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: text),
+              const SizedBox(width: DsSpacing.xl),
+              illustration,
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _KpiDelta {
+  const _KpiDelta(this.text, this.trend);
+  final String text;
+  final DsMetricTrend trend;
+}
+
+class _KpiData {
+  const _KpiData(this.icon, this.label, this.value, this.delta);
+  final IconData icon;
+  final String label;
+  final String value;
+  final _KpiDelta? delta;
+}
+
+_KpiDelta? _monthDelta(int diff) {
+  if (diff == 0) return null;
+  return _KpiDelta(
+    diff > 0 ? '+$diff' : '$diff',
+    diff > 0 ? DsMetricTrend.up : DsMetricTrend.down,
+  );
+}
+
+class _AdminKpiGrid extends StatelessWidget {
+  const _AdminKpiGrid({
+    required this.monthlyMaraudes,
+    required this.monthlyMaraudesDelta,
+    required this.volunteersCount,
+    required this.invitationsCount,
+    required this.mealsSaved,
+    required this.mealsSavedDelta,
+    required this.organizationsCount,
+  });
+
+  final int monthlyMaraudes;
+  final int monthlyMaraudesDelta;
+  final int volunteersCount;
+  final int invitationsCount;
+  final int mealsSaved;
+  final int mealsSavedDelta;
+  final int organizationsCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = <_KpiData>[
+      _KpiData(
+        DsIcons.calendar,
+        'Maraudes ce mois',
+        '$monthlyMaraudes',
+        _monthDelta(monthlyMaraudesDelta),
+      ),
+      _KpiData(DsIcons.users, 'Bénévoles actifs', '$volunteersCount', null),
+      _KpiData(DsIcons.mail, 'Invitations', '$invitationsCount', null),
+      _KpiData(
+        DsIcons.utensils,
+        'Repas sauvés ce mois',
+        '$mealsSaved',
+        _monthDelta(mealsSavedDelta),
+      ),
+      _KpiData(DsIcons.building, 'Organisations', '$organizationsCount', null),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 1100
+            ? 5
+            : constraints.maxWidth >= 760
+            ? 3
+            : constraints.maxWidth >= 480
+            ? 2
+            : 1;
+        final width =
+            (constraints.maxWidth - DsSpacing.lg * (columns - 1)) / columns;
+        return Wrap(
+          spacing: DsSpacing.lg,
+          runSpacing: DsSpacing.lg,
+          children: [
+            for (final metric in metrics)
+              SizedBox(
+                width: width,
+                child: DsMetricCard(
+                  icon: metric.icon,
+                  label: metric.label,
+                  value: metric.value,
+                  delta: metric.delta?.text,
+                  trend: metric.delta?.trend ?? DsMetricTrend.neutral,
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _QuickActionTile extends StatelessWidget {
+  const _QuickActionTile({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<DsTokens>()!;
+    final colors = tokens.colors;
+    return DsCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: colors.primarySelectedBg,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 20, color: colors.primary),
+          ),
+          const SizedBox(height: DsSpacing.md),
+          Text(
+            label,
+            style: DsTypography.body.copyWith(
+              color: colors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickActionsSection extends StatelessWidget {
+  const _QuickActionsSection({required this.onExport});
+
+  final VoidCallback onExport;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const DsSectionHeader(title: 'Actions rapides'),
+        const SizedBox(height: DsSpacing.lg),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 900
+                ? 4
+                : constraints.maxWidth >= 560
+                ? 2
+                : 1;
+            final width =
+                (constraints.maxWidth - DsSpacing.lg * (columns - 1)) / columns;
+            final actions = <Widget>[
+              SizedBox(
+                width: width,
+                child: _QuickActionTile(
+                  icon: DsIcons.plus,
+                  label: 'Nouvelle maraude',
+                  onTap: () => context.go('/maraudes'),
+                ),
+              ),
+              SizedBox(
+                width: width,
+                child: _QuickActionTile(
+                  icon: DsIcons.users,
+                  label: 'Inviter des bénévoles',
+                  onTap: () => context.go('/administration'),
+                ),
+              ),
+              SizedBox(
+                width: width,
+                child: _QuickActionTile(
+                  icon: DsIcons.building,
+                  label: 'Nouvelle organisation',
+                  onTap: () => context.go('/organizations'),
+                ),
+              ),
+              SizedBox(
+                width: width,
+                child: _QuickActionTile(
+                  key: const ValueKey('open-export-dialog-button'),
+                  icon: DsIcons.download,
+                  label: 'Exporter',
+                  onTap: onExport,
+                ),
+              ),
+            ];
+            return Wrap(
+              spacing: DsSpacing.lg,
+              runSpacing: DsSpacing.lg,
+              children: actions,
+            );
+          },
         ),
-        const SizedBox(height: 24),
-        MaraudeListSection(
-          title: 'Prochaines maraudes',
-          items: upcoming.take(5).toList(),
-          actionLabel: 'Ouvrir la fiche opérationnelle',
-        ),
-        MaraudeListSection(
-          title: 'Candidatures à examiner',
-          items: openWithApplications,
-          actionLabel: 'Constituer l’équipe',
-        ),
-        MaraudeListSection(
-          title: 'Équipes non validées',
-          items: teamNotValidated,
-          actionLabel: 'Valider l’organisation retenue',
-        ),
-        MaraudeListSection(
-          title: 'Confirmations bénévoles en attente',
-          items: confirmationsPending,
-          actionLabel: 'Suivre les confirmations',
-        ),
-        MaraudeListSection(
-          title: 'Aujourd’hui',
-          items: todayMaraudes,
-          actionLabelFor: _adminTodayAction,
-        ),
-        MaraudeListSection(
-          title: 'Maraudes passées non clôturées',
-          items: pastNotClosed,
-          actionLabel: 'Saisir le compte rendu',
-        ),
-        MaraudeListSection(
-          title: 'Présences et crédits à valider',
-          items: creditsToValidate,
-          actionLabelFor: (item) =>
-              '${item.pendingCreditValidationCount} '
-              '${item.pendingCreditValidationCount == 1 ? 'crédit à valider' : 'crédits à valider'}',
-        ),
-        MaraudeListSection(
-          title: 'Dernières maraudes clôturées',
-          items: history,
-          actionLabel: 'Consulter l’historique',
-        ),
-        _InvitationDashboardSection(
-          role: AppUserRole.admin,
-          campaigns: invitations
-              .where(
-                (campaign) =>
-                    campaign.status == InvitationCampaignStatus.open ||
-                    campaign.status == InvitationCampaignStatus.draft ||
-                    campaign.awaitingConfirmationCount > 0,
-              )
-              .toList(growable: false),
-        ),
-        const _PendingDocumentsSection(),
       ],
     );
   }
+}
+
+class _MonthlyGoalCard extends StatelessWidget {
+  const _MonthlyGoalCard({required this.completed, required this.total});
+
+  final int completed;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<DsTokens>()!;
+    final colors = tokens.colors;
+    final progress = total == 0
+        ? 0.0
+        : (completed / total).clamp(0, 1).toDouble();
+    final monthLabel = _frenchMonth(DateTime.now());
+
+    return DsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          DsSectionHeader(
+            title: 'Objectif du mois',
+            subtitle: total == 0
+                ? 'Aucune maraude prévue en $monthLabel pour le moment.'
+                : '$completed maraude${completed > 1 ? 's' : ''} clôturée'
+                      '${completed > 1 ? 's' : ''} sur $total en $monthLabel.',
+          ),
+          const SizedBox(height: DsSpacing.lg),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: progress),
+              duration: DsMotion.standard,
+              curve: DsMotion.curve,
+              builder: (context, value, _) => Stack(
+                children: [
+                  Container(height: 10, color: colors.border),
+                  FractionallySizedBox(
+                    widthFactor: value,
+                    child: Container(height: 10, color: colors.primary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: DsSpacing.sm),
+          Text(
+            '${(progress * 100).round()} %',
+            style: DsTypography.caption.copyWith(
+              color: colors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityTimeline extends StatelessWidget {
+  const _ActivityTimeline({required this.history});
+
+  final List<MaraudeOverview> history;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<DsTokens>()!;
+    final colors = tokens.colors;
+    return DsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const DsSectionHeader(title: 'Activité récente'),
+          const SizedBox(height: DsSpacing.lg),
+          if (history.isEmpty)
+            const DsEmptyState(
+              illustration: DsEmptyBoxIllustration(),
+              title: 'Aucune activité récente',
+              message: 'Les maraudes clôturées apparaîtront ici.',
+            )
+          else
+            for (var i = 0; i < history.length; i++) ...[
+              if (i > 0) ...[
+                const SizedBox(height: DsSpacing.md),
+                Divider(height: 1, color: colors.borderSubtle),
+                const SizedBox(height: DsSpacing.md),
+              ],
+              _ActivityRow(item: history[i]),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityRow extends StatelessWidget {
+  const _ActivityRow({required this.item});
+
+  final MaraudeOverview item;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<DsTokens>()!;
+    final colors = tokens.colors;
+    final cancelled = item.maraudeStatus == MaraudeStatus.cancelled;
+    final iconColor = cancelled ? colors.error : colors.success;
+
+    return GestureDetector(
+      onTap: () => context.go('/maraudes/${item.concertId}'),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                cancelled ? DsIcons.circleX : DsIcons.circleCheck,
+                size: 16,
+                color: iconColor,
+              ),
+            ),
+            const SizedBox(width: DsSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.artist,
+                          style: DsTypography.body.copyWith(
+                            color: colors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: DsSpacing.sm),
+                      Text(
+                        formatLongFrenchDate(item.date),
+                        style: DsTypography.caption.copyWith(
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    cancelled
+                        ? 'Maraude annulée · ${item.venueName}'
+                        : 'Maraude clôturée · ${item.venueName}',
+                    style: DsTypography.caption.copyWith(
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: DsSpacing.md,
+                    runSpacing: 4,
+                    children: [
+                      Text(
+                        '${item.selectedCount} bénévole'
+                        '${item.selectedCount > 1 ? 's' : ''}',
+                        style: DsTypography.caption.copyWith(
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        item.totalWeightKg == null
+                            ? 'Poids : —'
+                            : '${_dashboardNumber(item.totalWeightKg!)} kg',
+                        style: DsTypography.caption.copyWith(
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (item.cateringName != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Catering : ${item.cateringName}',
+                      style: DsTypography.caption.copyWith(
+                        color: colors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+DsChipStatus _mapMaraudeChipStatus(MaraudeStatus status) => switch (status) {
+  MaraudeStatus.draft => DsChipStatus.draft,
+  MaraudeStatus.open ||
+  MaraudeStatus.teamReady ||
+  MaraudeStatus.inProgress => DsChipStatus.active,
+  MaraudeStatus.completed => DsChipStatus.completed,
+  MaraudeStatus.cancelled => DsChipStatus.cancelled,
+};
+
+class _PremiumMaraudeSection extends StatelessWidget {
+  const _PremiumMaraudeSection({
+    required this.title,
+    required this.items,
+    this.actionLabel,
+    this.actionLabelFor,
+  });
+
+  final String title;
+  final List<MaraudeOverview> items;
+  final String? actionLabel;
+  final String Function(MaraudeOverview)? actionLabelFor;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: DsSpacing.xxl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DsSectionHeader(title: title),
+          const SizedBox(height: DsSpacing.lg),
+          for (var i = 0; i < items.length; i++) ...[
+            _PremiumMaraudeCard(
+              maraude: items[i],
+              actionLabel: actionLabelFor?.call(items[i]) ?? actionLabel,
+            ),
+            if (i < items.length - 1) const SizedBox(height: DsSpacing.md),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumMaraudeCard extends StatelessWidget {
+  const _PremiumMaraudeCard({required this.maraude, this.actionLabel});
+
+  final MaraudeOverview maraude;
+  final String? actionLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<DsTokens>()!;
+    final colors = tokens.colors;
+
+    return DsCard(
+      onTap: () => context.go('/maraudes/${maraude.concertId}'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  maraude.artist,
+                  style: DsTypography.h3.copyWith(color: colors.textPrimary),
+                ),
+              ),
+              const SizedBox(width: DsSpacing.sm),
+              DsStatusChip(
+                label: maraude.maraudeStatus.label,
+                status: _mapMaraudeChipStatus(maraude.maraudeStatus),
+              ),
+            ],
+          ),
+          const SizedBox(height: DsSpacing.sm),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(DsIcons.calendar, size: 14, color: colors.textSecondary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '${formatLongFrenchDate(maraude.date)} · ${maraude.venueName}'
+                  '${maraude.time == null ? '' : ' · ${formatDatabaseTime(maraude.time!)}'}',
+                  style: DsTypography.caption.copyWith(
+                    color: colors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (maraude.venueAddress != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              maraude.venueAddress!,
+              style: DsTypography.caption.copyWith(color: colors.textSecondary),
+            ),
+          ],
+          if (maraude.cateringName != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Catering : ${maraude.cateringName}',
+              style: DsTypography.caption.copyWith(color: colors.textSecondary),
+            ),
+          ],
+          if (maraude.ownTeamRole != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Rôle : ${maraude.ownTeamRole!.label}',
+              style: DsTypography.caption.copyWith(color: colors.textSecondary),
+            ),
+          ],
+          if (maraude.cateringClosesAt != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Arrivée recommandée : ${_hm(maraude.recommendedArrival)}',
+              style: DsTypography.caption.copyWith(color: colors.textSecondary),
+            ),
+          ],
+          if (maraude.isAdmin &&
+              maraude.maraudeStatus != MaraudeStatus.completed &&
+              maraude.maraudeStatus != MaraudeStatus.cancelled) ...[
+            const SizedBox(height: DsSpacing.sm),
+            Wrap(
+              spacing: DsSpacing.md,
+              runSpacing: 6,
+              children: [
+                Text(
+                  maraude.selectedCount == 0
+                      ? 'Équipe non constituée'
+                      : '${maraude.selectedCount} bénévole'
+                            '${maraude.selectedCount > 1 ? 's' : ''} '
+                            'sélectionné'
+                            '${maraude.selectedCount > 1 ? 's' : ''}',
+                  style: DsTypography.caption.copyWith(
+                    color: colors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (maraude.pendingApplicationCount > 0)
+                  Text(
+                    '${maraude.pendingApplicationCount} candidature'
+                    '${maraude.pendingApplicationCount > 1 ? 's' : ''} '
+                    'à examiner',
+                    style: DsTypography.caption.copyWith(
+                      color: colors.warning,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                if (maraude.pendingConfirmationCount > 0)
+                  Text(
+                    '${maraude.pendingConfirmationCount} confirmation'
+                    '${maraude.pendingConfirmationCount > 1 ? 's' : ''} '
+                    'attendue'
+                    '${maraude.pendingConfirmationCount > 1 ? 's' : ''}',
+                    style: DsTypography.caption.copyWith(
+                      color: colors.info,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          if (maraude.maraudeStatus == MaraudeStatus.completed ||
+              maraude.maraudeStatus == MaraudeStatus.cancelled) ...[
+            const SizedBox(height: DsSpacing.sm),
+            Wrap(
+              spacing: DsSpacing.md,
+              runSpacing: 6,
+              children: [
+                Text(
+                  '${maraude.selectedCount} bénévole'
+                  '${maraude.selectedCount > 1 ? 's' : ''}',
+                  style: DsTypography.caption.copyWith(
+                    color: colors.textSecondary,
+                  ),
+                ),
+                Text(
+                  maraude.totalWeightKg == null
+                      ? 'Poids : —'
+                      : '${_dashboardNumber(maraude.totalWeightKg!)} kg',
+                  style: DsTypography.caption.copyWith(
+                    color: colors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (actionLabel != null) ...[
+            const SizedBox(height: DsSpacing.md),
+            Text(
+              actionLabel!,
+              style: DsTypography.caption.copyWith(
+                color: colors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+String _frenchMonth(DateTime date) {
+  const months = [
+    'janvier',
+    'février',
+    'mars',
+    'avril',
+    'mai',
+    'juin',
+    'juillet',
+    'août',
+    'septembre',
+    'octobre',
+    'novembre',
+    'décembre',
+  ];
+  return months[date.month - 1];
+}
+
+String _hm(DateTime value) {
+  return '${value.hour.toString().padLeft(2, '0')}:'
+      '${value.minute.toString().padLeft(2, '0')}';
 }
 
 class _PendingDocumentsSection extends ConsumerWidget {
