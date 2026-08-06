@@ -1,3 +1,4 @@
+import 'package:club_sandwich/design_system/widgets/club_sandwich_mascot.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
@@ -77,13 +78,25 @@ class AppShell extends ConsumerWidget {
                     },
                     children: [
                       const Padding(
-                        padding: EdgeInsets.fromLTRB(28, 20, 28, 24),
-                        child: Text(
-                          'Club Sandwich',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        padding: EdgeInsets.fromLTRB(20, 20, 20, 24),
+                        child: Row(
+                          children: [
+                            ClubSandwichMascot(
+                              size: 28,
+                              color: MascotColor.blue,
+                            ),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Club Sandwich',
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       for (final destination in destinations)
@@ -116,6 +129,25 @@ class AppShell extends ConsumerWidget {
             width: 280,
             child: Column(
               children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, 12),
+                  child: Row(
+                    children: [
+                      ClubSandwichMascot(size: 28, color: MascotColor.blue),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Club Sandwich',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 Expanded(
                   child: NavigationRail(
                     extended: true,

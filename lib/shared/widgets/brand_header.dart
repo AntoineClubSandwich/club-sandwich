@@ -1,3 +1,4 @@
+import 'package:club_sandwich/design_system/widgets/club_sandwich_mascot.dart';
 import 'package:flutter/material.dart';
 
 class BrandHeader extends StatelessWidget {
@@ -7,11 +8,7 @@ class BrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(
-          Icons.volunteer_activism,
-          size: 52,
-          color: Theme.of(context).colorScheme.primary,
-        ),
+        const ClubSandwichMascot(size: 64, color: MascotColor.blue),
         const SizedBox(height: 12),
         Text(
           'Club Sandwich',

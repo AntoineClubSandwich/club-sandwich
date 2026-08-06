@@ -10,6 +10,7 @@ import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
 import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
 import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
+import 'package:club_sandwich/design_system/widgets/club_sandwich_mascot.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
@@ -654,10 +655,9 @@ class _DashboardHero extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 560;
-          final illustration = SizedBox(
-            width: 88,
-            height: 88,
-            child: DsAllDoneIllustration(color: colors.secondary),
+          final illustration = const ClubSandwichMascot(
+            size: 88,
+            color: MascotColor.orange,
           );
           final text = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
