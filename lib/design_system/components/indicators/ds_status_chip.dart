@@ -73,11 +73,14 @@ class DsStatusChip extends StatelessWidget {
             ),
             const SizedBox(width: DsSpacing.xs),
           ],
-          Text(
-            label,
-            style: DsTypography.caption.copyWith(
-              color: semantic.foreground,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: DsTypography.caption.copyWith(
+                color: semantic.foreground,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

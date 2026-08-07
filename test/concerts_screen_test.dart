@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
@@ -65,7 +66,7 @@ void main() {
           if (venueRepository != null)
             venueRepositoryProvider.overrideWithValue(venueRepository),
         ],
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(theme: DsTheme.light, routerConfig: router),
       ),
     );
     await tester.pumpAndSettle();
@@ -178,6 +179,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
+          theme: DsTheme.light,
           home: Scaffold(
             body: ConcertForm(initialConcert: concert, onSubmit: (_) async {}),
           ),
@@ -284,6 +286,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
+          theme: DsTheme.light,
           home: Scaffold(
             body: ConcertForm(
               initialConcert: buildConcert(venue: testVenue),

@@ -57,6 +57,7 @@ abstract final class DsIcons {
   static const IconData truck = LucideIcons.truck;
   static const IconData utensils = LucideIcons.utensils;
   static const IconData heart = LucideIcons.heart;
+  static const IconData footprints = LucideIcons.footprints;
   static const IconData fileDown = LucideIcons.fileDown;
 
   // Metrics & achievement

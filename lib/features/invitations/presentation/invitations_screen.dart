@@ -2,6 +2,7 @@ import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart'
     show ConcertViewMode;
+import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_calendar.dart';
 import 'package:club_sandwich/features/invitations/data/invitation_providers.dart';
@@ -41,72 +42,76 @@ class _InvitationsScreenState extends ConsumerState<InvitationsScreen> {
     final campaigns = ref.watch(invitationCampaignsProvider);
     final viewMode = ref.watch(invitationViewModeProvider);
     final role = userContext?.role ?? AppUserRole.volunteer;
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      floatingActionButton:
-          userContext?.role == AppUserRole.admin ||
-              userContext?.role == AppUserRole.promoter
-          ? FloatingActionButton.extended(
-              onPressed: () => _createCampaign(context, ref, userContext!),
-              icon: const Icon(Icons.add),
-              label: const Text('Nouvelle campagne'),
-            )
-          : null,
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-            child: Text(_subtitle(userContext?.role)),
-          ),
-          MaraudeViewToolbar(
-            title: userContext?.role == AppUserRole.promoter
-                ? 'Mes invitations'
-                : 'Invitations',
-            viewMode: viewMode,
-            onViewChanged: (mode) =>
-                ref.read(invitationViewModeProvider.notifier).select(mode),
-            selectorKey: const ValueKey('invitation-view-selector'),
-          ),
-          Expanded(
-            child: campaigns.when(
-              loading: () =>
-                  const AppLoadingState(label: 'Chargement des invitations'),
-              error: (_, _) => AppErrorState(
-                message: 'Impossible de charger les invitations.',
-                onRetry: () => ref.invalidate(invitationCampaignsProvider),
-              ),
-              data: (items) => items.isEmpty
-                  ? const AppEmptyState(
-                      title: 'Aucune invitation',
-                      message:
-                          'Aucune campagne d’invitations n’est disponible.',
-                      icon: Icons.confirmation_number_outlined,
-                    )
-                  : viewMode == ConcertViewMode.list
-                  ? ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-                      children: [
-                        for (final campaign in items)
-                          _CampaignCard(campaign: campaign, role: role),
-                      ],
-                    )
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-                      child: MaraudeCalendar(
-                        month: _displayedMonth,
-                        items: items
-                            .where((campaign) => campaign.eventDate != null)
-                            .map(_invitationCalendarItem)
-                            .toList(growable: false),
-                        onPreviousMonth: () => _changeMonth(-1),
-                        onNextMonth: () => _changeMonth(1),
-                        onToday: _goToCurrentMonth,
-                        onOpen: (id) => _openCampaign(context, items, id, role),
-                      ),
-                    ),
+    return Theme(
+      data: DsTheme.light,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        floatingActionButton:
+            userContext?.role == AppUserRole.admin ||
+                userContext?.role == AppUserRole.promoter
+            ? FloatingActionButton.extended(
+                onPressed: () => _createCampaign(context, ref, userContext!),
+                icon: const Icon(Icons.add),
+                label: const Text('Nouvelle campagne'),
+              )
+            : null,
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+              child: Text(_subtitle(userContext?.role)),
             ),
-          ),
-        ],
+            MaraudeViewToolbar(
+              title: userContext?.role == AppUserRole.promoter
+                  ? 'Mes invitations'
+                  : 'Invitations',
+              viewMode: viewMode,
+              onViewChanged: (mode) =>
+                  ref.read(invitationViewModeProvider.notifier).select(mode),
+              selectorKey: const ValueKey('invitation-view-selector'),
+            ),
+            Expanded(
+              child: campaigns.when(
+                loading: () =>
+                    const AppLoadingState(label: 'Chargement des invitations'),
+                error: (_, _) => AppErrorState(
+                  message: 'Impossible de charger les invitations.',
+                  onRetry: () => ref.invalidate(invitationCampaignsProvider),
+                ),
+                data: (items) => items.isEmpty
+                    ? const AppEmptyState(
+                        title: 'Aucune invitation',
+                        message:
+                            'Aucune campagne d’invitations n’est disponible.',
+                        icon: Icons.confirmation_number_outlined,
+                      )
+                    : viewMode == ConcertViewMode.list
+                    ? ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                        children: [
+                          for (final campaign in items)
+                            _CampaignCard(campaign: campaign, role: role),
+                        ],
+                      )
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                        child: MaraudeCalendar(
+                          month: _displayedMonth,
+                          items: items
+                              .where((campaign) => campaign.eventDate != null)
+                              .map(_invitationCalendarItem)
+                              .toList(growable: false),
+                          onPreviousMonth: () => _changeMonth(-1),
+                          onNextMonth: () => _changeMonth(1),
+                          onToday: _goToCurrentMonth,
+                          onOpen: (id) =>
+                              _openCampaign(context, items, id, role),
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,5 +1,5 @@
 import 'package:club_sandwich/core/config/environment.dart';
-import 'package:club_sandwich/core/theme/app_theme.dart';
+import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/presentation/login_screen.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
@@ -82,7 +82,7 @@ void main() {
     await _setViewport(tester, const Size(320, 640));
     await tester.pumpWidget(
       ProviderScope(
-        child: MaterialApp(theme: AppTheme.light, home: const LoginScreen()),
+        child: MaterialApp(theme: DsTheme.light, home: const LoginScreen()),
       ),
     );
 
@@ -111,7 +111,7 @@ void main() {
           maraudeOverviewProvider.overrideWith((ref) async => const []),
         ],
         child: MaterialApp(
-          theme: AppTheme.light,
+          theme: DsTheme.light,
           home: const AppShell(
             location: '/dashboard',
             child: DashboardScreen(),
@@ -180,7 +180,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: AppTheme.light,
+        theme: DsTheme.light,
         home: const AppEnvironmentBanner(
           environment: AppEnvironment.preprod,
           child: Scaffold(body: Text('Contenu')),
@@ -224,7 +224,7 @@ void main() {
           ),
         ],
         child: MaterialApp(
-          theme: AppTheme.light,
+          theme: DsTheme.light,
           home: const ConcertDetailScreen(concertId: 'concert-id'),
         ),
       ),
@@ -252,7 +252,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
-          theme: AppTheme.light,
+          theme: DsTheme.light,
           home: Scaffold(
             body: MaraudeDistributionFormDialog(onSubmit: (draft) async {}),
           ),
@@ -268,7 +268,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
-          theme: AppTheme.light,
+          theme: DsTheme.light,
           home: Scaffold(body: ConcertForm(onSubmit: (_) async {})),
         ),
       ),

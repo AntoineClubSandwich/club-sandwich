@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:club_sandwich/design_system/tokens/ds_colors.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/collections/domain/maraude_collection.dart';
@@ -804,17 +805,18 @@ void main() {
       expect(find.text('Ouverte'), findsOneWidget);
       expect(find.text('En attente'), findsOneWidget);
       expect(find.text('Sélectionné'), findsOneWidget);
+      const dsColors = DsColorTokens.light;
       expect(
         _calendarItemColor(tester, 'open-calendar'),
-        Colors.blue.withValues(alpha: 0.12),
+        dsColors.info.withValues(alpha: 0.14),
       );
       expect(
         _calendarItemColor(tester, 'pending-calendar'),
-        Colors.orange.withValues(alpha: 0.12),
+        dsColors.warning.withValues(alpha: 0.14),
       );
       expect(
         _calendarItemColor(tester, 'selected-calendar'),
-        Colors.green.withValues(alpha: 0.12),
+        dsColors.success.withValues(alpha: 0.14),
       );
 
       await tester.tap(

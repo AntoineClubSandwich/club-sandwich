@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:club_sandwich/core/router/app_router.dart';
+import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/data/auth_repository.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
@@ -52,7 +53,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(theme: DsTheme.light, routerConfig: router),
       ),
     );
 
@@ -308,7 +309,10 @@ class _RouterTestApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return MaterialApp.router(routerConfig: ref.watch(appRouterProvider));
+    return MaterialApp.router(
+      theme: DsTheme.light,
+      routerConfig: ref.watch(appRouterProvider),
+    );
   }
 }
 

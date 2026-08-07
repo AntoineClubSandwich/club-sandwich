@@ -1,3 +1,16 @@
+import 'package:club_sandwich/design_system/components/buttons/ds_ghost_button.dart';
+import 'package:club_sandwich/design_system/components/buttons/ds_primary_button.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_status_chip.dart';
+import 'package:club_sandwich/design_system/components/inputs/ds_dropdown.dart';
+import 'package:club_sandwich/design_system/components/inputs/ds_filter_chip.dart';
+import 'package:club_sandwich/design_system/components/inputs/ds_text_field.dart';
+import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
+import 'package:club_sandwich/design_system/icons/ds_icons.dart';
+import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
+import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
+import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
+import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
+import 'package:club_sandwich/design_system/widgets/club_sandwich_mascot.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
@@ -57,106 +70,109 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
             )
             .toList(growable: false);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Column(
-        children: [
-          MaraudeViewToolbar(
-            title: 'Maraudes',
-            viewMode: viewMode,
-            onViewChanged: (mode) =>
-                ref.read(concertViewModeProvider.notifier).select(mode),
-            selectorKey: const ValueKey('concert-view-selector'),
-          ),
-          Expanded(
-            child: asyncConcerts.when(
-              loading: () =>
-                  const AppLoadingState(label: 'Chargement des maraudes'),
-              error: (error, stackTrace) => AppErrorState(
-                message: _errorMessage(error),
-                onRetry: () => ref.invalidate(concertsProvider),
-              ),
-              data: (items) {
-                final filtered = _filterConcerts(items);
-                return RefreshIndicator(
-                  onRefresh: () => ref.refresh(concertsProvider.future),
-                  child: CustomScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                        sliver: SliverToBoxAdapter(
-                          child: _ConcertFilters(
-                            artistController: _artistFilterController,
-                            venueController: _venueFilterController,
-                            promoterController: _promoterFilterController,
-                            organizations: promoterOrganizations,
-                            selectedOrganizationIds: _selectedOrganizationIds,
-                            concertStatus: _concertStatusFilter,
-                            maraudeStatus: _maraudeStatusFilter,
-                            cateringFilter: _cateringFilter,
-                            onTextChanged: (_) => setState(() {}),
-                            onOrganizationsChanged: (value) => setState(
-                              () => _selectedOrganizationIds = value,
-                            ),
-                            onConcertStatusChanged: (value) =>
-                                setState(() => _concertStatusFilter = value),
-                            onMaraudeStatusChanged: (value) =>
-                                setState(() => _maraudeStatusFilter = value),
-                            onCateringChanged: (value) =>
-                                setState(() => _cateringFilter = value),
-                            onClear: _clearFilters,
-                          ),
-                        ),
-                      ),
-                      if (items.isEmpty)
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: _EmptyConcerts(
-                            onCreate: () => _createConcert(context),
-                          ),
-                        )
-                      else if (filtered.isEmpty)
-                        const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: _NoFilterResults(),
-                        )
-                      else if (viewMode == ConcertViewMode.list)
-                        _ConcertListSliver(
-                          concerts: _sortForDashboard(filtered),
-                          role: currentRole,
-                        )
-                      else
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-                          sliver: SliverToBoxAdapter(
-                            child: MaraudeCalendar(
-                              month: _displayedMonth,
-                              items: filtered
-                                  .map(_concertCalendarItem)
-                                  .toList(growable: false),
-                              onPreviousMonth: () => _changeMonth(-1),
-                              onNextMonth: () => _changeMonth(1),
-                              onToday: _goToCurrentMonth,
-                              onOpen: (id) => context.go('/maraudes/$id'),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              },
+    return Theme(
+      data: DsTheme.light,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Column(
+          children: [
+            MaraudeViewToolbar(
+              title: 'Maraudes',
+              viewMode: viewMode,
+              onViewChanged: (mode) =>
+                  ref.read(concertViewModeProvider.notifier).select(mode),
+              selectorKey: const ValueKey('concert-view-selector'),
             ),
-          ),
-        ],
+            Expanded(
+              child: asyncConcerts.when(
+                loading: () =>
+                    const AppLoadingState(label: 'Chargement des maraudes'),
+                error: (error, stackTrace) => AppErrorState(
+                  message: _errorMessage(error),
+                  onRetry: () => ref.invalidate(concertsProvider),
+                ),
+                data: (items) {
+                  final filtered = _filterConcerts(items);
+                  return RefreshIndicator(
+                    onRefresh: () => ref.refresh(concertsProvider.future),
+                    child: CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                          sliver: SliverToBoxAdapter(
+                            child: _ConcertFilters(
+                              artistController: _artistFilterController,
+                              venueController: _venueFilterController,
+                              promoterController: _promoterFilterController,
+                              organizations: promoterOrganizations,
+                              selectedOrganizationIds: _selectedOrganizationIds,
+                              concertStatus: _concertStatusFilter,
+                              maraudeStatus: _maraudeStatusFilter,
+                              cateringFilter: _cateringFilter,
+                              onTextChanged: (_) => setState(() {}),
+                              onOrganizationsChanged: (value) => setState(
+                                () => _selectedOrganizationIds = value,
+                              ),
+                              onConcertStatusChanged: (value) =>
+                                  setState(() => _concertStatusFilter = value),
+                              onMaraudeStatusChanged: (value) =>
+                                  setState(() => _maraudeStatusFilter = value),
+                              onCateringChanged: (value) =>
+                                  setState(() => _cateringFilter = value),
+                              onClear: _clearFilters,
+                            ),
+                          ),
+                        ),
+                        if (items.isEmpty)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: _EmptyConcerts(
+                              onCreate: () => _createConcert(context),
+                            ),
+                          )
+                        else if (filtered.isEmpty)
+                          const SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: _NoFilterResults(),
+                          )
+                        else if (viewMode == ConcertViewMode.list)
+                          _ConcertListSliver(
+                            concerts: _sortForDashboard(filtered),
+                            role: currentRole,
+                          )
+                        else
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+                            sliver: SliverToBoxAdapter(
+                              child: MaraudeCalendar(
+                                month: _displayedMonth,
+                                items: filtered
+                                    .map(_concertCalendarItem)
+                                    .toList(growable: false),
+                                onPreviousMonth: () => _changeMonth(-1),
+                                onNextMonth: () => _changeMonth(1),
+                                onToday: _goToCurrentMonth,
+                                onOpen: (id) => context.go('/maraudes/$id'),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        floatingActionButton: asyncConcerts.value?.isNotEmpty == true
+            ? FloatingActionButton.extended(
+                onPressed: () => _createConcert(context),
+                icon: const Icon(Icons.add),
+                label: const Text('Nouvelle maraude'),
+              )
+            : null,
       ),
-      floatingActionButton: asyncConcerts.value?.isNotEmpty == true
-          ? FloatingActionButton.extended(
-              onPressed: () => _createConcert(context),
-              icon: const Icon(Icons.add),
-              label: const Text('Nouvelle maraude'),
-            )
-          : null,
     );
   }
 
@@ -315,12 +331,23 @@ class _ConcertFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final tokens = Theme.of(context).extension<DsTokens>()!;
+    final colors = tokens.colors;
+    return DsCard(
+      padding: EdgeInsets.zero,
       child: ExpansionTile(
         key: const ValueKey('concert-filters'),
-        leading: const Icon(Icons.filter_list),
-        title: const Text('Filtres'),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        leading: Icon(DsIcons.filter, color: colors.textPrimary),
+        title: Text(
+          'Filtres',
+          style: DsTypography.body.copyWith(
+            color: colors.textPrimary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        shape: const RoundedRectangleBorder(side: BorderSide.none),
+        collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
+        childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         children: [
           LayoutBuilder(
             builder: (context, constraints) {
@@ -333,44 +360,49 @@ class _ConcertFilters extends StatelessWidget {
                 spacing: 16,
                 runSpacing: 12,
                 children: [
-                  _FilterTextField(
+                  SizedBox(
                     width: fieldWidth,
-                    keyValue: 'concert-filter-artist',
-                    controller: artistController,
-                    label: 'Artiste',
-                    onChanged: onTextChanged,
-                  ),
-                  _FilterTextField(
-                    width: fieldWidth,
-                    keyValue: 'concert-filter-venue',
-                    controller: venueController,
-                    label: 'Salle',
-                    onChanged: onTextChanged,
-                  ),
-                  _FilterTextField(
-                    width: fieldWidth,
-                    keyValue: 'concert-filter-promoter',
-                    controller: promoterController,
-                    label: 'Contact tourneur',
-                    onChanged: onTextChanged,
+                    child: DsTextField(
+                      key: const ValueKey('concert-filter-artist'),
+                      controller: artistController,
+                      label: 'Artiste',
+                      prefixIcon: DsIcons.search,
+                      onChanged: onTextChanged,
+                    ),
                   ),
                   SizedBox(
                     width: fieldWidth,
-                    child: DropdownButtonFormField<ConcertStatus?>(
+                    child: DsTextField(
+                      key: const ValueKey('concert-filter-venue'),
+                      controller: venueController,
+                      label: 'Salle',
+                      prefixIcon: DsIcons.search,
+                      onChanged: onTextChanged,
+                    ),
+                  ),
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DsTextField(
+                      key: const ValueKey('concert-filter-promoter'),
+                      controller: promoterController,
+                      label: 'Contact tourneur',
+                      prefixIcon: DsIcons.search,
+                      onChanged: onTextChanged,
+                    ),
+                  ),
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DsDropdown<ConcertStatus?>(
                       key: const ValueKey('concert-filter-status'),
-                      initialValue: concertStatus,
-                      decoration: const InputDecoration(
-                        labelText: 'Statut concert',
-                      ),
+                      label: 'Statut concert',
+                      hintText: 'Tous',
+                      value: concertStatus,
                       items: [
-                        const DropdownMenuItem(
-                          value: null,
-                          child: Text('Tous'),
-                        ),
+                        const DsDropdownItem(value: null, label: 'Tous'),
                         for (final status in ConcertStatus.values)
-                          DropdownMenuItem(
+                          DsDropdownItem(
                             value: status,
-                            child: Text(_concertStatusLabel(status)),
+                            label: _concertStatusLabel(status),
                           ),
                       ],
                       onChanged: onConcertStatusChanged,
@@ -378,42 +410,30 @@ class _ConcertFilters extends StatelessWidget {
                   ),
                   SizedBox(
                     width: fieldWidth,
-                    child: DropdownButtonFormField<MaraudeStatus?>(
+                    child: DsDropdown<MaraudeStatus?>(
                       key: const ValueKey('concert-filter-maraude'),
-                      initialValue: maraudeStatus,
-                      decoration: const InputDecoration(
-                        labelText: 'Statut maraude',
-                      ),
+                      label: 'Statut maraude',
+                      hintText: 'Tous',
+                      value: maraudeStatus,
                       items: [
-                        const DropdownMenuItem(
-                          value: null,
-                          child: Text('Tous'),
-                        ),
+                        const DsDropdownItem(value: null, label: 'Tous'),
                         for (final status in MaraudeStatus.values)
-                          DropdownMenuItem(
-                            value: status,
-                            child: Text(status.label),
-                          ),
+                          DsDropdownItem(value: status, label: status.label),
                       ],
                       onChanged: onMaraudeStatusChanged,
                     ),
                   ),
                   SizedBox(
                     width: fieldWidth,
-                    child: DropdownButtonFormField<bool?>(
+                    child: DsDropdown<bool?>(
                       key: const ValueKey('concert-filter-catering'),
-                      initialValue: cateringFilter,
-                      decoration: const InputDecoration(labelText: 'Catering'),
+                      label: 'Catering',
+                      hintText: 'Tous',
+                      value: cateringFilter,
                       items: const [
-                        DropdownMenuItem(value: null, child: Text('Tous')),
-                        DropdownMenuItem(
-                          value: true,
-                          child: Text('Avec catering'),
-                        ),
-                        DropdownMenuItem(
-                          value: false,
-                          child: Text('Sans catering'),
-                        ),
+                        DsDropdownItem(value: null, label: 'Tous'),
+                        DsDropdownItem(value: true, label: 'Avec catering'),
+                        DsDropdownItem(value: false, label: 'Sans catering'),
                       ],
                       onChanged: onCateringChanged,
                     ),
@@ -423,23 +443,26 @@ class _ConcertFilters extends StatelessWidget {
             },
           ),
           if (organizations.isNotEmpty) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: DsSpacing.lg),
             Text(
               'Organisation tourneur',
-              style: Theme.of(context).textTheme.labelLarge,
+              style: DsTypography.caption.copyWith(
+                color: colors.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: DsSpacing.sm),
             Wrap(
               key: const ValueKey('concert-filter-organizations'),
               spacing: 8,
               runSpacing: 8,
               children: [
                 for (final organization in organizations)
-                  FilterChip(
+                  DsFilterChip(
                     key: ValueKey(
                       'concert-filter-organization-${organization.id}',
                     ),
-                    label: Text(organization.name),
+                    label: organization.name,
                     selected: selectedOrganizationIds.contains(organization.id),
                     onSelected: (selected) {
                       final updated = Set<String>.of(selectedOrganizationIds);
@@ -454,48 +477,16 @@ class _ConcertFilters extends StatelessWidget {
               ],
             ),
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: DsSpacing.sm),
           Align(
             alignment: Alignment.centerRight,
-            child: TextButton.icon(
+            child: DsGhostButton(
+              icon: DsIcons.close,
+              label: 'Effacer les filtres',
               onPressed: onClear,
-              icon: const Icon(Icons.filter_alt_off_outlined),
-              label: const Text('Effacer les filtres'),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _FilterTextField extends StatelessWidget {
-  const _FilterTextField({
-    required this.width,
-    required this.keyValue,
-    required this.controller,
-    required this.label,
-    required this.onChanged,
-  });
-
-  final double width;
-  final String keyValue;
-  final TextEditingController controller;
-  final String label;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      child: TextField(
-        key: ValueKey(keyValue),
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: const Icon(Icons.search),
-        ),
-        onChanged: onChanged,
       ),
     );
   }
@@ -520,7 +511,7 @@ class _ConcertListSliver extends StatelessWidget {
               crossAxisCount: columns,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              mainAxisExtent: 290,
+              mainAxisExtent: 366,
             ),
             delegate: SliverChildBuilderDelegate(
               (context, index) =>
@@ -542,111 +533,113 @@ class _ConcertCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        key: ValueKey('concert-card-${concert.id}'),
-        onTap: () => context.go('/maraudes/${concert.id}'),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 8, 16),
-          child: Column(
+    final tokens = Theme.of(context).extension<DsTokens>()!;
+    final colors = tokens.colors;
+    final (statusLabel, tone) = _concertCalendarStatus(concert);
+
+    return DsCard(
+      key: ValueKey('concert-card-${concert.id}'),
+      onTap: () => context.go('/maraudes/${concert.id}'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      concert.artist,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  concert.artist,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: DsTypography.h3.copyWith(color: colors.textPrimary),
+                ),
+              ),
+              if (role == AppUserRole.admin || role == AppUserRole.promoter)
+                PopupMenuButton<_ConcertAction>(
+                  tooltip: 'Actions',
+                  icon: Icon(Icons.more_vert, color: colors.textSecondary),
+                  onSelected: (action) {
+                    switch (action) {
+                      case _ConcertAction.edit:
+                        _edit(context, ref);
+                      case _ConcertAction.delete:
+                        deleteConcertWithConfirmation(context, ref, concert);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: _ConcertAction.edit,
+                      child: ListTile(
+                        leading: Icon(Icons.edit_outlined),
+                        title: Text('Modifier'),
+                        contentPadding: EdgeInsets.zero,
                       ),
                     ),
-                  ),
-                  if (role == AppUserRole.admin || role == AppUserRole.promoter)
-                    PopupMenuButton<_ConcertAction>(
-                      tooltip: 'Actions',
-                      onSelected: (action) {
-                        switch (action) {
-                          case _ConcertAction.edit:
-                            _edit(context, ref);
-                          case _ConcertAction.delete:
-                            deleteConcertWithConfirmation(
-                              context,
-                              ref,
-                              concert,
-                            );
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: _ConcertAction.edit,
-                          child: ListTile(
-                            leading: Icon(Icons.edit_outlined),
-                            title: Text('Modifier'),
-                            contentPadding: EdgeInsets.zero,
-                          ),
+                    if (role == AppUserRole.admin)
+                      const PopupMenuItem(
+                        value: _ConcertAction.delete,
+                        child: ListTile(
+                          leading: Icon(Icons.delete_outline),
+                          title: Text('Supprimer'),
+                          contentPadding: EdgeInsets.zero,
                         ),
-                        if (role == AppUserRole.admin)
-                          const PopupMenuItem(
-                            value: _ConcertAction.delete,
-                            child: ListTile(
-                              leading: Icon(Icons.delete_outline),
-                              title: Text('Supprimer'),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                      ],
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _CardInformation(
-                icon: Icons.location_on_outlined,
-                text: concert.venueName ?? '—',
-              ),
-              const SizedBox(height: 8),
-              _CardInformation(
-                icon: Icons.calendar_today_outlined,
-                text: formatLongFrenchDate(concert.date),
-              ),
-              if (concert.cateringClosesAt != null) ...[
-                const SizedBox(height: 8),
-                _CardInformation(
-                  icon: Icons.schedule_outlined,
-                  text:
-                      'Catering : ${formatDatabaseTime(concert.cateringClosesAt!)}',
+                      ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                _CardInformation(
-                  icon: Icons.directions_walk_outlined,
-                  text:
-                      'Arrivée recommandée : '
-                      '${recommendedArrivalFromDatabase(concert.cateringClosesAt!)}',
-                ),
-              ],
-              const Spacer(),
-              const Divider(height: 1),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 24,
-                runSpacing: 8,
-                children: [
-                  _Metadata(
-                    label: 'Producteur',
-                    value: concert.promoterOrganizationName ?? '—',
-                  ),
-                  _Metadata(
-                    label: 'Équipe',
-                    value: _volunteerCountLabel(concert.selectedVolunteerCount),
-                  ),
-                ],
+            ],
+          ),
+          const SizedBox(height: DsSpacing.sm),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: DsStatusChip(
+              label: statusLabel,
+              status: _chipStatusFor(tone),
+            ),
+          ),
+          const SizedBox(height: DsSpacing.md),
+          _CardInformation(
+            icon: DsIcons.mapPin,
+            text: concert.venueName ?? '—',
+          ),
+          const SizedBox(height: DsSpacing.sm),
+          _CardInformation(
+            icon: DsIcons.calendar,
+            text: formatLongFrenchDate(concert.date),
+          ),
+          if (concert.cateringClosesAt != null) ...[
+            const SizedBox(height: DsSpacing.sm),
+            _CardInformation(
+              icon: DsIcons.clock,
+              text:
+                  'Catering : ${formatDatabaseTime(concert.cateringClosesAt!)}',
+            ),
+            const SizedBox(height: DsSpacing.sm),
+            _CardInformation(
+              icon: DsIcons.footprints,
+              text:
+                  'Arrivée recommandée : '
+                  '${recommendedArrivalFromDatabase(concert.cateringClosesAt!)}',
+            ),
+          ],
+          const SizedBox(height: DsSpacing.md),
+          Divider(height: 1, color: colors.border),
+          const SizedBox(height: DsSpacing.md),
+          Wrap(
+            spacing: 24,
+            runSpacing: 8,
+            children: [
+              _Metadata(
+                label: 'Producteur',
+                value: concert.promoterOrganizationName ?? '—',
+              ),
+              _Metadata(
+                label: 'Équipe',
+                value: _volunteerCountLabel(concert.selectedVolunteerCount),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -678,29 +671,29 @@ class _EmptyConcerts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.music_note_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 20),
+            const ClubSandwichMascot(size: 96, color: MascotColor.orange),
+            const SizedBox(height: DsSpacing.lg),
             Text(
               'Aucune maraude',
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: DsTypography.h2.copyWith(color: colors.textPrimary),
             ),
-            const SizedBox(height: 8),
-            const Text('Ouvrez votre première maraude.'),
-            const SizedBox(height: 24),
-            FilledButton.icon(
+            const SizedBox(height: DsSpacing.sm),
+            Text(
+              'Ouvrez votre première maraude.',
+              style: DsTypography.body.copyWith(color: colors.textSecondary),
+            ),
+            const SizedBox(height: DsSpacing.xl),
+            DsPrimaryButton(
+              icon: DsIcons.plus,
+              label: 'Ouvrir une maraude',
               onPressed: onCreate,
-              icon: const Icon(Icons.add),
-              label: const Text('Ouvrir une maraude'),
             ),
           ],
         ),
@@ -714,24 +707,24 @@ class _NoFilterResults extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.search_off_outlined,
-              size: 56,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 16),
+            Icon(DsIcons.search, size: 48, color: colors.textSecondary),
+            const SizedBox(height: DsSpacing.lg),
             Text(
               'Aucun résultat',
-              style: Theme.of(context).textTheme.titleLarge,
+              style: DsTypography.h3.copyWith(color: colors.textPrimary),
             ),
-            const SizedBox(height: 8),
-            const Text('Modifiez ou effacez les filtres.'),
+            const SizedBox(height: DsSpacing.sm),
+            Text(
+              'Modifiez ou effacez les filtres.',
+              style: DsTypography.body.copyWith(color: colors.textSecondary),
+            ),
           ],
         ),
       ),
@@ -805,12 +798,21 @@ class _CardInformation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
     return Row(
       children: [
-        Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(width: 8),
+        Icon(icon, size: 18, color: colors.textSecondary),
+        const SizedBox(width: DsSpacing.sm),
         Expanded(
-          child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis),
+          child: Text(
+            text,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: DsTypography.caption.copyWith(
+              color: colors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ],
     );
@@ -825,14 +827,24 @@ class _Metadata extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: Theme.of(context).textTheme.labelMedium),
+          Text(
+            label,
+            style: DsTypography.caption.copyWith(color: colors.textSecondary),
+          ),
           const SizedBox(height: 2),
-          Text(value, style: Theme.of(context).textTheme.bodyMedium),
+          Text(
+            value,
+            style: DsTypography.body.copyWith(
+              color: colors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ],
       ),
     );
@@ -871,6 +883,16 @@ MaraudeCalendarItem _concertCalendarItem(Concert concert) {
   }
   return ('Préparation · Équipe incomplète', MaraudeCalendarTone.tertiary);
 }
+
+DsChipStatus _chipStatusFor(MaraudeCalendarTone tone) => switch (tone) {
+  MaraudeCalendarTone.error => DsChipStatus.cancelled,
+  MaraudeCalendarTone.neutral => DsChipStatus.completed,
+  MaraudeCalendarTone.primary => DsChipStatus.active,
+  MaraudeCalendarTone.green => DsChipStatus.completed,
+  MaraudeCalendarTone.tertiary => DsChipStatus.pending,
+  MaraudeCalendarTone.blue => DsChipStatus.active,
+  MaraudeCalendarTone.orange => DsChipStatus.pending,
+};
 
 List<Concert> _sortForDashboard(List<Concert> concerts) {
   final now = DateTime.now();

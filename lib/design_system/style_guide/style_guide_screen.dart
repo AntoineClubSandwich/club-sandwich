@@ -36,12 +36,11 @@ import '../tokens/ds_tokens.dart';
 import '../tokens/ds_typography.dart';
 
 /// `/style-guide` — every design-system component in one place, with
-/// mock data, so the new visual identity can be reviewed before any real
-/// screen adopts it. Admin-only, absent from the navigation menu (see
-/// `lib/core/router/app_router.dart`). Wraps its whole subtree in
-/// `Theme(data: DsTheme.light, ...)`: it is the *only* place in the app
-/// that renders with the new theme — every other screen keeps using
-/// `AppTheme.light` untouched.
+/// mock data. Admin-only, absent from the navigation menu (see
+/// `lib/core/router/app_router.dart`). `DsTheme.light` is now the app-wide
+/// theme (`lib/app.dart`), so the local `Theme(data: DsTheme.light, ...)`
+/// wrap here is redundant but harmless — kept so this screen still renders
+/// correctly if it's ever revisited in isolation.
 class StyleGuideScreen extends StatelessWidget {
   const StyleGuideScreen({super.key});
 

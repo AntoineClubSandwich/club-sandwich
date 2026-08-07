@@ -3,6 +3,7 @@ import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
+import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_calendar.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_list_section.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
@@ -40,43 +41,46 @@ class _VolunteersScreenState extends ConsumerState<VolunteersScreen> {
     }
     final overview = ref.watch(maraudeOverviewProvider);
     final viewMode = ref.watch(concertViewModeProvider);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Column(
-        children: [
-          MaraudeViewToolbar(
-            title: 'Mes maraudes',
-            viewMode: viewMode,
-            onViewChanged: (mode) =>
-                ref.read(concertViewModeProvider.notifier).select(mode),
-            selectorKey: const ValueKey('volunteer-view-selector'),
-          ),
-          Expanded(
-            child: overview.when(
-              loading: () =>
-                  const AppLoadingState(label: 'Chargement des maraudes'),
-              error: (_, _) => AppErrorState(
-                message: 'Impossible de charger vos maraudes.',
-                onRetry: () => ref.invalidate(maraudeOverviewProvider),
-              ),
-              data: (items) => viewMode == ConcertViewMode.list
-                  ? _VolunteerMaraudes(items: items)
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 48),
-                      child: MaraudeCalendar(
-                        month: _displayedMonth,
-                        items: items
-                            .map(_volunteerCalendarItem)
-                            .toList(growable: false),
-                        onPreviousMonth: () => _changeMonth(-1),
-                        onNextMonth: () => _changeMonth(1),
-                        onToday: _goToCurrentMonth,
-                        onOpen: (id) => context.go('/maraudes/$id'),
-                      ),
-                    ),
+    return Theme(
+      data: DsTheme.light,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Column(
+          children: [
+            MaraudeViewToolbar(
+              title: 'Mes maraudes',
+              viewMode: viewMode,
+              onViewChanged: (mode) =>
+                  ref.read(concertViewModeProvider.notifier).select(mode),
+              selectorKey: const ValueKey('volunteer-view-selector'),
             ),
-          ),
-        ],
+            Expanded(
+              child: overview.when(
+                loading: () =>
+                    const AppLoadingState(label: 'Chargement des maraudes'),
+                error: (_, _) => AppErrorState(
+                  message: 'Impossible de charger vos maraudes.',
+                  onRetry: () => ref.invalidate(maraudeOverviewProvider),
+                ),
+                data: (items) => viewMode == ConcertViewMode.list
+                    ? _VolunteerMaraudes(items: items)
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 48),
+                        child: MaraudeCalendar(
+                          month: _displayedMonth,
+                          items: items
+                              .map(_volunteerCalendarItem)
+                              .toList(growable: false),
+                          onPreviousMonth: () => _changeMonth(-1),
+                          onNextMonth: () => _changeMonth(1),
+                          onToday: _goToCurrentMonth,
+                          onOpen: (id) => context.go('/maraudes/$id'),
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
