@@ -1,3 +1,4 @@
+import 'package:club_sandwich/design_system/components/ds_pressable.dart';
 import 'package:club_sandwich/design_system/components/feedback/ds_empty_state.dart';
 import 'package:club_sandwich/design_system/components/indicators/ds_status_chip.dart';
 import 'package:club_sandwich/design_system/components/navigation/ds_section_header.dart';
@@ -5,12 +6,14 @@ import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
 import 'package:club_sandwich/design_system/components/surfaces/ds_metric_card.dart';
 import 'package:club_sandwich/design_system/icons/ds_icons.dart';
 import 'package:club_sandwich/design_system/illustrations/ds_illustration.dart';
+import 'package:club_sandwich/design_system/tokens/ds_borders.dart';
 import 'package:club_sandwich/design_system/tokens/ds_motion.dart';
+import 'package:club_sandwich/design_system/tokens/ds_radius.dart';
+import 'package:club_sandwich/design_system/tokens/ds_shadows.dart';
 import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
 import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
 import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
-import 'package:club_sandwich/design_system/widgets/club_sandwich_mascot.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
@@ -651,49 +654,88 @@ class _DashboardHero extends StatelessWidget {
         : '$todayCount maraude${todayCount > 1 ? 's' : ''} prévue'
               '${todayCount > 1 ? 's' : ''} aujourd’hui';
 
-    return DsCard(
+    return Container(
+      padding: const EdgeInsets.all(DsSpacing.xl),
+      decoration: BoxDecoration(
+        color: colors.primary,
+        borderRadius: DsRadius.mdRadius,
+        border: Border.all(color: colors.borderStrong, width: DsBorders.thick),
+        boxShadow: DsShadows.elevated(colors.borderStrong),
+      ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 560;
-          final illustration = const ClubSandwichMascot(
-            size: 88,
-            color: MascotColor.orange,
-          );
           final text = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                greeting,
-                style: DsTypography.h1.copyWith(color: colors.textPrimary),
+                greeting.toUpperCase(),
+                style: DsTypography.h1.copyWith(color: colors.textOnColor),
               ),
               const SizedBox(height: DsSpacing.sm),
               Text(
-                summary,
-                style: DsTypography.body.copyWith(color: colors.textSecondary),
+                '🥪 $summary',
+                style: DsTypography.body.copyWith(
+                  color: colors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           );
+          const badge = _AdminHeroBadge();
           if (compact) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                illustration,
+                Align(alignment: Alignment.topRight, child: badge),
                 const SizedBox(height: DsSpacing.lg),
                 text,
               ],
             );
           }
           return Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(child: text),
               const SizedBox(width: DsSpacing.xl),
-              illustration,
+              badge,
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// The "ADMIN" role pill in the dashboard hero. White fill (not a new
+/// saturated brand color) so it reads clearly against the orange banner
+/// without introducing an accent outside the established palette.
+class _AdminHeroBadge extends StatelessWidget {
+  const _AdminHeroBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<DsTokens>()!;
+    final colors = tokens.colors;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DsSpacing.md,
+        vertical: DsSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: DsRadius.pillRadius,
+        border: Border.all(color: colors.borderStrong, width: DsBorders.thick),
+        boxShadow: DsShadows.card(colors.borderStrong),
+      ),
+      child: Text(
+        'ADMIN',
+        style: DsTypography.caption.copyWith(
+          color: colors.primary,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
@@ -798,42 +840,80 @@ class _QuickActionTile extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.isPrimary = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final bool isPrimary;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<DsTokens>()!;
     final colors = tokens.colors;
-    return DsCard(
+    if (!isPrimary) {
+      return DsCard(
+        onTap: onTap,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 24, color: colors.textPrimary),
+            const SizedBox(width: DsSpacing.md),
+            Expanded(
+              child: Text(
+                label,
+                style: DsTypography.body.copyWith(
+                  color: colors.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return DsPressable(
       onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: colors.primarySelectedBg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 20, color: colors.primary),
+      builder: (context, state) {
+        final shadow = DsShadows.card(colors.borderStrong);
+        final pressDelta = state.pressed ? shadow.first.offset : Offset.zero;
+        return AnimatedContainer(
+          duration: DsMotion.standard,
+          curve: DsMotion.curve,
+          transform: Matrix4.translationValues(pressDelta.dx, pressDelta.dy, 0),
+          padding: const EdgeInsets.symmetric(
+            horizontal: DsSpacing.lg,
+            vertical: DsSpacing.lg,
           ),
-          const SizedBox(height: DsSpacing.md),
-          Text(
-            label,
-            style: DsTypography.body.copyWith(
-              color: colors.textPrimary,
-              fontWeight: FontWeight.w600,
+          decoration: BoxDecoration(
+            color: colors.primary,
+            borderRadius: DsRadius.mdRadius,
+            border: Border.all(
+              color: colors.borderStrong,
+              width: DsBorders.thick,
             ),
+            boxShadow: state.pressed ? const [] : shadow,
           ),
-        ],
-      ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 24, color: colors.textOnColor),
+              const SizedBox(width: DsSpacing.md),
+              Expanded(
+                child: Text(
+                  label,
+                  style: DsTypography.body.copyWith(
+                    color: colors.textOnColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -865,6 +945,7 @@ class _QuickActionsSection extends StatelessWidget {
                 child: _QuickActionTile(
                   icon: DsIcons.plus,
                   label: 'Nouvelle maraude',
+                  isPrimary: true,
                   onTap: () => context.go('/maraudes'),
                 ),
               ),
@@ -1022,17 +1103,21 @@ class _ActivityRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 32,
-              height: 32,
+              width: 40,
+              height: 40,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
+                color: iconColor,
+                borderRadius: DsRadius.smRadius,
+                border: Border.all(
+                  color: colors.borderStrong,
+                  width: DsBorders.standard,
+                ),
               ),
               child: Icon(
                 cancelled ? DsIcons.circleX : DsIcons.circleCheck,
-                size: 16,
-                color: iconColor,
+                size: 18,
+                color: colors.textOnColor,
               ),
             ),
             const SizedBox(width: DsSpacing.md),
@@ -1048,15 +1133,30 @@ class _ActivityRow extends StatelessWidget {
                           item.artist,
                           style: DsTypography.body.copyWith(
                             color: colors.textPrimary,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
                       const SizedBox(width: DsSpacing.sm),
-                      Text(
-                        formatLongFrenchDate(item.date),
-                        style: DsTypography.caption.copyWith(
-                          color: colors.textSecondary,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: DsSpacing.sm,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colors.primary,
+                          borderRadius: DsRadius.smRadius,
+                          border: Border.all(
+                            color: colors.borderStrong,
+                            width: DsBorders.standard,
+                          ),
+                        ),
+                        child: Text(
+                          formatLongFrenchDate(item.date),
+                          style: DsTypography.caption.copyWith(
+                            color: colors.textOnColor,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ],

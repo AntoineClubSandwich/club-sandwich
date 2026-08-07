@@ -32,8 +32,8 @@ class DsSectionHeader extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                title,
-                style: DsTypography.h2.copyWith(color: colors.textPrimary),
+                title.toUpperCase(),
+                style: DsTypography.h3.copyWith(color: colors.textPrimary),
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: DsSpacing.xs),

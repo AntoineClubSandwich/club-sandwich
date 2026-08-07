@@ -25,6 +25,7 @@ class DsColorTokens {
     required this.border,
     required this.borderSubtle,
     required this.borderFocus,
+    required this.borderStrong,
     required this.success,
     required this.successBg,
     required this.successHover,
@@ -66,6 +67,12 @@ class DsColorTokens {
   final Color border;
   final Color borderSubtle;
   final Color borderFocus;
+
+  /// Structural "ink" border/shadow color for the neo-brutalist surfaces
+  /// (`DsCard`, buttons, chips): a thick outline or a hard offset shadow,
+  /// as opposed to [border]'s hairline dividers. Same hex as [textPrimary]
+  /// — it's the same near-black ink, just named for its structural role.
+  final Color borderStrong;
 
   final Color success;
   final Color successBg;
@@ -110,6 +117,7 @@ class DsColorTokens {
     border: Color(0xFFE5E7EB),
     borderSubtle: Color(0xFFEEF0F3),
     borderFocus: Color(0xFFEA5133),
+    borderStrong: Color(0xFF14161A),
     success: Color(0xFF1F9254),
     successBg: Color(0xFFE7F6EE),
     successHover: Color(0xFF187A45),
@@ -151,6 +159,7 @@ class DsColorTokens {
       border: c(border, other.border),
       borderSubtle: c(borderSubtle, other.borderSubtle),
       borderFocus: c(borderFocus, other.borderFocus),
+      borderStrong: c(borderStrong, other.borderStrong),
       success: c(success, other.success),
       successBg: c(successBg, other.successBg),
       successHover: c(successHover, other.successHover),

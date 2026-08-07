@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../tokens/ds_borders.dart';
 import '../../tokens/ds_colors.dart';
 import '../../tokens/ds_motion.dart';
 import '../../tokens/ds_radius.dart';
+import '../../tokens/ds_shadows.dart';
 import '../../tokens/ds_spacing.dart';
 import '../../tokens/ds_tokens.dart';
 import '../../tokens/ds_typography.dart';
@@ -91,6 +93,13 @@ class DsNavigationRail extends StatelessWidget {
           decoration: BoxDecoration(
             color: background,
             borderRadius: DsRadius.lgRadius,
+            border: selected
+                ? Border.all(
+                    color: colors.borderStrong,
+                    width: DsBorders.standard,
+                  )
+                : null,
+            boxShadow: selected ? DsShadows.card(colors.borderStrong) : null,
           ),
           child: Row(
             children: [

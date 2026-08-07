@@ -258,11 +258,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Candidatures à examiner'), findsOneWidget);
+    expect(find.text('CANDIDATURES À EXAMINER'), findsOneWidget);
     expect(find.text('Équipe non constituée'), findsWidgets);
     expect(find.text('2 candidatures à examiner'), findsOneWidget);
-    expect(find.text('Aujourd’hui'), findsOneWidget);
-    expect(find.text('Maraudes passées non clôturées'), findsOneWidget);
+    expect(find.text('AUJOURD’HUI'), findsOneWidget);
+    expect(find.text('MARAUDES PASSÉES NON CLÔTURÉES'), findsOneWidget);
     expect(find.text('Constituer l’équipe'), findsOneWidget);
     expect(find.text('Saisir le compte rendu'), findsOneWidget);
     expect(find.text('2 bénévoles'), findsOneWidget);
@@ -308,7 +308,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Confirmations bénévoles en attente'), findsOneWidget);
+      expect(find.text('CONFIRMATIONS BÉNÉVOLES EN ATTENTE'), findsOneWidget);
       expect(find.text('Suivre les confirmations'), findsOneWidget);
       expect(
         find.text('Invitations nécessitant votre attention'),
@@ -396,7 +396,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Présences et crédits à valider'), findsOneWidget);
+    expect(find.text('PRÉSENCES ET CRÉDITS À VALIDER'), findsOneWidget);
     expect(find.text('2 crédits à valider'), findsOneWidget);
     expect(find.text('Dernières maraudes clôturées'), findsNothing);
   });
@@ -497,7 +497,7 @@ void main() {
     expect(find.text('Prochaine mission'), findsOneWidget);
     expect(find.text('Disponibilités en attente'), findsOneWidget);
     expect(find.text('Rôle : Chargé.e de logistique'), findsOneWidget);
-    expect(find.text('Candidatures à examiner'), findsNothing);
+    expect(find.text('CANDIDATURES À EXAMINER'), findsNothing);
   });
 
   testWidgets(

@@ -2,25 +2,21 @@ import 'package:flutter/widgets.dart';
 
 /// Shadow tokens for the Club Sandwich design system.
 ///
-/// Deliberately extremely subtle — this system avoids the heavy Material
-/// default elevation shadows. `card` is for resting surfaces, `elevated`
-/// for surfaces that float above the page (dialogs, dropdown menus, bottom
-/// sheets), `focusRing` is a keyboard-focus indicator, not a shadow proper.
+/// Hard, offset, zero-blur "ink" shadows — the neo-brutalist signature —
+/// rather than Material's soft blurred elevation. `card` is for resting
+/// surfaces, `elevated` for surfaces that float above the page (dialogs,
+/// dropdown menus, bottom sheets). Both take the active `colors.borderStrong`
+/// ink color, same pattern as `focusRing` already used for `colors.primary`,
+/// so the shadow color always tracks the active theme rather than being
+/// hardcoded. `focusRing` itself is a keyboard-focus indicator, not a
+/// shadow proper.
 abstract final class DsShadows {
-  static const List<BoxShadow> card = [
-    BoxShadow(
-      color: Color(0x0A000000), // #000000 @ 4%
-      blurRadius: 2,
-      offset: Offset(0, 1),
-    ),
+  static List<BoxShadow> card(Color ink) => [
+    BoxShadow(color: ink, offset: const Offset(3, 3)),
   ];
 
-  static const List<BoxShadow> elevated = [
-    BoxShadow(
-      color: Color(0x14000000), // #000000 @ 8%
-      blurRadius: 24,
-      offset: Offset(0, 8),
-    ),
+  static List<BoxShadow> elevated(Color ink) => [
+    BoxShadow(color: ink, offset: const Offset(5, 5)),
   ];
 
   static List<BoxShadow> focusRing(Color primary) => [

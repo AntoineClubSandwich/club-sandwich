@@ -4,36 +4,49 @@ import 'ds_colors.dart';
 
 /// Typography scale for the Club Sandwich design system.
 ///
-/// Backed by Inter (bundled as a variable font in `assets/fonts/`,
+/// Backed by Archivo (bundled as a variable font in `assets/fonts/`,
 /// SIL Open Font License — same license family as the Noto Sans already
-/// bundled for PDF export). Each named style below is mapped onto a
-/// standard Material 3 `TextTheme` slot in [DsTypography.buildTextTheme]
-/// so incidental Material widgets inherit a consistent look too; use the
-/// named aliases (`DsTypography.h1`, ...) directly when a `Ds*` component
-/// wants to be explicit about intent rather than reaching for the
-/// Material slot name.
+/// bundled for PDF export) for body/UI text, and the dedicated Archivo
+/// Black family ([displayFontFamily]) for high-impact headlines and big
+/// numbers — the neo-brutalist type pairing. Each named style below is
+/// mapped onto a standard Material 3 `TextTheme` slot in
+/// [DsTypography.buildTextTheme] so incidental Material widgets inherit a
+/// consistent look too; use the named aliases (`DsTypography.h1`, ...)
+/// directly when a `Ds*` component wants to be explicit about intent
+/// rather than reaching for the Material slot name.
 abstract final class DsTypography {
-  static const String fontFamily = 'Inter';
+  static const String fontFamily = 'Archivo';
+  static const String displayFontFamily = 'Archivo Black';
 
   static const TextStyle h1 = TextStyle(
-    fontFamily: fontFamily,
+    fontFamily: displayFontFamily,
     fontSize: 32,
     height: 40 / 32,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w400,
   );
 
   static const TextStyle h2 = TextStyle(
-    fontFamily: fontFamily,
+    fontFamily: displayFontFamily,
     fontSize: 24,
     height: 32 / 24,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w400,
   );
 
   static const TextStyle h3 = TextStyle(
-    fontFamily: fontFamily,
+    fontFamily: displayFontFamily,
     fontSize: 20,
     height: 28 / 20,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w400,
+  );
+
+  /// Large, high-impact figures — KPI values, hero stats. Archivo Black,
+  /// bigger than [h1]; distinct from the headline slots because it's
+  /// meant for a single short number/word, not a wrapping line.
+  static const TextStyle display = TextStyle(
+    fontFamily: displayFontFamily,
+    fontSize: 40,
+    height: 44 / 40,
+    fontWeight: FontWeight.w400,
   );
 
   static const TextStyle body = TextStyle(

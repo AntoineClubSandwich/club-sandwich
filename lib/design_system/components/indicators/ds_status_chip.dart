@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../tokens/ds_borders.dart';
 import '../../tokens/ds_radius.dart';
 import '../../tokens/ds_spacing.dart';
 import '../../tokens/ds_tokens.dart';
@@ -53,7 +54,10 @@ class DsStatusChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: semantic.background,
         borderRadius: DsRadius.pillRadius,
-        border: Border.all(color: colors.border),
+        border: Border.all(
+          color: colors.borderStrong,
+          width: DsBorders.hairline,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

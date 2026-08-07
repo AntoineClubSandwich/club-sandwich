@@ -29,7 +29,7 @@ class DsBottomSheet extends StatelessWidget {
           topLeft: Radius.circular(DsRadius.lg),
           topRight: Radius.circular(DsRadius.lg),
         ),
-        boxShadow: DsShadows.elevated,
+        boxShadow: DsShadows.elevated(colors.borderStrong),
       ),
       padding: const EdgeInsets.fromLTRB(
         DsSpacing.xl,

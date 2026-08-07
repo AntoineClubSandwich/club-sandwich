@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../tokens/ds_borders.dart';
 import '../../tokens/ds_radius.dart';
 import '../../tokens/ds_shadows.dart';
 import '../../tokens/ds_spacing.dart';
@@ -36,7 +37,11 @@ class DsDialog extends StatelessWidget {
           decoration: BoxDecoration(
             color: colors.surfaceElevated,
             borderRadius: DsRadius.lgRadius,
-            boxShadow: DsShadows.elevated,
+            border: Border.all(
+              color: colors.borderStrong,
+              width: DsBorders.standard,
+            ),
+            boxShadow: DsShadows.elevated(colors.borderStrong),
           ),
           padding: const EdgeInsets.all(DsSpacing.xl),
           child: Column(

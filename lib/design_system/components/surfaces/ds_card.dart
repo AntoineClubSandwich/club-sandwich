@@ -8,9 +8,12 @@ import '../../tokens/ds_tokens.dart';
 import '../ds_pressable.dart';
 
 /// The base "floating card" surface of the design system: white, a hair
-/// of border, an extremely subtle shadow — never a heavy Material
-/// elevation. Every other surface component (`DsMetricCard`, the domain
-/// showcase cards) is built on top of this one.
+/// of border, a hard offset ink shadow — the neo-brutalist signature,
+/// never a soft Material elevation. Every other surface component
+/// (`DsMetricCard`, the domain showcase cards) is built on top of this
+/// one. When [onTap] is set, pressing the card shrinks its shadow offset
+/// and nudges the card toward it — simulating it physically pressing
+/// onto its own shadow.
 class DsCard extends StatelessWidget {
   const DsCard({
     super.key,
@@ -30,39 +33,38 @@ class DsCard extends StatelessWidget {
     final tokens = Theme.of(context).extension<DsTokens>()!;
     final colors = tokens.colors;
 
-    Widget buildSurface(bool hovered) {
+    Widget buildSurface(bool hovered, bool pressed) {
+      final shadowOffsets = elevated
+          ? DsShadows.elevated(colors.borderStrong)
+          : (hovered
+                ? DsShadows.elevated(colors.borderStrong)
+                : DsShadows.card(colors.borderStrong));
+      final pressDelta = pressed && shadowOffsets.isNotEmpty
+          ? shadowOffsets.first.offset
+          : Offset.zero;
+
       return AnimatedContainer(
         duration: DsMotion.standard,
         curve: DsMotion.curve,
+        transform: Matrix4.translationValues(pressDelta.dx, pressDelta.dy, 0),
         padding: padding,
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: DsRadius.lgRadius,
+          borderRadius: DsRadius.mdRadius,
           border: Border.all(color: colors.border),
-          boxShadow: elevated
-              ? DsShadows.elevated
-              : (hovered ? DsShadows.elevated : DsShadows.card),
+          boxShadow: pressed ? const [] : shadowOffsets,
         ),
         child: child,
       );
     }
 
     if (onTap == null) {
-      return buildSurface(false);
+      return buildSurface(false, false);
     }
 
     return DsPressable(
       onTap: onTap,
-      builder: (context, state) => AnimatedScale(
-        scale: state.pressed
-            ? 0.99
-            : state.hovered
-            ? 1.01
-            : 1,
-        duration: DsMotion.standard,
-        curve: DsMotion.curve,
-        child: buildSurface(state.hovered),
-      ),
+      builder: (context, state) => buildSurface(state.hovered, state.pressed),
     );
   }
 }

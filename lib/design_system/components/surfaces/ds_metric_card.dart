@@ -77,7 +77,7 @@ class DsMetricCard extends StatelessWidget {
           const SizedBox(height: DsSpacing.md),
           Text(
             value,
-            style: DsTypography.h2.copyWith(color: colors.textPrimary),
+            style: DsTypography.display.copyWith(color: colors.textPrimary),
           ),
           if (delta != null) ...[
             const SizedBox(height: DsSpacing.xs),

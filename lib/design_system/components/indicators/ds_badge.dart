@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../tokens/ds_borders.dart';
 import '../../tokens/ds_radius.dart';
 import '../../tokens/ds_spacing.dart';
 import '../../tokens/ds_tokens.dart';
@@ -23,7 +24,8 @@ class DsBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<DsTokens>()!;
-    final semantic = DsSemanticColors.resolve(tokens.colors, variant);
+    final colors = tokens.colors;
+    final semantic = DsSemanticColors.resolve(colors, variant);
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -33,6 +35,10 @@ class DsBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: semantic.background,
         borderRadius: DsRadius.pillRadius,
+        border: Border.all(
+          color: colors.borderStrong,
+          width: DsBorders.hairline,
+        ),
       ),
       child: Text(
         label,

@@ -23,6 +23,7 @@ abstract final class DsIcons {
 
   // Navigation
   static const IconData home = LucideIcons.home;
+  static const IconData layoutDashboard = LucideIcons.layoutDashboard;
   static const IconData chevronDown = LucideIcons.chevronDown;
   static const IconData chevronLeft = LucideIcons.chevronLeft;
   static const IconData chevronRight = LucideIcons.chevronRight;
@@ -42,7 +43,9 @@ abstract final class DsIcons {
   // People & organisations
   static const IconData user = LucideIcons.user;
   static const IconData users = LucideIcons.users;
+  static const IconData users2 = LucideIcons.users2;
   static const IconData building = LucideIcons.building;
+  static const IconData building2 = LucideIcons.building2;
 
   // Domain (maraudes)
   static const IconData calendar = LucideIcons.calendar;
@@ -51,8 +54,10 @@ abstract final class DsIcons {
   static const IconData mail = LucideIcons.mail;
   static const IconData scale = LucideIcons.scale;
   static const IconData route = LucideIcons.route;
+  static const IconData truck = LucideIcons.truck;
   static const IconData utensils = LucideIcons.utensils;
   static const IconData heart = LucideIcons.heart;
+  static const IconData fileDown = LucideIcons.fileDown;
 
   // Metrics & achievement
   static const IconData trendingUp = LucideIcons.trendingUp;

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../tokens/ds_borders.dart';
 import '../../tokens/ds_motion.dart';
 import '../../tokens/ds_radius.dart';
+import '../../tokens/ds_shadows.dart';
 import '../../tokens/ds_spacing.dart';
 import '../../tokens/ds_tokens.dart';
 import '../../tokens/ds_typography.dart';
@@ -43,57 +45,63 @@ class DsPrimaryButton extends StatelessWidget {
             ? colors.primaryHover
             : colors.primary;
 
-        return AnimatedScale(
-          scale: state.pressed ? 0.97 : 1,
+        final shadow = DsShadows.card(colors.borderStrong);
+        final pressDelta = state.pressed && enabled
+            ? shadow.first.offset
+            : Offset.zero;
+
+        return AnimatedContainer(
           duration: DsMotion.standard,
           curve: DsMotion.curve,
-          child: AnimatedContainer(
-            duration: DsMotion.standard,
-            curve: DsMotion.curve,
-            width: isFullWidth ? double.infinity : null,
-            padding: const EdgeInsets.symmetric(horizontal: DsSpacing.lg),
-            height: 44,
-            alignment: isFullWidth ? Alignment.center : null,
-            decoration: BoxDecoration(
-              color: background,
-              borderRadius: DsRadius.lgRadius,
+          transform: Matrix4.translationValues(pressDelta.dx, pressDelta.dy, 0),
+          width: isFullWidth ? double.infinity : null,
+          padding: const EdgeInsets.symmetric(horizontal: DsSpacing.lg),
+          height: 44,
+          alignment: isFullWidth ? Alignment.center : null,
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: DsRadius.lgRadius,
+            border: Border.all(
+              color: colors.borderStrong,
+              width: DsBorders.thick,
             ),
-            child: Row(
-              mainAxisSize: isFullWidth ? MainAxisSize.max : MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedSwitcher(
-                  duration: DsMotion.standard,
-                  child: isLoading
-                      ? SizedBox(
-                          key: const ValueKey('loading'),
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: colors.textOnColor,
-                          ),
-                        )
-                      : icon != null
-                      ? Icon(
-                          icon,
-                          key: const ValueKey('icon'),
-                          size: 18,
+            boxShadow: state.pressed || !enabled ? const [] : shadow,
+          ),
+          child: Row(
+            mainAxisSize: isFullWidth ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedSwitcher(
+                duration: DsMotion.standard,
+                child: isLoading
+                    ? SizedBox(
+                        key: const ValueKey('loading'),
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
                           color: colors.textOnColor,
-                        )
-                      : const SizedBox.shrink(key: ValueKey('no-icon')),
+                        ),
+                      )
+                    : icon != null
+                    ? Icon(
+                        icon,
+                        key: const ValueKey('icon'),
+                        size: 18,
+                        color: colors.textOnColor,
+                      )
+                    : const SizedBox.shrink(key: ValueKey('no-icon')),
+              ),
+              if (isLoading || icon != null)
+                const SizedBox(width: DsSpacing.sm),
+              Text(
+                label,
+                style: DsTypography.body.copyWith(
+                  color: colors.textOnColor,
+                  fontWeight: FontWeight.w600,
                 ),
-                if (isLoading || icon != null)
-                  const SizedBox(width: DsSpacing.sm),
-                Text(
-                  label,
-                  style: DsTypography.body.copyWith(
-                    color: colors.textOnColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
