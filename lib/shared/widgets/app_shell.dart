@@ -323,7 +323,7 @@ class _UserAccountPanelState extends ConsumerState<_UserAccountPanel> {
       padding: const EdgeInsets.all(DsSpacing.md),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: DsRadius.lgRadius,
+        borderRadius: DsRadius.xlRadius,
         border: Border.all(color: colors.border, width: DsBorders.hairline),
         boxShadow: DsShadows.ambient(colors.textPrimary),
       ),
@@ -389,7 +389,6 @@ class _UserAccountPanelState extends ConsumerState<_UserAccountPanel> {
             enabled: !_isSigningOut,
             onTap: _signOut,
             builder: (context, state) {
-              final shadow = DsShadows.accent(colors.primary);
               return DsPressScale(
                 pressed: state.pressed,
                 child: AnimatedContainer(
@@ -400,22 +399,27 @@ class _UserAccountPanelState extends ConsumerState<_UserAccountPanel> {
                   ),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: colors.primary,
+                    color: state.hovered
+                        ? colors.neutralHoverOverlay
+                        : Colors.transparent,
                     borderRadius: DsRadius.mdRadius,
-                    boxShadow: state.pressed ? const [] : shadow,
+                    border: Border.all(
+                      color: colors.border,
+                      width: DsBorders.hairline,
+                    ),
                   ),
                   child: _isSigningOut
                       ? SizedBox.square(
                           dimension: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: colors.textOnColor,
+                            color: colors.textSecondary,
                           ),
                         )
                       : Text(
                           'SE DÉCONNECTER',
                           style: DsTypography.caption.copyWith(
-                            color: colors.textOnColor,
+                            color: colors.textSecondary,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -440,11 +444,11 @@ String _accountInitial(String label) {
   return normalizedLabel.isEmpty ? '?' : normalizedLabel[0].toUpperCase();
 }
 
-/// Desktop sidebar. [dark] switches between the tinted admin-only
-/// treatment (a light purple wash + mascot widget + "ADMIN" badge) and
-/// the plain canvas treatment used by every other role — same
-/// [_AppDestination] route list and navigation behavior either way, only
-/// the visuals differ.
+/// Desktop sidebar. [dark] switches between the admin-only treatment (a
+/// deep, softened indigo — [DsColorTokens.secondaryMuted], not a stark
+/// black — plus mascot widget + "ADMIN" badge) and the plain canvas
+/// treatment used by every other role — same [_AppDestination] route
+/// list and navigation behavior either way, only the visuals differ.
 class _DsSidebar extends StatelessWidget {
   const _DsSidebar({
     required this.dark,
@@ -469,7 +473,7 @@ class _DsSidebar extends StatelessWidget {
       key: AppShell.desktopSidebarKey,
       width: 280,
       decoration: BoxDecoration(
-        color: dark ? colors.primarySelectedBg : colors.canvas,
+        color: dark ? colors.secondaryMuted : colors.canvas,
         border: Border(
           right: BorderSide(color: colors.border, width: DsBorders.hairline),
         ),
@@ -555,8 +559,8 @@ class _DsNavItem extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  /// Whether this item sits on the tinted admin sidebar (unselected items
-  /// render as white cards) versus the plain canvas sidebar/drawer
+  /// Whether this item sits on the deep-indigo admin sidebar (unselected
+  /// items render as white cards) versus the plain canvas sidebar/drawer
   /// (unselected items are transparent with a subtle hover tint).
   final bool dark;
 
@@ -637,7 +641,7 @@ class _AdminMascotWidget extends StatelessWidget {
       padding: const EdgeInsets.all(DsSpacing.md),
       decoration: BoxDecoration(
         color: colors.surfaceElevated,
-        borderRadius: DsRadius.lgRadius,
+        borderRadius: DsRadius.xlRadius,
         border: Border.all(color: colors.border, width: DsBorders.hairline),
         boxShadow: DsShadows.ambientElevated(colors.textPrimary),
       ),

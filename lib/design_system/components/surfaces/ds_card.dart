@@ -45,7 +45,7 @@ class DsCard extends StatelessWidget {
           padding: padding,
           decoration: BoxDecoration(
             color: colors.surface,
-            borderRadius: DsRadius.lgRadius,
+            borderRadius: DsRadius.xlRadius,
             border: Border.all(color: colors.border),
             boxShadow: pressed ? const [] : shadow,
           ),

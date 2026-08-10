@@ -6,7 +6,6 @@ import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
 import 'package:club_sandwich/design_system/components/surfaces/ds_metric_card.dart';
 import 'package:club_sandwich/design_system/icons/ds_icons.dart';
 import 'package:club_sandwich/design_system/illustrations/ds_illustration.dart';
-import 'package:club_sandwich/design_system/tokens/ds_borders.dart';
 import 'package:club_sandwich/design_system/tokens/ds_motion.dart';
 import 'package:club_sandwich/design_system/tokens/ds_radius.dart';
 import 'package:club_sandwich/design_system/tokens/ds_shadows.dart';
@@ -1089,6 +1088,7 @@ class _ActivityRow extends StatelessWidget {
     final colors = tokens.colors;
     final cancelled = item.maraudeStatus == MaraudeStatus.cancelled;
     final iconColor = cancelled ? colors.error : colors.success;
+    final iconBg = cancelled ? colors.errorBg : colors.successBg;
 
     return GestureDetector(
       onTap: () => context.go('/maraudes/${item.concertId}'),
@@ -1102,17 +1102,13 @@ class _ActivityRow extends StatelessWidget {
               height: 40,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: iconColor,
+                color: iconBg,
                 borderRadius: DsRadius.smRadius,
-                border: Border.all(
-                  color: colors.borderStrong,
-                  width: DsBorders.standard,
-                ),
               ),
               child: Icon(
                 cancelled ? DsIcons.circleX : DsIcons.circleCheck,
                 size: 18,
-                color: colors.textOnColor,
+                color: iconColor,
               ),
             ),
             const SizedBox(width: DsSpacing.md),
@@ -1139,17 +1135,13 @@ class _ActivityRow extends StatelessWidget {
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: colors.primary,
+                          color: colors.primarySelectedBg,
                           borderRadius: DsRadius.smRadius,
-                          border: Border.all(
-                            color: colors.borderStrong,
-                            width: DsBorders.standard,
-                          ),
                         ),
                         child: Text(
                           formatLongFrenchDate(item.date),
                           style: DsTypography.caption.copyWith(
-                            color: colors.textOnColor,
+                            color: colors.primary,
                             fontWeight: FontWeight.w700,
                           ),
                         ),

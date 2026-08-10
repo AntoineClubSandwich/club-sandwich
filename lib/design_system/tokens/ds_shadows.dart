@@ -11,7 +11,7 @@ import 'package:flutter/widgets.dart';
 abstract final class DsShadows {
   static List<BoxShadow> ambient(Color tint) => [
     BoxShadow(
-      color: tint.withValues(alpha: 0.03),
+      color: tint.withValues(alpha: 0.06),
       offset: const Offset(0, 12),
       blurRadius: 12,
     ),
@@ -19,7 +19,7 @@ abstract final class DsShadows {
 
   static List<BoxShadow> ambientElevated(Color tint) => [
     BoxShadow(
-      color: tint.withValues(alpha: 0.03),
+      color: tint.withValues(alpha: 0.07),
       offset: const Offset(0, 12),
       blurRadius: 24,
     ),

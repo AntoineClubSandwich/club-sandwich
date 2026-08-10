@@ -19,6 +19,7 @@ class DsColorTokens {
     required this.secondaryPressed,
     required this.secondarySelectedBg,
     required this.secondaryDisabled,
+    required this.secondaryMuted,
     required this.canvas,
     required this.surface,
     required this.surfaceElevated,
@@ -62,6 +63,12 @@ class DsColorTokens {
   final Color secondaryPressed;
   final Color secondarySelectedBg;
   final Color secondaryDisabled;
+
+  /// A deep, softened indigo — [secondary]'s near-black ink lightened
+  /// with a hint of [primary]'s purple. For dark surfaces that want depth
+  /// and brand warmth (e.g. the admin sidebar) without reading as a stark
+  /// neo-brutalist black block.
+  final Color secondaryMuted;
 
   final Color canvas;
   final Color surface;
@@ -114,6 +121,7 @@ class DsColorTokens {
     secondaryPressed: Color(0xFF0E0E18),
     secondarySelectedBg: Color(0xFFF1F0EE),
     secondaryDisabled: Color(0x611A1A2E), // secondary @ 38%
+    secondaryMuted: Color(0xFF2D2B55),
     canvas: Color(0xFFF8F7F4),
     surface: Color(0xFFFFFFFF),
     surfaceElevated: Color(0xFFFFFFFF),
@@ -156,6 +164,7 @@ class DsColorTokens {
       secondaryPressed: c(secondaryPressed, other.secondaryPressed),
       secondarySelectedBg: c(secondarySelectedBg, other.secondarySelectedBg),
       secondaryDisabled: c(secondaryDisabled, other.secondaryDisabled),
+      secondaryMuted: c(secondaryMuted, other.secondaryMuted),
       canvas: c(canvas, other.canvas),
       surface: c(surface, other.surface),
       surfaceElevated: c(surfaceElevated, other.surfaceElevated),

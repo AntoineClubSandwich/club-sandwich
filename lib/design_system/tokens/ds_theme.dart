@@ -77,7 +77,7 @@ abstract final class DsTheme {
         color: colors.surface,
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
-          borderRadius: DsRadius.lgRadius,
+          borderRadius: DsRadius.xlRadius,
           side: BorderSide(color: colors.border, width: DsBorders.hairline),
         ),
       ),
@@ -123,6 +123,15 @@ abstract final class DsTheme {
         ),
       ),
       dividerTheme: DividerThemeData(color: colors.border, space: 24),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: colors.primary,
+        foregroundColor: colors.textOnColor,
+        extendedTextStyle: DsTypography.body.copyWith(
+          color: colors.textOnColor,
+          fontWeight: FontWeight.w600,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: DsRadius.pillRadius),
+      ),
     );
   }
 }
