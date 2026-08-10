@@ -1129,21 +1129,11 @@ class _ActivityRow extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: DsSpacing.sm),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: DsSpacing.sm,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.primarySelectedBg,
-                          borderRadius: DsRadius.smRadius,
-                        ),
-                        child: Text(
-                          formatLongFrenchDate(item.date),
-                          style: DsTypography.caption.copyWith(
-                            color: colors.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      Text(
+                        formatLongFrenchDate(item.date),
+                        style: DsTypography.caption.copyWith(
+                          color: colors.textSecondary,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
