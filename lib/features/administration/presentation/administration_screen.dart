@@ -1,3 +1,13 @@
+import 'package:club_sandwich/design_system/components/buttons/ds_secondary_button.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_avatar.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_badge.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_semantic_variant.dart';
+import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
+import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
+import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
+import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
+import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
+import 'package:club_sandwich/design_system/widgets/club_sandwich_mascot.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/organizations/data/organization_providers.dart';
@@ -18,50 +28,61 @@ class AdministrationScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final users = ref.watch(managedUsersProvider);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _invite(context, ref),
-        icon: const Icon(Icons.person_add_alt_1),
-        label: const Text('Inviter un utilisateur'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 96),
-        children: [
-          Text(
-            'Administration',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 4),
-          const Text('Utilisateurs et accès à la plateforme.'),
-          const SizedBox(height: 20),
-          users.when(
-            loading: () =>
-                const AppLoadingState(label: 'Chargement des utilisateurs'),
-            error: (_, _) => AppErrorState(
-              message: 'Impossible de charger les utilisateurs.',
-              onRetry: () => ref.invalidate(managedUsersProvider),
+    return Theme(
+      data: DsTheme.light,
+      child: Builder(
+        builder: (context) {
+          final colors = Theme.of(context).extension<DsTokens>()!.colors;
+          return Scaffold(
+            backgroundColor: Colors.transparent,
+            floatingActionButton: FloatingActionButton.extended(
+              onPressed: () => _invite(context, ref),
+              icon: const Icon(Icons.person_add_alt_1),
+              label: const Text('Inviter un utilisateur'),
             ),
-            data: (items) => items.isEmpty
-                ? const AppEmptyState(
-                    title: 'Aucun utilisateur',
-                    message: 'Aucun utilisateur n’est encore enregistré.',
-                    icon: Icons.manage_accounts_outlined,
-                  )
-                : LayoutBuilder(
-                    builder: (context, constraints) =>
-                        constraints.maxWidth >= 980
-                        ? _UsersTable(users: items)
-                        : Column(
-                            children: [
-                              for (final user in items) _UserCard(user: user),
-                            ],
-                          ),
+            body: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 96),
+              children: [
+                Text(
+                  'Administration',
+                  style: DsTypography.h2.copyWith(color: colors.textPrimary),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Utilisateurs et accès à la plateforme.',
+                  style: DsTypography.body.copyWith(
+                    color: colors.textSecondary,
                   ),
-          ),
-          const SizedBox(height: 24),
-          const _DocumentTemplatesSection(),
-        ],
+                ),
+                const SizedBox(height: DsSpacing.lg),
+                users.when(
+                  loading: () => const AppLoadingState(
+                    label: 'Chargement des utilisateurs',
+                  ),
+                  error: (_, _) => AppErrorState(
+                    message: 'Impossible de charger les utilisateurs.',
+                    onRetry: () => ref.invalidate(managedUsersProvider),
+                  ),
+                  data: (items) => items.isEmpty
+                      ? const _EmptyUsers()
+                      : LayoutBuilder(
+                          builder: (context, constraints) =>
+                              constraints.maxWidth >= 980
+                              ? _UsersTable(users: items)
+                              : Column(
+                                  children: [
+                                    for (final user in items)
+                                      _UserCard(user: user),
+                                  ],
+                                ),
+                        ),
+                ),
+                const SizedBox(height: DsSpacing.xl),
+                const _DocumentTemplatesSection(),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -179,36 +200,67 @@ class _SendingInvitationDialog extends StatelessWidget {
   );
 }
 
+class _EmptyUsers extends StatelessWidget {
+  const _EmptyUsers();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ClubSandwichMascot(size: 96, color: MascotColor.orange),
+            const SizedBox(height: DsSpacing.lg),
+            Text(
+              'Aucun utilisateur',
+              style: DsTypography.h2.copyWith(color: colors.textPrimary),
+            ),
+            const SizedBox(height: DsSpacing.sm),
+            Text(
+              'Aucun utilisateur n’est encore enregistré.',
+              style: DsTypography.body.copyWith(color: colors.textSecondary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DocumentTemplatesSection extends StatelessWidget {
   const _DocumentTemplatesSection();
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return DsCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Modèles de documents',
-            style: Theme.of(context).textTheme.titleMedium,
+            style: DsTypography.h3.copyWith(color: colors.textPrimary),
           ),
-          const SizedBox(height: 4),
-          const Text(
+          const SizedBox(height: 2),
+          Text(
             'Modèles vierges consultables par les bénévoles et les tourneurs.',
+            style: DsTypography.body.copyWith(color: colors.textSecondary),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: DsSpacing.md),
           const _TemplateRow(
             templateKey: DocumentTemplateKey.volunteerContract,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: DsSpacing.sm),
           const _TemplateRow(
             templateKey: DocumentTemplateKey.organizationConvention,
           ),
         ],
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _TemplateRow extends ConsumerStatefulWidget {
@@ -263,6 +315,7 @@ class _TemplateRowState extends ConsumerState<_TemplateRow> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
     final template = ref.watch(documentTemplateProvider(widget.templateKey));
     final hasTemplate = template.maybeWhen(
       data: (value) => value != null,
@@ -270,21 +323,26 @@ class _TemplateRowState extends ConsumerState<_TemplateRow> {
     );
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 12,
-      runSpacing: 8,
+      spacing: DsSpacing.md,
+      runSpacing: DsSpacing.sm,
       children: [
-        SizedBox(width: 280, child: Text(widget.templateKey.label)),
+        SizedBox(
+          width: 280,
+          child: Text(
+            widget.templateKey.label,
+            style: DsTypography.body.copyWith(
+              color: colors.textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
         if (hasTemplate)
           DocumentTemplateDownloadLink(templateKey: widget.templateKey),
-        OutlinedButton.icon(
+        DsSecondaryButton(
           onPressed: _uploading ? null : _replace,
-          icon: _uploading
-              ? const SizedBox.square(
-                  dimension: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.upload_file),
-          label: Text(hasTemplate ? 'Remplacer' : 'Déposer'),
+          isLoading: _uploading,
+          icon: Icons.upload_file,
+          label: hasTemplate ? 'Remplacer' : 'Déposer',
         ),
       ],
     );
@@ -296,42 +354,66 @@ class _UsersTable extends StatelessWidget {
   final List<ManagedUser> users;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columns: const [
-          DataColumn(label: Text('Nom')),
-          DataColumn(label: Text('Rôle')),
-          DataColumn(label: Text('Organisation')),
-          DataColumn(label: Text('Statut')),
-          DataColumn(label: Text('Invitation')),
-          DataColumn(label: Text('Dernière connexion')),
-          DataColumn(label: Text('Actions')),
-        ],
-        rows: [
-          for (final user in users)
-            DataRow(
-              cells: [
-                DataCell(
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [Text(user.displayName), Text(user.email)],
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return DsCard(
+      padding: EdgeInsets.zero,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingTextStyle: DsTypography.caption.copyWith(
+            color: colors.textSecondary,
+            fontWeight: FontWeight.w800,
+          ),
+          dataTextStyle: DsTypography.body.copyWith(color: colors.textPrimary),
+          dividerThickness: 1,
+          columns: const [
+            DataColumn(label: Text('Nom')),
+            DataColumn(label: Text('Rôle')),
+            DataColumn(label: Text('Organisation')),
+            DataColumn(label: Text('Statut')),
+            DataColumn(label: Text('Invitation')),
+            DataColumn(label: Text('Dernière connexion')),
+            DataColumn(label: Text('Actions')),
+          ],
+          rows: [
+            for (final user in users)
+              DataRow(
+                cells: [
+                  DataCell(
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.displayName,
+                          style: DsTypography.body.copyWith(
+                            color: colors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          user.email,
+                          style: DsTypography.caption.copyWith(
+                            color: colors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                DataCell(Text(user.role.label)),
-                DataCell(Text(user.organizationName ?? '—')),
-                DataCell(Chip(label: Text(user.status.label))),
-                DataCell(Text(_date(user.invitedAt))),
-                DataCell(Text(_date(user.lastSignInAt))),
-                DataCell(_UserActions(user: user)),
-              ],
-            ),
-        ],
+                  DataCell(Text(user.role.label)),
+                  DataCell(Text(user.organizationName ?? '—')),
+                  DataCell(_UserStatusBadge(status: user.status)),
+                  DataCell(Text(_date(user.invitedAt))),
+                  DataCell(Text(_date(user.lastSignInAt))),
+                  DataCell(_UserActions(user: user)),
+                ],
+              ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _UserCard extends StatelessWidget {
@@ -339,33 +421,70 @@ class _UserCard extends StatelessWidget {
   final ManagedUser user;
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 10),
-    child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          CircleAvatar(child: Text(user.displayName.characters.first)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user.displayName,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                Text(user.email),
-                Text('${user.role.label} · ${user.organizationName ?? '—'}'),
-                Text(user.status.label),
-              ],
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: DsSpacing.md),
+      child: DsCard(
+        child: Row(
+          children: [
+            DsAvatar(
+              initials: user.displayName.isEmpty
+                  ? '?'
+                  : user.displayName.characters.first.toUpperCase(),
             ),
-          ),
-          _UserActions(user: user),
-        ],
+            const SizedBox(width: DsSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    user.displayName,
+                    style: DsTypography.body.copyWith(
+                      color: colors.textPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    user.email,
+                    style: DsTypography.caption.copyWith(
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${user.role.label} · ${user.organizationName ?? '—'}',
+                    style: DsTypography.caption.copyWith(
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _UserStatusBadge(status: user.status),
+                ],
+              ),
+            ),
+            _UserActions(user: user),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
+}
+
+class _UserStatusBadge extends StatelessWidget {
+  const _UserStatusBadge({required this.status});
+  final UserAccountStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final variant = switch (status) {
+      UserAccountStatus.invited => DsSemanticVariant.warning,
+      UserAccountStatus.active => DsSemanticVariant.success,
+      UserAccountStatus.disabled => DsSemanticVariant.error,
+    };
+    return DsBadge(label: status.label, variant: variant);
+  }
 }
 
 class _UserActions extends ConsumerStatefulWidget {
