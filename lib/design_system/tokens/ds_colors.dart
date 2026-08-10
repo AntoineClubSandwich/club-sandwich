@@ -2,11 +2,10 @@ import 'package:flutter/painting.dart';
 
 /// Color tokens for the Club Sandwich design system — "Bento Soft Modern":
 /// a warm off-white canvas, white cards, a single saturated purple brand
-/// accent, and soft low-opacity tints for everything else. Extracted
-/// directly from the Figma "Bento Soft Modern" reference (page
-/// "05 - Inspiration"), not invented — except `error`/`info`, which have
-/// no swatch in that reference and were chosen to match its low-saturation
-/// character (flag for design confirmation if precision matters later).
+/// accent, and soft low-opacity tints for everything else. Values come
+/// from the project's `design-system/CLAUDE.md` brief (the authoritative
+/// source where it's explicit); a handful of tints/hovers not spelled out
+/// there are still derived from the initial Figma extraction.
 class DsColorTokens {
   const DsColorTokens({
     required this.primary,
@@ -125,25 +124,30 @@ class DsColorTokens {
     canvas: Color(0xFFF8F7F4),
     surface: Color(0xFFFFFFFF),
     surfaceElevated: Color(0xFFFFFFFF),
-    border: Color(0xFFEAE9E2),
+    border: Color(0xFFE5E7EB),
     borderSubtle: Color(0xFFF1EFEB),
     borderFocus: Color(0xFF6C5CE7),
     borderStrong: Color(0xFF1A1A2E),
-    success: Color(0xFF00D2A0),
-    successBg: Color(0x1400D2A0), // success @ ~8%
-    successHover: Color(0xFF00B489),
-    warning: Color(0xFFFFC857),
-    warningBg: Color(0x14FFC857), // warning @ ~8%
-    warningHover: Color(0xFFE6B24E),
-    error: Color(0xFFE5484D),
-    errorBg: Color(0x14E5484D), // error @ ~8%
-    errorHover: Color(0xFFCC3F44),
-    info: Color(0xFF5B8DEF),
-    infoBg: Color(0x145B8DEF), // info @ ~8%
-    infoHover: Color(0xFF4A78D6),
+    // Functional colors: `success`/`warning`/`error`/`info` hold the
+    // *text/icon* tone (readable on the pale `*Bg`), not the mid-tone
+    // swatch from the design brief — that mid-tone lives in `*Hover`
+    // instead, since it reads well as a hover/pressed accent between the
+    // two.
+    success: Color(0xFF059669),
+    successBg: Color(0xFFECFDF5),
+    successHover: Color(0xFF34D399),
+    warning: Color(0xFFD97706),
+    warningBg: Color(0xFFFFFBEB),
+    warningHover: Color(0xFFFBBF24),
+    error: Color(0xFFDC2626),
+    errorBg: Color(0xFFFEF2F2),
+    errorHover: Color(0xFFEF4444),
+    info: Color(0xFF2563EB),
+    infoBg: Color(0xFFEFF6FF),
+    infoHover: Color(0xFF60A5FA),
     textPrimary: Color(0xFF1A1A2E),
-    textSecondary: Color(0xFF5B5A6E),
-    textDisabled: Color(0xFF9E9DA8),
+    textSecondary: Color(0xFF6B7280),
+    textDisabled: Color(0xFF9CA3AF),
     textOnColor: Color(0xFFFFFFFF),
     neutralHoverOverlay: Color(0x081A1A2E), // ink @ ~3%
     neutralPressedOverlay: Color(0x0F1A1A2E), // ink @ ~6%

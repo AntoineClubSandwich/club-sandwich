@@ -656,9 +656,10 @@ class _DashboardHero extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(DsSpacing.xl),
       decoration: BoxDecoration(
-        color: colors.primary,
-        borderRadius: DsRadius.xxlRadius,
-        boxShadow: DsShadows.ambientElevated(colors.textPrimary),
+        color: colors.surface,
+        borderRadius: DsRadius.xlRadius,
+        border: Border.all(color: colors.border),
+        boxShadow: DsShadows.ambient(colors.textPrimary),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -669,14 +670,14 @@ class _DashboardHero extends StatelessWidget {
             children: [
               Text(
                 greeting.toUpperCase(),
-                style: DsTypography.h1.copyWith(color: colors.textOnColor),
+                style: DsTypography.h1.copyWith(color: colors.textPrimary),
               ),
               const SizedBox(height: DsSpacing.sm),
               Text(
                 '🥪 $summary',
                 style: DsTypography.body.copyWith(
-                  color: colors.textPrimary,
-                  fontWeight: FontWeight.w700,
+                  color: colors.textSecondary,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
@@ -707,9 +708,8 @@ class _DashboardHero extends StatelessWidget {
   }
 }
 
-/// The "ADMIN" role pill in the dashboard hero. White fill (not a new
-/// saturated brand color) so it reads clearly against the orange banner
-/// without introducing an accent outside the established palette.
+/// The "ADMIN" role pill in the dashboard hero — a soft purple-tinted
+/// pill, per design-system/CLAUDE.md.
 class _AdminHeroBadge extends StatelessWidget {
   const _AdminHeroBadge();
 
@@ -723,9 +723,8 @@ class _AdminHeroBadge extends StatelessWidget {
         vertical: DsSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: colors.surface,
+        color: colors.primarySelectedBg,
         borderRadius: DsRadius.pillRadius,
-        boxShadow: DsShadows.accent(colors.primary),
       ),
       child: Text(
         'ADMIN',
@@ -852,6 +851,7 @@ class _QuickActionTile extends StatelessWidget {
     if (!isPrimary) {
       return DsCard(
         onTap: onTap,
+        borderRadius: DsRadius.lgRadius,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -886,7 +886,7 @@ class _QuickActionTile extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               color: colors.primary,
-              borderRadius: DsRadius.mdRadius,
+              borderRadius: DsRadius.lgRadius,
               boxShadow: state.pressed ? const [] : shadow,
             ),
             child: Row(

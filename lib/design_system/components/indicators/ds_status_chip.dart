@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../tokens/ds_borders.dart';
 import '../../tokens/ds_radius.dart';
 import '../../tokens/ds_spacing.dart';
 import '../../tokens/ds_tokens.dart';
@@ -23,11 +22,11 @@ extension on DsChipStatus {
   };
 }
 
-/// A status pill with an optional colored dot — for showing where an
-/// entity (a maraude, an invitation, a document...) sits in its
-/// lifecycle. Unlike [DsBadge], it carries a visible border and an
-/// (optional) dot indicator, since it represents *state* rather than a
-/// static tag.
+/// A status pill — solid tint background, no border ("pills pleines" per
+/// design-system/CLAUDE.md) — with an optional colored dot, for showing
+/// where an entity (a maraude, an invitation, a document...) sits in its
+/// lifecycle. Unlike [DsBadge], it carries the dot indicator, since it
+/// represents *state* rather than a static tag.
 class DsStatusChip extends StatelessWidget {
   const DsStatusChip({
     super.key,
@@ -54,10 +53,6 @@ class DsStatusChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: semantic.background,
         borderRadius: DsRadius.pillRadius,
-        border: Border.all(
-          color: semantic.foreground,
-          width: DsBorders.hairline,
-        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

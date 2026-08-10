@@ -47,9 +47,8 @@ class MaraudeViewToolbar extends StatelessWidget {
       key: selectorKey,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: DsRadius.smRadius,
-        border: Border.all(color: colors.border, width: DsBorders.standard),
+        color: colors.secondarySelectedBg,
+        borderRadius: DsRadius.lgRadius,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -116,9 +115,9 @@ class _ViewModeSegment extends StatelessWidget {
       onTap: onTap,
       builder: (context, state) {
         final background = selected
-            ? colors.primary
+            ? colors.surface
             : (state.hovered ? colors.neutralHoverOverlay : Colors.transparent);
-        final foreground = selected ? colors.textOnColor : colors.textPrimary;
+        final foreground = selected ? colors.primary : colors.textSecondary;
         return AnimatedContainer(
           duration: DsMotion.standard,
           curve: DsMotion.curve,
@@ -129,7 +128,7 @@ class _ViewModeSegment extends StatelessWidget {
           decoration: BoxDecoration(
             color: background,
             borderRadius: DsRadius.smRadius,
-            boxShadow: selected ? DsShadows.accent(colors.primary) : null,
+            boxShadow: selected ? DsShadows.ambient(colors.textPrimary) : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -140,7 +139,7 @@ class _ViewModeSegment extends StatelessWidget {
                 label,
                 style: DsTypography.caption.copyWith(
                   color: foreground,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],

@@ -6,6 +6,7 @@ import 'package:club_sandwich/design_system/components/inputs/ds_filter_chip.dar
 import 'package:club_sandwich/design_system/components/inputs/ds_text_field.dart';
 import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
 import 'package:club_sandwich/design_system/icons/ds_icons.dart';
+import 'package:club_sandwich/design_system/tokens/ds_radius.dart';
 import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
 import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
@@ -335,6 +336,7 @@ class _ConcertFilters extends StatelessWidget {
     final colors = tokens.colors;
     return DsCard(
       padding: EdgeInsets.zero,
+      borderRadius: DsRadius.lgRadius,
       child: ExpansionTile(
         key: const ValueKey('concert-filters'),
         leading: Icon(DsIcons.filter, color: colors.textPrimary),

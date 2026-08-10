@@ -444,11 +444,11 @@ String _accountInitial(String label) {
   return normalizedLabel.isEmpty ? '?' : normalizedLabel[0].toUpperCase();
 }
 
-/// Desktop sidebar. [dark] switches between the admin-only treatment (a
-/// deep, softened indigo — [DsColorTokens.secondaryMuted], not a stark
-/// black — plus mascot widget + "ADMIN" badge) and the plain canvas
-/// treatment used by every other role — same [_AppDestination] route
-/// list and navigation behavior either way, only the visuals differ.
+/// Desktop sidebar. [dark] switches between the admin-only treatment
+/// (deep indigo [DsColorTokens.secondary] background, muted nav-item
+/// text, mascot widget + "ADMIN" badge) and the plain canvas treatment
+/// used by every other role — same [_AppDestination] route list and
+/// navigation behavior either way, only the visuals differ.
 class _DsSidebar extends StatelessWidget {
   const _DsSidebar({
     required this.dark,
@@ -473,7 +473,7 @@ class _DsSidebar extends StatelessWidget {
       key: AppShell.desktopSidebarKey,
       width: 280,
       decoration: BoxDecoration(
-        color: dark ? colors.secondaryMuted : colors.canvas,
+        color: dark ? colors.secondary : colors.canvas,
         border: Border(
           right: BorderSide(color: colors.border, width: DsBorders.hairline),
         ),
@@ -559,9 +559,10 @@ class _DsNavItem extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  /// Whether this item sits on the deep-indigo admin sidebar (unselected
-  /// items render as white cards) versus the plain canvas sidebar/drawer
-  /// (unselected items are transparent with a subtle hover tint).
+  /// Whether this item sits on the dark admin sidebar (transparent bg,
+  /// muted light-gray text, soft purple tint when selected) versus the
+  /// plain canvas sidebar/drawer (solid fill when selected, subtle hover
+  /// tint when not).
   final bool dark;
 
   @override
@@ -572,18 +573,26 @@ class _DsNavItem extends StatelessWidget {
     return DsPressable(
       onTap: onTap,
       builder: (context, state) {
-        final background = selected
-            ? colors.primary
-            : dark
-            // Always white, never the sidebar's own tint on hover — that
-            // would make the item blend into the background instead of
-            // standing out.
-            ? colors.surface
-            : (state.hovered ? colors.neutralHoverOverlay : Colors.transparent);
-        final foreground = selected ? colors.textOnColor : colors.textPrimary;
-        final unselectedHoverShadow = dark && state.hovered && !selected
-            ? DsShadows.ambient(colors.textPrimary)
-            : null;
+        final Color background;
+        final Color foreground;
+        final FontWeight weight;
+        if (dark) {
+          background = selected
+              ? colors.primary.withValues(alpha: 0.15)
+              : (state.hovered
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.transparent);
+          foreground = selected ? Colors.white : _sidebarMutedText;
+          weight = selected ? FontWeight.w600 : FontWeight.w500;
+        } else {
+          background = selected
+              ? colors.primary
+              : (state.hovered
+                    ? colors.neutralHoverOverlay
+                    : Colors.transparent);
+          foreground = selected ? colors.textOnColor : colors.textPrimary;
+          weight = FontWeight.w800;
+        }
 
         return Semantics(
           selected: selected,
@@ -600,9 +609,9 @@ class _DsNavItem extends StatelessWidget {
             decoration: BoxDecoration(
               color: background,
               borderRadius: DsRadius.mdRadius,
-              boxShadow: selected
+              boxShadow: !dark && selected
                   ? DsShadows.accent(colors.primary)
-                  : unselectedHoverShadow,
+                  : null,
             ),
             child: Row(
               children: [
@@ -613,7 +622,7 @@ class _DsNavItem extends StatelessWidget {
                     label,
                     style: DsTypography.body.copyWith(
                       color: foreground,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: weight,
                     ),
                   ),
                 ),
@@ -625,6 +634,11 @@ class _DsNavItem extends StatelessWidget {
     );
   }
 }
+
+/// Muted nav-item text on the dark admin sidebar — not a general-purpose
+/// token since it's only meaningful against [DsColorTokens.secondary]'s
+/// near-black; kept local rather than added to the global palette.
+const _sidebarMutedText = Color(0xFFA1A1AA);
 
 /// Decorative mascot widget in the admin sidebar. The "Personnaliser"
 /// button is intentionally disabled — no mascot-customization feature

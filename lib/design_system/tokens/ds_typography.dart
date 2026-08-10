@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'ds_colors.dart';
 
 /// Typography scale for the Club Sandwich design system — "Bento Soft
-/// Modern".
+/// Modern". Sizes/weights/line-heights/tracking come from
+/// `design-system/CLAUDE.md`.
 ///
 /// Backed by Inter (bundled as a variable font in `assets/fonts/`, SIL
 /// Open Font License) for every text role — hierarchy comes purely from
@@ -21,14 +22,25 @@ abstract final class DsTypography {
   /// editing; hierarchy in this style comes from weight, not a second face.
   static const String displayFontFamily = 'Inter';
 
-  /// Large, high-impact figures — KPI values, hero stats. Distinct from
-  /// the headline slots because it's meant for a single short number/word,
-  /// not a wrapping line.
+  /// "Stat large" — the biggest KPI/hero figure on a page. Tabular figures
+  /// so a run of digits doesn't jitter in width as it updates.
   static const TextStyle display = TextStyle(
     fontFamily: fontFamily,
-    fontSize: 40,
-    height: 44 / 40,
-    fontWeight: FontWeight.w800,
+    fontSize: 36,
+    height: 40 / 36,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.72, // -0.02em
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+
+  /// "Stat moyen" — a secondary/smaller KPI figure, same tabular-numeral
+  /// treatment as [display] at a lower size.
+  static const TextStyle statMedium = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 24,
+    height: 28 / 24,
+    fontWeight: FontWeight.w700,
+    fontFeatures: [FontFeature.tabularFigures()],
   );
 
   static const TextStyle h1 = TextStyle(
@@ -36,33 +48,36 @@ abstract final class DsTypography {
     fontSize: 32,
     height: 40 / 32,
     fontWeight: FontWeight.w700,
+    letterSpacing: -0.64, // -0.02em
   );
 
   /// Card/entity title.
   static const TextStyle h2 = TextStyle(
     fontFamily: fontFamily,
-    fontSize: 20,
-    height: 28 / 20,
+    fontSize: 24,
+    height: 32 / 24,
     fontWeight: FontWeight.w600,
+    letterSpacing: -0.24, // -0.01em
   );
 
   /// Section title.
   static const TextStyle h3 = TextStyle(
     fontFamily: fontFamily,
     fontSize: 18,
-    height: 24 / 18,
+    height: 28 / 18,
     fontWeight: FontWeight.w600,
   );
 
-  /// Button labels, active nav item text.
+  /// Button labels, active nav item text, default body copy.
   static const TextStyle body = TextStyle(
     fontFamily: fontFamily,
     fontSize: 15,
-    height: 20 / 15,
-    fontWeight: FontWeight.w500,
+    height: 24 / 15,
+    fontWeight: FontWeight.w400,
   );
 
-  /// Nav labels, names — a step down from [body].
+  /// Nav labels, names — a step down from [body]. Not part of the
+  /// design-system/CLAUDE.md scale; kept at its prior size/weight.
   static const TextStyle label = TextStyle(
     fontFamily: fontFamily,
     fontSize: 14,
@@ -70,20 +85,23 @@ abstract final class DsTypography {
     fontWeight: FontWeight.w500,
   );
 
-  /// Meta text (dates, secondary line under a title).
+  /// "Body small" — meta text (dates, secondary line under a title).
   static const TextStyle meta = TextStyle(
     fontFamily: fontFamily,
     fontSize: 13,
-    height: 18 / 13,
-    fontWeight: FontWeight.w500,
+    height: 20 / 13,
+    fontWeight: FontWeight.w400,
   );
 
-  /// Uppercase micro-labels (stat titles, section eyebrows).
+  /// "Label" — uppercase micro-labels (stat titles, section eyebrows).
+  /// Callers apply `.toUpperCase()` to the string themselves; `TextStyle`
+  /// has no built-in text-transform.
   static const TextStyle caption = TextStyle(
     fontFamily: fontFamily,
-    fontSize: 12,
-    height: 16 / 12,
-    fontWeight: FontWeight.w600,
+    fontSize: 11,
+    height: 16 / 11,
+    fontWeight: FontWeight.w500,
+    letterSpacing: 0.55, // 0.05em
   );
 
   /// Smallest text — status chip labels, inline email/meta.

@@ -20,12 +20,19 @@ class DsCard extends StatelessWidget {
     this.padding = const EdgeInsets.all(DsSpacing.lg),
     this.onTap,
     this.elevated = false,
+    this.borderRadius = DsRadius.xlRadius,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
   final VoidCallback? onTap;
   final bool elevated;
+
+  /// Defaults to [DsRadius.xlRadius] (16px — stat/content cards). Some
+  /// smaller surfaces (quick-action tiles, filter accordions) want the
+  /// tighter [DsRadius.lgRadius] (12px) instead; override explicitly
+  /// rather than introducing a second card primitive for that.
+  final BorderRadius borderRadius;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +52,7 @@ class DsCard extends StatelessWidget {
           padding: padding,
           decoration: BoxDecoration(
             color: colors.surface,
-            borderRadius: DsRadius.xlRadius,
+            borderRadius: borderRadius,
             border: Border.all(color: colors.border),
             boxShadow: pressed ? const [] : shadow,
           ),
