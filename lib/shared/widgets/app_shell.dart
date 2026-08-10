@@ -239,6 +239,36 @@ class _SidebarLogo extends StatelessWidget {
   }
 }
 
+/// Small "ADMIN" pill shown under the logo in the tinted admin sidebar —
+/// the non-color cue that reinforces the sidebar's purple tint, so the
+/// distinction doesn't rely on color alone.
+class _AdminBadge extends StatelessWidget {
+  const _AdminBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DsSpacing.sm,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: DsRadius.pillRadius,
+        boxShadow: DsShadows.accent(colors.primary),
+      ),
+      child: Text(
+        'ADMIN',
+        style: DsTypography.caption.copyWith(
+          color: colors.primary,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
 class _UserAccountPanel extends ConsumerStatefulWidget {
   const _UserAccountPanel({required this.onSignedOut});
 
@@ -410,10 +440,11 @@ String _accountInitial(String label) {
   return normalizedLabel.isEmpty ? '?' : normalizedLabel[0].toUpperCase();
 }
 
-/// Desktop sidebar. [dark] switches between the navy
-/// admin-only treatment (with mascot widget) and the light canvas
-/// treatment used by every other role — same [_AppDestination] route list
-/// and navigation behavior either way, only the visuals differ.
+/// Desktop sidebar. [dark] switches between the tinted admin-only
+/// treatment (a light purple wash + mascot widget + "ADMIN" badge) and
+/// the plain canvas treatment used by every other role — same
+/// [_AppDestination] route list and navigation behavior either way, only
+/// the visuals differ.
 class _DsSidebar extends StatelessWidget {
   const _DsSidebar({
     required this.dark,
@@ -438,7 +469,7 @@ class _DsSidebar extends StatelessWidget {
       key: AppShell.desktopSidebarKey,
       width: 280,
       decoration: BoxDecoration(
-        color: dark ? colors.secondary : colors.canvas,
+        color: dark ? colors.primarySelectedBg : colors.canvas,
         border: Border(
           right: BorderSide(color: colors.border, width: DsBorders.hairline),
         ),
@@ -446,14 +477,23 @@ class _DsSidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
               DsSpacing.lg,
               DsSpacing.lg,
               DsSpacing.lg,
               DsSpacing.sm,
             ),
-            child: _SidebarLogo(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _SidebarLogo(),
+                if (dark) ...[
+                  const SizedBox(height: DsSpacing.sm),
+                  const _AdminBadge(),
+                ],
+              ],
+            ),
           ),
           Expanded(
             child: SingleChildScrollView(
@@ -515,8 +555,8 @@ class _DsNavItem extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  /// Whether this item sits on the navy admin sidebar (unselected items
-  /// render as white cards) versus the light canvas sidebar/drawer
+  /// Whether this item sits on the tinted admin sidebar (unselected items
+  /// render as white cards) versus the plain canvas sidebar/drawer
   /// (unselected items are transparent with a subtle hover tint).
   final bool dark;
 
@@ -531,9 +571,15 @@ class _DsNavItem extends StatelessWidget {
         final background = selected
             ? colors.primary
             : dark
-            ? (state.hovered ? colors.secondaryHover : colors.surface)
+            // Always white, never the sidebar's own tint on hover — that
+            // would make the item blend into the background instead of
+            // standing out.
+            ? colors.surface
             : (state.hovered ? colors.neutralHoverOverlay : Colors.transparent);
         final foreground = selected ? colors.textOnColor : colors.textPrimary;
+        final unselectedHoverShadow = dark && state.hovered && !selected
+            ? DsShadows.ambient(colors.textPrimary)
+            : null;
 
         return Semantics(
           selected: selected,
@@ -550,7 +596,9 @@ class _DsNavItem extends StatelessWidget {
             decoration: BoxDecoration(
               color: background,
               borderRadius: DsRadius.mdRadius,
-              boxShadow: selected ? DsShadows.accent(colors.primary) : null,
+              boxShadow: selected
+                  ? DsShadows.accent(colors.primary)
+                  : unselectedHoverShadow,
             ),
             child: Row(
               children: [
