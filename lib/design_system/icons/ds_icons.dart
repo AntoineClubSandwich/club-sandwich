@@ -21,6 +21,7 @@ abstract final class DsIcons {
   static const IconData logOut = LucideIcons.logOut;
   static const IconData settings = LucideIcons.settings;
   static const IconData menu = LucideIcons.menu;
+  static const IconData trash2 = LucideIcons.trash2;
 
   // Navigation
   static const IconData home = LucideIcons.home;

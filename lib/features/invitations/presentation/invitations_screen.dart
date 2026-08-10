@@ -1,8 +1,17 @@
+import 'package:club_sandwich/design_system/components/buttons/ds_ghost_button.dart';
+import 'package:club_sandwich/design_system/components/buttons/ds_secondary_button.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_status_chip.dart';
+import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
+import 'package:club_sandwich/design_system/icons/ds_icons.dart';
+import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
+import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
+import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
+import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
+import 'package:club_sandwich/design_system/widgets/club_sandwich_mascot.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart'
     show ConcertViewMode;
-import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_calendar.dart';
 import 'package:club_sandwich/features/invitations/data/invitation_providers.dart';
@@ -59,7 +68,19 @@ class _InvitationsScreenState extends ConsumerState<InvitationsScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-              child: Text(_subtitle(userContext?.role)),
+              child: Builder(
+                builder: (context) {
+                  final colors = Theme.of(
+                    context,
+                  ).extension<DsTokens>()!.colors;
+                  return Text(
+                    _subtitle(userContext?.role),
+                    style: DsTypography.body.copyWith(
+                      color: colors.textSecondary,
+                    ),
+                  );
+                },
+              ),
             ),
             MaraudeViewToolbar(
               title: userContext?.role == AppUserRole.promoter
@@ -79,12 +100,7 @@ class _InvitationsScreenState extends ConsumerState<InvitationsScreen> {
                   onRetry: () => ref.invalidate(invitationCampaignsProvider),
                 ),
                 data: (items) => items.isEmpty
-                    ? const AppEmptyState(
-                        title: 'Aucune invitation',
-                        message:
-                            'Aucune campagne d’invitations n’est disponible.',
-                        icon: Icons.confirmation_number_outlined,
-                      )
+                    ? const _EmptyInvitations()
                     : viewMode == ConcertViewMode.list
                     ? ListView(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
@@ -220,6 +236,44 @@ MaraudeCalendarTone _invitationCalendarTone(InvitationCampaignStatus status) =>
       InvitationCampaignStatus.cancelled => MaraudeCalendarTone.error,
     };
 
+DsChipStatus _campaignChipStatus(InvitationCampaignStatus status) =>
+    switch (status) {
+      InvitationCampaignStatus.draft => DsChipStatus.draft,
+      InvitationCampaignStatus.open => DsChipStatus.active,
+      InvitationCampaignStatus.closed => DsChipStatus.completed,
+      InvitationCampaignStatus.cancelled => DsChipStatus.cancelled,
+    };
+
+class _EmptyInvitations extends StatelessWidget {
+  const _EmptyInvitations();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ClubSandwichMascot(size: 96, color: MascotColor.orange),
+            const SizedBox(height: DsSpacing.lg),
+            Text(
+              'Aucune invitation',
+              style: DsTypography.h2.copyWith(color: colors.textPrimary),
+            ),
+            const SizedBox(height: DsSpacing.sm),
+            Text(
+              'Aucune campagne d’invitations n’est disponible.',
+              style: DsTypography.body.copyWith(color: colors.textSecondary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CampaignCard extends ConsumerWidget {
   const _CampaignCard({required this.campaign, required this.role});
   final InvitationCampaign campaign;
@@ -227,118 +281,154 @@ class _CampaignCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    campaign.title,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-                Chip(label: Text(campaign.status.label)),
-              ],
-            ),
-            if (campaign.organizationName != null)
-              Text(campaign.organizationName!),
-            const SizedBox(height: 8),
-            _CampaignVenue(campaign: campaign),
-            if (campaign.description != null) ...[
-              const SizedBox(height: 8),
-              Text(campaign.description!),
-            ],
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              children: [
-                Text(
-                  '${_countLabel(campaign.remainingPlaces, 'place')} '
-                  'restante${campaign.remainingPlaces > 1 ? 's' : ''}',
-                ),
-                Text(
-                  '${campaign.attributedPlacesCount} '
-                  '${campaign.attributedPlacesCount == 1 ? 'place attribuée' : 'places attribuées'}',
-                ),
-                if (campaign.applicationDeadline != null)
-                  Text(
-                    'Clôture : ${_date(campaign.applicationDeadline!.toLocal())}',
-                  ),
-                if (campaign.eventDate != null)
-                  Text('Événement : ${_date(campaign.eventDate!)}'),
-              ],
-            ),
-            const SizedBox(height: 14),
-            if (role == AppUserRole.volunteer)
-              _VolunteerCampaignAction(campaign: campaign)
-            else
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilledButton.tonalIcon(
-                      onPressed: () => showDialog<void>(
-                        context: context,
-                        builder: (_) => UncontrolledProviderScope(
-                          container: ProviderScope.containerOf(context),
-                          child: _CandidatesDialog(campaign: campaign),
-                        ),
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DsCard(
+        // The volunteer action below still uses a stock CheckboxListTile,
+        // which needs a Material ancestor for its background/ink — DsCard
+        // itself is a plain decorated Container, not a Material.
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      campaign.title,
+                      style: DsTypography.h3.copyWith(
+                        color: colors.textPrimary,
                       ),
-                      icon: const Icon(Icons.people_outline),
-                      label: const Text('Voir les candidatures'),
                     ),
-                    if (campaign.status == InvitationCampaignStatus.draft)
-                      OutlinedButton.icon(
-                        key: ValueKey('open-invitation-${campaign.id}'),
-                        onPressed: () => _changeStatus(
-                          context,
-                          ref,
-                          InvitationCampaignStatus.open,
-                        ),
-                        icon: const Icon(Icons.campaign_outlined),
-                        label: const Text('Ouvrir la campagne'),
-                      ),
-                    if (campaign.status == InvitationCampaignStatus.open)
-                      OutlinedButton.icon(
-                        key: ValueKey('close-invitation-${campaign.id}'),
-                        onPressed: () => _changeStatus(
-                          context,
-                          ref,
-                          InvitationCampaignStatus.closed,
-                        ),
-                        icon: const Icon(Icons.check_circle_outline),
-                        label: const Text('Clôturer la campagne'),
-                      ),
-                    if (campaign.status == InvitationCampaignStatus.draft ||
-                        campaign.status == InvitationCampaignStatus.open)
-                      OutlinedButton.icon(
-                        key: ValueKey('cancel-invitation-${campaign.id}'),
-                        onPressed: () => _changeStatus(
-                          context,
-                          ref,
-                          InvitationCampaignStatus.cancelled,
-                        ),
-                        icon: const Icon(Icons.cancel_outlined),
-                        label: const Text('Annuler la campagne'),
-                      ),
-                    OutlinedButton.icon(
-                      key: ValueKey('delete-invitation-${campaign.id}'),
-                      onPressed: () => _deleteCampaign(context, ref),
-                      icon: const Icon(Icons.delete_outline),
-                      label: const Text('Supprimer la campagne'),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: DsSpacing.sm),
+                  DsStatusChip(
+                    label: campaign.status.label,
+                    status: _campaignChipStatus(campaign.status),
+                  ),
+                ],
               ),
-          ],
+              if (campaign.organizationName != null) ...[
+                const SizedBox(height: DsSpacing.xs),
+                Text(
+                  campaign.organizationName!,
+                  style: DsTypography.caption.copyWith(
+                    color: colors.textSecondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+              const SizedBox(height: DsSpacing.md),
+              _CampaignVenue(campaign: campaign),
+              if (campaign.description != null) ...[
+                const SizedBox(height: DsSpacing.sm),
+                Text(
+                  campaign.description!,
+                  style: DsTypography.body.copyWith(
+                    color: colors.textSecondary,
+                  ),
+                ),
+              ],
+              const SizedBox(height: DsSpacing.md),
+              Wrap(
+                spacing: DsSpacing.lg,
+                runSpacing: DsSpacing.sm,
+                children: [
+                  _CampaignMetadata(
+                    label: 'Places restantes',
+                    value:
+                        '${_countLabel(campaign.remainingPlaces, 'place')} '
+                        'restante${campaign.remainingPlaces > 1 ? 's' : ''}',
+                  ),
+                  _CampaignMetadata(
+                    label: 'Places attribuées',
+                    value:
+                        '${campaign.attributedPlacesCount} '
+                        '${campaign.attributedPlacesCount == 1 ? 'place' : 'places'}',
+                  ),
+                  if (campaign.applicationDeadline != null)
+                    _CampaignMetadata(
+                      label: 'Clôture',
+                      value: _date(campaign.applicationDeadline!.toLocal()),
+                    ),
+                  if (campaign.eventDate != null)
+                    _CampaignMetadata(
+                      label: 'Événement',
+                      value: _date(campaign.eventDate!),
+                    ),
+                ],
+              ),
+              const SizedBox(height: DsSpacing.md),
+              Divider(height: 1, color: colors.border),
+              const SizedBox(height: DsSpacing.md),
+              if (role == AppUserRole.volunteer)
+                _VolunteerCampaignAction(campaign: campaign)
+              else
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    spacing: DsSpacing.sm,
+                    runSpacing: DsSpacing.sm,
+                    children: [
+                      DsSecondaryButton(
+                        icon: DsIcons.users,
+                        label: 'Voir les candidatures',
+                        onPressed: () => showDialog<void>(
+                          context: context,
+                          builder: (_) => UncontrolledProviderScope(
+                            container: ProviderScope.containerOf(context),
+                            child: _CandidatesDialog(campaign: campaign),
+                          ),
+                        ),
+                      ),
+                      if (campaign.status == InvitationCampaignStatus.draft)
+                        DsSecondaryButton(
+                          key: ValueKey('open-invitation-${campaign.id}'),
+                          icon: DsIcons.check,
+                          label: 'Ouvrir la campagne',
+                          onPressed: () => _changeStatus(
+                            context,
+                            ref,
+                            InvitationCampaignStatus.open,
+                          ),
+                        ),
+                      if (campaign.status == InvitationCampaignStatus.open)
+                        DsSecondaryButton(
+                          key: ValueKey('close-invitation-${campaign.id}'),
+                          icon: DsIcons.circleCheck,
+                          label: 'Clôturer la campagne',
+                          onPressed: () => _changeStatus(
+                            context,
+                            ref,
+                            InvitationCampaignStatus.closed,
+                          ),
+                        ),
+                      if (campaign.status == InvitationCampaignStatus.draft ||
+                          campaign.status == InvitationCampaignStatus.open)
+                        DsGhostButton(
+                          key: ValueKey('cancel-invitation-${campaign.id}'),
+                          icon: DsIcons.close,
+                          label: 'Annuler la campagne',
+                          onPressed: () => _changeStatus(
+                            context,
+                            ref,
+                            InvitationCampaignStatus.cancelled,
+                          ),
+                        ),
+                      DsGhostButton(
+                        key: ValueKey('delete-invitation-${campaign.id}'),
+                        icon: DsIcons.trash2,
+                        label: 'Supprimer la campagne',
+                        onPressed: () => _deleteCampaign(context, ref),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -1109,33 +1199,77 @@ class _CampaignVenue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
     final venue = campaign.venue;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(top: 2),
-          child: Icon(Icons.location_on_outlined, size: 20),
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(DsIcons.mapPin, size: 18, color: colors.textSecondary),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: DsSpacing.sm),
         Expanded(
           child: venue == null
-              ? const Text('Salle non renseignée')
+              ? Text(
+                  'Salle non renseignée',
+                  style: DsTypography.caption.copyWith(
+                    color: colors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       venue.name,
-                      style: Theme.of(context).textTheme.titleSmall,
+                      style: DsTypography.body.copyWith(
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     Text(
                       venue.formattedAddress,
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: DsTypography.caption.copyWith(
+                        color: colors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
         ),
       ],
+    );
+  }
+}
+
+class _CampaignMetadata extends StatelessWidget {
+  const _CampaignMetadata({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 120),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: DsTypography.caption.copyWith(color: colors.textSecondary),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: DsTypography.body.copyWith(
+              color: colors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
