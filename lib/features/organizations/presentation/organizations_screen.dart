@@ -1,3 +1,13 @@
+import 'package:club_sandwich/design_system/components/buttons/ds_ghost_button.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_avatar.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_badge.dart';
+import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
+import 'package:club_sandwich/design_system/icons/ds_icons.dart';
+import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
+import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
+import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
+import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
+import 'package:club_sandwich/design_system/widgets/club_sandwich_mascot.dart';
 import 'package:club_sandwich/features/organizations/data/organization_providers.dart';
 import 'package:club_sandwich/features/organizations/domain/organization.dart';
 import 'package:club_sandwich/features/organizations/presentation/organization_convention_panel.dart';
@@ -20,99 +30,98 @@ class _OrganizationsScreenState extends ConsumerState<OrganizationsScreen> {
   @override
   Widget build(BuildContext context) {
     final organizations = ref.watch(organizationsProvider);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _editOrganization(),
-        icon: const Icon(Icons.add),
-        label: const Text('Ajouter'),
-      ),
-      body: organizations.when(
-        loading: () =>
-            const AppLoadingState(label: 'Chargement des organisations'),
-        error: (_, _) => AppErrorState(
-          message: 'Impossible de charger les organisations.',
-          onRetry: () => ref.invalidate(organizationsProvider),
+    return Theme(
+      data: DsTheme.light,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () => _editOrganization(),
+          icon: const Icon(Icons.add),
+          label: const Text('Ajouter'),
         ),
-        data: (items) {
-          final promoters = items
-              .where((item) => item.kind == OrganizationKind.promoter)
-              .toList(growable: false);
-          if (promoters.isEmpty) {
-            return const AppEmptyState(
-              title: 'Aucune organisation',
-              message: 'Aucune organisation tourneur n’est enregistrée.',
-              icon: Icons.business_outlined,
-            );
-          }
-          final selectedId = _selectedId ?? promoters.first.id;
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth < 840) {
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 96),
-                  children: [
-                    _Header(count: promoters.length),
-                    const SizedBox(height: 16),
-                    for (final organization in promoters)
-                      Card(
-                        child: ListTile(
-                          title: Text(organization.name),
-                          subtitle: Text(
-                            organization.contactEmail ??
-                                organization.phone ??
-                                'Aucun contact principal',
+        body: organizations.when(
+          loading: () =>
+              const AppLoadingState(label: 'Chargement des organisations'),
+          error: (_, _) => AppErrorState(
+            message: 'Impossible de charger les organisations.',
+            onRetry: () => ref.invalidate(organizationsProvider),
+          ),
+          data: (items) {
+            final promoters = items
+                .where((item) => item.kind == OrganizationKind.promoter)
+                .toList(growable: false);
+            if (promoters.isEmpty) {
+              return const _EmptyOrganizations();
+            }
+            final selectedId = _selectedId ?? promoters.first.id;
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth < 840) {
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 96),
+                    children: [
+                      _Header(count: promoters.length),
+                      const SizedBox(height: DsSpacing.lg),
+                      for (final organization in promoters)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: DsSpacing.md),
+                          child: _OrganizationListItem(
+                            organization: organization,
+                            onTap: () => _showMobileDetails(organization),
                           ),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () => _showMobileDetails(organization),
                         ),
+                    ],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      width: 320,
+                      child: ListView(
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          _Header(count: promoters.length),
+                          const SizedBox(height: DsSpacing.lg),
+                          for (final organization in promoters)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: DsSpacing.md,
+                              ),
+                              child: _OrganizationListItem(
+                                organization: organization,
+                                selected: organization.id == selectedId,
+                                onTap: () => setState(
+                                  () => _selectedId = organization.id,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
+                    ),
+                    Builder(
+                      builder: (context) {
+                        final colors = Theme.of(
+                          context,
+                        ).extension<DsTokens>()!.colors;
+                        return VerticalDivider(width: 1, color: colors.border);
+                      },
+                    ),
+                    Expanded(
+                      child: _OrganizationDetailsPane(
+                        organizationId: selectedId,
+                        onEdit: _editOrganization,
+                        onDelete: _deleteOrganization,
+                        onAddContact: _addContact,
+                        onAddDocument: _addDocument,
+                      ),
+                    ),
                   ],
                 );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(
-                    width: 320,
-                    child: ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        _Header(count: promoters.length),
-                        const SizedBox(height: 16),
-                        for (final organization in promoters)
-                          Card(
-                            color: organization.id == selectedId
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.secondaryContainer
-                                : null,
-                            child: ListTile(
-                              selected: organization.id == selectedId,
-                              title: Text(organization.name),
-                              subtitle: Text(organization.slug),
-                              onTap: () =>
-                                  setState(() => _selectedId = organization.id),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const VerticalDivider(width: 1),
-                  Expanded(
-                    child: _OrganizationDetailsPane(
-                      organizationId: selectedId,
-                      onEdit: _editOrganization,
-                      onDelete: _deleteOrganization,
-                      onAddContact: _addContact,
-                      onAddDocument: _addDocument,
-                    ),
-                  ),
-                ],
-              );
-            },
-          );
-        },
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -257,13 +266,117 @@ class _Header extends StatelessWidget {
   final int count;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text('Organisations', style: Theme.of(context).textTheme.headlineMedium),
-      Text('$count organisation${count > 1 ? 's' : ''} tourneur'),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Organisations',
+          style: DsTypography.h2.copyWith(color: colors.textPrimary),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '$count organisation${count > 1 ? 's' : ''} tourneur',
+          style: DsTypography.body.copyWith(color: colors.textSecondary),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyOrganizations extends StatelessWidget {
+  const _EmptyOrganizations();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ClubSandwichMascot(size: 96, color: MascotColor.orange),
+            const SizedBox(height: DsSpacing.lg),
+            Text(
+              'Aucune organisation',
+              style: DsTypography.h2.copyWith(color: colors.textPrimary),
+            ),
+            const SizedBox(height: DsSpacing.sm),
+            Text(
+              'Aucune organisation tourneur n’est enregistrée.',
+              style: DsTypography.body.copyWith(color: colors.textSecondary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OrganizationListItem extends StatelessWidget {
+  const _OrganizationListItem({
+    required this.organization,
+    required this.onTap,
+    this.selected = false,
+  });
+
+  final Organization organization;
+  final VoidCallback onTap;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    final subtitle =
+        organization.contactEmail ??
+        organization.phone ??
+        'Aucun contact principal';
+    return Container(
+      decoration: selected
+          ? BoxDecoration(
+              border: Border(left: BorderSide(color: colors.primary, width: 4)),
+            )
+          : null,
+      child: DsCard(
+        onTap: onTap,
+        elevated: selected,
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    organization.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: DsTypography.body.copyWith(
+                      color: colors.textPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: DsTypography.caption.copyWith(
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: DsSpacing.sm),
+            Icon(DsIcons.chevronRight, size: 18, color: colors.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _OrganizationDetailsPane extends ConsumerWidget {
@@ -293,7 +406,15 @@ class _OrganizationDetailsPane extends ConsumerWidget {
             ref.invalidate(organizationDetailsProvider(organizationId)),
       ),
       data: (value) {
-        if (value == null) return const Center(child: Text('Introuvable.'));
+        final colors = Theme.of(context).extension<DsTokens>()!.colors;
+        if (value == null) {
+          return Center(
+            child: Text(
+              'Introuvable.',
+              style: DsTypography.body.copyWith(color: colors.textSecondary),
+            ),
+          );
+        }
         final organization = value.organization;
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 48),
@@ -303,10 +424,11 @@ class _OrganizationDetailsPane extends ConsumerWidget {
                 Expanded(
                   child: Text(
                     organization.name,
-                    style: Theme.of(context).textTheme.headlineSmall,
+                    style: DsTypography.h2.copyWith(color: colors.textPrimary),
                   ),
                 ),
                 PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: colors.textSecondary),
                   onSelected: (action) => action == 'edit'
                       ? onEdit(organization)
                       : onDelete(organization),
@@ -317,7 +439,7 @@ class _OrganizationDetailsPane extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: DsSpacing.md),
             _SectionCard(
               title: 'Informations',
               children: [
@@ -330,52 +452,30 @@ class _OrganizationDetailsPane extends ConsumerWidget {
             ),
             _SectionCard(
               title: 'Contacts',
-              action: TextButton.icon(
+              action: DsGhostButton(
+                icon: DsIcons.plus,
+                label: 'Ajouter',
                 onPressed: () => onAddContact(organization),
-                icon: const Icon(Icons.add),
-                label: const Text('Ajouter'),
               ),
               children: value.contacts.isEmpty
-                  ? const [Text('Aucun contact.')]
+                  ? [_EmptySectionLabel('Aucun contact.')]
                   : [
                       for (final contact in value.contacts)
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: const CircleAvatar(
-                            child: Icon(Icons.person_outline),
-                          ),
-                          title: Text(
-                            contact.displayName.isEmpty
-                                ? 'Contact'
-                                : contact.displayName,
-                          ),
-                          subtitle: Text(
-                            [
-                              contact.jobTitle,
-                              contact.email,
-                              contact.phone,
-                            ].whereType<String>().join(' · '),
-                          ),
-                        ),
+                        _ContactRow(contact: contact),
                     ],
             ),
             _SectionCard(
               title: 'Documents',
-              action: TextButton.icon(
+              action: DsGhostButton(
+                icon: DsIcons.plus,
+                label: 'Ajouter',
                 onPressed: () => onAddDocument(organization),
-                icon: const Icon(Icons.add),
-                label: const Text('Ajouter'),
               ),
               children: value.documents.isEmpty
-                  ? const [Text('Aucun document.')]
+                  ? [_EmptySectionLabel('Aucun document.')]
                   : [
                       for (final document in value.documents)
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.description_outlined),
-                          title: Text(document.name),
-                          subtitle: SelectableText(document.url),
-                        ),
+                        _DocumentRow(document: document),
                     ],
             ),
             _SectionCard(
@@ -388,8 +488,8 @@ class _OrganizationDetailsPane extends ConsumerWidget {
               title: 'Concerts, historique et statistiques',
               children: [
                 Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
+                  spacing: DsSpacing.sm,
+                  runSpacing: DsSpacing.sm,
                   children: [
                     _Metric('Concerts', value.concertCount.toString()),
                     _Metric(
@@ -676,30 +776,46 @@ class _SectionCard extends StatelessWidget {
   final Widget? action;
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 12),
-    child: Padding(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: DsSpacing.md),
+      child: DsCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: DsTypography.h3.copyWith(color: colors.textPrimary),
+                  ),
                 ),
-              ),
-              ?action,
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...children,
-        ],
+                ?action,
+              ],
+            ),
+            const SizedBox(height: DsSpacing.sm),
+            ...children,
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
+}
+
+class _EmptySectionLabel extends StatelessWidget {
+  const _EmptySectionLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return Text(
+      text,
+      style: DsTypography.body.copyWith(color: colors.textSecondary),
+    );
+  }
 }
 
 class _Value extends StatelessWidget {
@@ -708,10 +824,27 @@ class _Value extends StatelessWidget {
   final String? value;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 5),
-    child: Text('$label : ${_blank(value) ?? '—'}'),
-  );
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: RichText(
+        text: TextSpan(
+          style: DsTypography.body.copyWith(color: colors.textPrimary),
+          children: [
+            TextSpan(
+              text: '$label : ',
+              style: TextStyle(
+                color: colors.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            TextSpan(text: _blank(value) ?? '—'),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _Metric extends StatelessWidget {
@@ -720,10 +853,98 @@ class _Metric extends StatelessWidget {
   final String value;
 
   @override
-  Widget build(BuildContext context) => Chip(
-    avatar: const Icon(Icons.insights_outlined, size: 18),
-    label: Text('$label : $value'),
-  );
+  Widget build(BuildContext context) => DsBadge(label: '$label : $value');
+}
+
+class _ContactRow extends StatelessWidget {
+  const _ContactRow({required this.contact});
+  final OrganizationContact contact;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    final subtitle = [
+      contact.jobTitle,
+      contact.email,
+      contact.phone,
+    ].whereType<String>().join(' · ');
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: DsSpacing.sm),
+      child: Row(
+        children: [
+          DsAvatar(
+            initials: contact.displayName.isEmpty
+                ? '?'
+                : contact.displayName.characters.first.toUpperCase(),
+          ),
+          const SizedBox(width: DsSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  contact.displayName.isEmpty ? 'Contact' : contact.displayName,
+                  style: DsTypography.body.copyWith(
+                    color: colors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (subtitle.isNotEmpty)
+                  Text(
+                    subtitle,
+                    style: DsTypography.caption.copyWith(
+                      color: colors.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DocumentRow extends StatelessWidget {
+  const _DocumentRow({required this.document});
+  final OrganizationDocument document;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: DsSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(DsIcons.fileDown, size: 18, color: colors.textSecondary),
+          const SizedBox(width: DsSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  document.name,
+                  style: DsTypography.body.copyWith(
+                    color: colors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SelectableText(
+                  document.url,
+                  style: DsTypography.caption.copyWith(
+                    color: colors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 String? _blank(String? value) {
