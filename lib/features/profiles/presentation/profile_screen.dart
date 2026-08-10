@@ -1,3 +1,14 @@
+import 'package:club_sandwich/design_system/components/buttons/ds_primary_button.dart';
+import 'package:club_sandwich/design_system/components/buttons/ds_secondary_button.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_badge.dart';
+import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
+import 'package:club_sandwich/design_system/components/surfaces/ds_metric_card.dart';
+import 'package:club_sandwich/design_system/icons/ds_icons.dart';
+import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
+import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
+import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
+import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
+import 'package:club_sandwich/design_system/widgets/club_sandwich_mascot.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
@@ -24,42 +35,83 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(currentProfileProvider);
     final userContext = ref.watch(currentUserContextProvider).value;
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 48),
-        children: [
-          Text(
-            userContext?.role == AppUserRole.promoter
-                ? 'Mon compte'
-                : 'Mon profil',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          if (userContext?.organizationName != null)
-            Text(userContext!.organizationName!),
-          const SizedBox(height: 20),
-          profile.when(
-            loading: () => const AppLoadingState(label: 'Chargement du profil'),
-            error: (_, _) => AppErrorState(
-              message: 'Impossible de charger votre profil.',
-              onRetry: () => ref.invalidate(currentProfileProvider),
+    // Wrapped in a local DsTheme.light regardless of the ambient theme:
+    // several widget tests pump ProfileScreen without the app-wide theme.
+    return Theme(
+      data: DsTheme.light,
+      child: Builder(
+        builder: (context) {
+          final colors = Theme.of(context).extension<DsTokens>()!.colors;
+          return Scaffold(
+            backgroundColor: Colors.transparent,
+            body: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 48),
+              children: [
+                Text(
+                  userContext?.role == AppUserRole.promoter
+                      ? 'Mon compte'
+                      : 'Mon profil',
+                  style: DsTypography.h2.copyWith(color: colors.textPrimary),
+                ),
+                if (userContext?.organizationName != null)
+                  Text(
+                    userContext!.organizationName!,
+                    style: DsTypography.body.copyWith(
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                const SizedBox(height: DsSpacing.lg),
+                profile.when(
+                  loading: () =>
+                      const AppLoadingState(label: 'Chargement du profil'),
+                  error: (_, _) => AppErrorState(
+                    message: 'Impossible de charger votre profil.',
+                    onRetry: () => ref.invalidate(currentProfileProvider),
+                  ),
+                  data: (value) => value == null
+                      ? const _EmptyProfile()
+                      : _ProfileForm(profile: value),
+                ),
+                if (userContext?.role == AppUserRole.volunteer) ...[
+                  const SizedBox(height: DsSpacing.md),
+                  const _VolunteerPrivateInformation(),
+                  const SizedBox(height: DsSpacing.md),
+                  const _VolunteerStatisticsCard(),
+                ],
+              ],
             ),
-            data: (value) => value == null
-                ? const AppEmptyState(
-                    title: 'Profil introuvable',
-                    message:
-                        'Votre profil n’est pas disponible pour le moment.',
-                    icon: Icons.person_off_outlined,
-                  )
-                : _ProfileForm(profile: value),
-          ),
-          if (userContext?.role == AppUserRole.volunteer) ...[
-            const SizedBox(height: 16),
-            const _VolunteerPrivateInformation(),
-            const SizedBox(height: 16),
-            const _VolunteerStatisticsCard(),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _EmptyProfile extends StatelessWidget {
+  const _EmptyProfile();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ClubSandwichMascot(size: 96, color: MascotColor.orange),
+            const SizedBox(height: DsSpacing.lg),
+            Text(
+              'Profil introuvable',
+              style: DsTypography.h2.copyWith(color: colors.textPrimary),
+            ),
+            const SizedBox(height: DsSpacing.sm),
+            Text(
+              'Votre profil n’est pas disponible pour le moment.',
+              style: DsTypography.body.copyWith(color: colors.textSecondary),
+            ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -73,20 +125,14 @@ class _VolunteerPrivateInformation extends ConsumerWidget {
     return ref
         .watch(currentVolunteerPrivateProfileProvider)
         .when(
-          loading: () => const Card(
-            child: Padding(
-              padding: EdgeInsets.all(20),
-              child: AppLoadingState(label: 'Chargement des informations'),
-            ),
+          loading: () => const DsCard(
+            child: AppLoadingState(label: 'Chargement des informations'),
           ),
-          error: (_, _) => Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: AppErrorState(
-                message: 'Informations complémentaires indisponibles.',
-                onRetry: () =>
-                    ref.invalidate(currentVolunteerPrivateProfileProvider),
-              ),
+          error: (_, _) => DsCard(
+            child: AppErrorState(
+              message: 'Informations complémentaires indisponibles.',
+              onRetry: () =>
+                  ref.invalidate(currentVolunteerPrivateProfileProvider),
             ),
           ),
           data: (value) => _VolunteerPrivateForm(
@@ -179,22 +225,23 @@ class _VolunteerPrivateFormState extends ConsumerState<_VolunteerPrivateForm> {
   }
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(18),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return DsCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             'Informations complémentaires',
-            style: Theme.of(context).textTheme.titleLarge,
+            style: DsTypography.h3.copyWith(color: colors.textPrimary),
           ),
-          const SizedBox(height: 6),
-          const Text(
+          const SizedBox(height: 4),
+          Text(
             'Ces informations confidentielles sont accessibles uniquement '
             'par vous et les administrateurs Club Sandwich.',
+            style: DsTypography.body.copyWith(color: colors.textSecondary),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: DsSpacing.md),
           TextField(
             controller: _additionalInformation,
             minLines: 2,
@@ -203,14 +250,14 @@ class _VolunteerPrivateFormState extends ConsumerState<_VolunteerPrivateForm> {
               labelText: 'Informations complémentaires',
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: DsSpacing.sm),
           TextField(
             controller: _emergencyName,
             decoration: const InputDecoration(
               labelText: 'Contact d’urgence — nom',
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: DsSpacing.sm),
           TextField(
             controller: _emergencyPhone,
             keyboardType: TextInputType.phone,
@@ -218,7 +265,7 @@ class _VolunteerPrivateFormState extends ConsumerState<_VolunteerPrivateForm> {
               labelText: 'Contact d’urgence — téléphone',
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: DsSpacing.sm),
           TextField(
             controller: _certifications,
             decoration: const InputDecoration(
@@ -226,22 +273,29 @@ class _VolunteerPrivateFormState extends ConsumerState<_VolunteerPrivateForm> {
               helperText: 'Séparez les certifications par une virgule.',
             ),
           ),
-          const SizedBox(height: 16),
-          Text('Mes documents', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
+          const SizedBox(height: DsSpacing.md),
+          Text(
+            'Mes documents',
+            style: DsTypography.body.copyWith(
+              color: colors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: DsSpacing.sm),
           const _MyDocumentsSection(),
-          const SizedBox(height: 16),
+          const SizedBox(height: DsSpacing.md),
           Align(
             alignment: Alignment.centerLeft,
-            child: FilledButton(
+            child: DsPrimaryButton(
               onPressed: _saving ? null : _save,
-              child: Text(_saving ? 'Enregistrement…' : 'Enregistrer'),
+              isLoading: _saving,
+              label: 'Enregistrer',
             ),
           ),
         ],
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _MyDocumentsSection extends ConsumerWidget {
@@ -269,12 +323,13 @@ class _MyDocumentsSection extends ConsumerWidget {
         final other = items
             .where((item) => item.type == VolunteerDocumentType.other)
             .toList(growable: false);
+        final colors = Theme.of(context).extension<DsTokens>()!.colors;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Wrap(
-              spacing: 10,
-              runSpacing: 10,
+              spacing: DsSpacing.sm,
+              runSpacing: DsSpacing.sm,
               children: [
                 _MyDocumentTile(
                   type: VolunteerDocumentType.identity,
@@ -291,14 +346,17 @@ class _MyDocumentsSection extends ConsumerWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 14),
-            const Divider(height: 1),
-            const SizedBox(height: 14),
+            const SizedBox(height: DsSpacing.md),
+            Divider(height: 1, color: colors.border),
+            const SizedBox(height: DsSpacing.md),
             Text(
               'Contrat de bénévolat',
-              style: Theme.of(context).textTheme.titleSmall,
+              style: DsTypography.body.copyWith(
+                color: colors.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: DsSpacing.sm),
             const DocumentTemplateDownloadLink(
               templateKey: DocumentTemplateKey.volunteerContract,
             ),
@@ -381,35 +439,24 @@ class _MyDocumentTileState extends ConsumerState<_MyDocumentTile> {
   Widget build(BuildContext context) {
     final document = widget.document;
     final label = document?.displayLabel ?? widget.type.label;
-    final colors = Theme.of(context).colorScheme;
-    final (icon, color) = switch (document?.status) {
-      VolunteerDocumentStatus.approved => (
-        Icons.check_circle_outline,
-        Colors.green,
-      ),
-      VolunteerDocumentStatus.rejected => (Icons.error_outline, colors.error),
-      VolunteerDocumentStatus.pending when document?.hasFile == true => (
-        Icons.hourglass_top_outlined,
-        Colors.orange,
-      ),
-      _ => (Icons.upload_file, colors.outline),
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    final icon = switch (document?.status) {
+      VolunteerDocumentStatus.approved => DsIcons.circleCheck,
+      VolunteerDocumentStatus.rejected => DsIcons.circleX,
+      VolunteerDocumentStatus.pending when document?.hasFile == true =>
+        DsIcons.clock,
+      _ => DsIcons.upload,
     };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        OutlinedButton.icon(
+        DsSecondaryButton(
           onPressed: _uploading ? null : _upload,
-          icon: _uploading
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Icon(icon, color: color),
-          label: Text(
-            document?.hasFile == true
-                ? '$label — ${_statusLabel(document!)}'
-                : 'Joindre $label',
-          ),
+          isLoading: _uploading,
+          icon: icon,
+          label: document?.hasFile == true
+              ? '$label — ${_statusLabel(document!)}'
+              : 'Joindre $label',
         ),
         if (document?.status == VolunteerDocumentStatus.rejected &&
             document?.rejectionReason != null)
@@ -417,9 +464,7 @@ class _MyDocumentTileState extends ConsumerState<_MyDocumentTile> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               document!.rejectionReason!,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: colors.error),
+              style: DsTypography.caption.copyWith(color: colors.error),
             ),
           ),
       ],
@@ -499,46 +544,50 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
   }
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(18),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return DsCard(
       child: Form(
         key: _key,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Informations', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 14),
+            Text(
+              'Informations',
+              style: DsTypography.h3.copyWith(color: colors.textPrimary),
+            ),
+            const SizedBox(height: DsSpacing.md),
             TextFormField(
               controller: _firstName,
               decoration: const InputDecoration(labelText: 'Prénom'),
               validator: _required,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: DsSpacing.sm),
             TextFormField(
               controller: _lastName,
               decoration: const InputDecoration(labelText: 'Nom'),
               validator: _required,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: DsSpacing.sm),
             TextFormField(
               controller: _phone,
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(labelText: 'Téléphone'),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: DsSpacing.md),
             Align(
               alignment: Alignment.centerLeft,
-              child: FilledButton(
+              child: DsPrimaryButton(
                 onPressed: _saving ? null : _save,
-                child: Text(_saving ? 'Enregistrement…' : 'Enregistrer'),
+                isLoading: _saving,
+                label: 'Enregistrer',
               ),
             ),
           ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _VolunteerStatisticsCard extends ConsumerWidget {
@@ -548,24 +597,32 @@ class _VolunteerStatisticsCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statistics = ref.watch(volunteerStatisticsProvider);
     final creditSummary = ref.watch(volunteerCreditSummaryProvider);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: statistics.when(
-          loading: () =>
-              const AppLoadingState(label: 'Chargement des statistiques'),
-          error: (_, _) => AppErrorState(
-            message: 'Statistiques indisponibles.',
-            onRetry: () => ref.invalidate(volunteerStatisticsProvider),
-          ),
-          data: (value) => value == null
-              ? const Text('Aucune statistique disponible.')
-              : _StatisticsContent(
-                  value: value,
-                  creditSummary: creditSummary.value,
-                ),
+    return statistics.when(
+      loading: () => const DsCard(
+        child: AppLoadingState(label: 'Chargement des statistiques'),
+      ),
+      error: (_, _) => DsCard(
+        child: AppErrorState(
+          message: 'Statistiques indisponibles.',
+          onRetry: () => ref.invalidate(volunteerStatisticsProvider),
         ),
       ),
+      data: (value) => value == null
+          ? Builder(
+              builder: (context) {
+                final colors = Theme.of(context).extension<DsTokens>()!.colors;
+                return Text(
+                  'Aucune statistique disponible.',
+                  style: DsTypography.body.copyWith(
+                    color: colors.textSecondary,
+                  ),
+                );
+              },
+            )
+          : _StatisticsContent(
+              value: value,
+              creditSummary: creditSummary.value,
+            ),
     );
   }
 }
@@ -576,87 +633,91 @@ class _StatisticsContent extends StatelessWidget {
   final VolunteerCreditSummary? creditSummary;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Text('Mon activité', style: Theme.of(context).textTheme.titleLarge),
-      const SizedBox(height: 14),
-      Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        children: [
-          _Metric('Membre depuis', _date(value.memberSince)),
-          _Metric('Maraudes réalisées', '${value.maraudesCompleted}'),
-          _Metric(
-            'Heures de bénévolat',
-            value.volunteeringHours.toStringAsFixed(1),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Mon activité',
+          style: DsTypography.h3.copyWith(color: colors.textPrimary),
+        ),
+        const SizedBox(height: DsSpacing.sm),
+        _MetricsRow(
+          metrics: [
+            ('Membre depuis', _date(value.memberSince)),
+            ('Maraudes réalisées', '${value.maraudesCompleted}'),
+            ('Heures de bénévolat', value.volunteeringHours.toStringAsFixed(1)),
+            ('Invitations obtenues', '${value.invitationsObtained}'),
+            (
+              'Impact collectif',
+              '${value.collectiveWeightKg.toStringAsFixed(1)} kg',
+            ),
+          ],
+        ),
+        if (creditSummary != null) ...[
+          const SizedBox(height: DsSpacing.md),
+          Text(
+            'Mes crédits d’invitation',
+            style: DsTypography.body.copyWith(
+              color: colors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          _Metric('Invitations obtenues', '${value.invitationsObtained}'),
-          _Metric(
-            'Impact collectif',
-            '${value.collectiveWeightKg.toStringAsFixed(1)} kg',
+          const SizedBox(height: DsSpacing.sm),
+          _MetricsRow(
+            metrics: [
+              ('Crédits disponibles', '${creditSummary!.available}'),
+              ('Crédits gagnés', '${creditSummary!.earned}'),
+              ('Crédits consommés', '${creditSummary!.consumed}'),
+            ],
           ),
         ],
-      ),
-      if (creditSummary != null) ...[
-        const SizedBox(height: 16),
+        if (value.roles.isNotEmpty) ...[
+          const SizedBox(height: DsSpacing.md),
+          Text(
+            'Rôles exercés',
+            style: DsTypography.body.copyWith(
+              color: colors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: DsSpacing.sm),
+          Wrap(
+            spacing: DsSpacing.sm,
+            runSpacing: DsSpacing.sm,
+            children: [
+              for (final role in value.roles.entries)
+                DsBadge(label: '${_roleLabel(role.key)} : ${role.value}'),
+            ],
+          ),
+        ],
+        const SizedBox(height: DsSpacing.sm),
         Text(
-          'Mes crédits d’invitation',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            _Metric('Crédits disponibles', '${creditSummary!.available}'),
-            _Metric('Crédits gagnés', '${creditSummary!.earned}'),
-            _Metric('Crédits consommés', '${creditSummary!.consumed}'),
-          ],
+          'Ces informations sont indicatives et ne constituent ni un score '
+          'ni un classement.',
+          style: DsTypography.caption.copyWith(color: colors.textSecondary),
         ),
       ],
-      if (value.roles.isNotEmpty) ...[
-        const SizedBox(height: 16),
-        Text('Rôles exercés', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: [
-            for (final role in value.roles.entries)
-              Chip(label: Text('${_roleLabel(role.key)} : ${role.value}')),
-          ],
-        ),
-      ],
-      const SizedBox(height: 10),
-      Text(
-        'Ces informations sont indicatives et ne constituent ni un score '
-        'ni un classement.',
-        style: Theme.of(context).textTheme.bodySmall,
-      ),
-    ],
-  );
+    );
+  }
 }
 
-class _Metric extends StatelessWidget {
-  const _Metric(this.label, this.value);
-  final String label;
-  final String value;
+class _MetricsRow extends StatelessWidget {
+  const _MetricsRow({required this.metrics});
+  final List<(String, String)> metrics;
 
   @override
-  Widget build(BuildContext context) => ConstrainedBox(
-    constraints: const BoxConstraints(minWidth: 160),
-    child: Card.filled(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label),
-            Text(value, style: Theme.of(context).textTheme.titleMedium),
-          ],
+  Widget build(BuildContext context) => Wrap(
+    spacing: DsSpacing.sm,
+    runSpacing: DsSpacing.sm,
+    children: [
+      for (final (label, value) in metrics)
+        SizedBox(
+          width: 160,
+          child: DsMetricCard(label: label, value: value),
         ),
-      ),
-    ),
+    ],
   );
 }
 

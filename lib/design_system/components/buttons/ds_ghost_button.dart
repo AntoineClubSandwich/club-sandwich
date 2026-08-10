@@ -82,11 +82,14 @@ class DsGhostButton extends StatelessWidget {
               ),
               if (isLoading || icon != null)
                 const SizedBox(width: DsSpacing.xs),
-              Text(
-                label,
-                style: DsTypography.body.copyWith(
-                  color: foreground,
-                  fontWeight: FontWeight.w600,
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: DsTypography.body.copyWith(
+                    color: foreground,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],

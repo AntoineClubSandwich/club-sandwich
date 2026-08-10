@@ -94,11 +94,14 @@ class DsPrimaryButton extends StatelessWidget {
               ),
               if (isLoading || icon != null)
                 const SizedBox(width: DsSpacing.sm),
-              Text(
-                label,
-                style: DsTypography.body.copyWith(
-                  color: colors.textOnColor,
-                  fontWeight: FontWeight.w600,
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: DsTypography.body.copyWith(
+                    color: colors.textOnColor,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
