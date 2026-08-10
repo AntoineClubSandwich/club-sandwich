@@ -1,4 +1,5 @@
 import 'package:club_sandwich/design_system/components/ds_pressable.dart';
+import 'package:club_sandwich/design_system/components/navigation/ds_top_bar.dart';
 import 'package:club_sandwich/design_system/icons/ds_icons.dart';
 import 'package:club_sandwich/design_system/tokens/ds_borders.dart';
 import 'package:club_sandwich/design_system/tokens/ds_motion.dart';
@@ -29,6 +30,11 @@ class AppShell extends ConsumerWidget {
 
   final String location;
   final Widget child;
+
+  /// Key on the desktop sidebar's root container, so widget tests can
+  /// assert its presence without depending on Material internals like
+  /// `NavigationRail`.
+  static const desktopSidebarKey = ValueKey('appShellDesktopSidebar');
 
   int _selectedIndex(List<_AppDestination> destinations) {
     final index = destinations.indexWhere(
@@ -68,137 +74,170 @@ class AppShell extends ConsumerWidget {
     }
 
     final accountPanel = _UserAccountPanel(onSignedOut: onSignedOut);
-
-    if (!isDesktop) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(destinations[selectedIndex].label),
-          actions: const [WorkflowNotificationsButton()],
-        ),
-        drawer: Drawer(
-          child: SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: NavigationDrawer(
-                    selectedIndex: selectedIndex,
-                    onDestinationSelected: (index) {
-                      Navigator.of(context).pop();
-                      _navigate(context, destinations, index);
-                    },
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(20, 20, 20, 24),
-                        child: Row(
-                          children: [
-                            ClubSandwichMascot(
-                              size: 28,
-                              color: MascotColor.blue,
-                            ),
-                            SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Club Sandwich',
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      for (final destination in destinations)
-                        NavigationDrawerDestination(
-                          icon: Icon(destination.icon),
-                          selectedIcon: Icon(destination.selectedIcon),
-                          label: Text(destination.label),
-                        ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                accountPanel,
-              ],
-            ),
-          ),
-        ),
-        body: child,
-      );
-    }
-
     final isAdmin =
         (userContext?.role ?? AppUserRole.volunteer) == AppUserRole.admin;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(destinations[selectedIndex].label),
-        actions: const [WorkflowNotificationsButton()],
-      ),
-      body: Row(
-        children: [
-          if (isAdmin)
-            Theme(
-              data: DsTheme.light,
-              child: _AdminDesktopSidebar(
-                destinations: destinations,
-                selectedIndex: selectedIndex,
-                onSelected: (index) => _navigate(context, destinations, index),
-                accountPanel: _UserAccountPanel(
-                  onSignedOut: onSignedOut,
-                  admin: true,
-                ),
+    // Wrapped in a local DsTheme.light regardless of the ambient theme:
+    // AppShell is exercised directly (without ClubSandwichApp's app-wide
+    // theme) by several widget tests, so DsTokens must not depend on it.
+    if (!isDesktop) {
+      return Theme(
+        data: DsTheme.light,
+        child: Scaffold(
+          appBar: DsTopBar(
+            title: destinations[selectedIndex].label,
+            leading: Builder(
+              builder: (context) => IconButton(
+                icon: Icon(DsIcons.menu),
+                tooltip: 'Menu',
+                onPressed: () => Scaffold.of(context).openDrawer(),
               ),
-            )
-          else ...[
-            SizedBox(
-              width: 280,
-              child: Column(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(20, 20, 20, 12),
-                    child: Row(
+            ),
+            actions: const [WorkflowNotificationsButton()],
+          ),
+          drawer: Drawer(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: Builder(
+              builder: (context) {
+                final tokens = Theme.of(context).extension<DsTokens>()!;
+                final colors = tokens.colors;
+                return Container(
+                  decoration: BoxDecoration(
+                    color: colors.canvas,
+                    border: Border(
+                      right: BorderSide(
+                        color: colors.borderStrong,
+                        width: DsBorders.thick,
+                      ),
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Column(
                       children: [
-                        ClubSandwichMascot(size: 28, color: MascotColor.blue),
-                        SizedBox(width: 10),
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            DsSpacing.lg,
+                            DsSpacing.lg,
+                            DsSpacing.lg,
+                            DsSpacing.sm,
+                          ),
+                          child: _SidebarLogo(),
+                        ),
                         Expanded(
-                          child: Text(
-                            'Club Sandwich',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: DsSpacing.lg,
+                              vertical: DsSpacing.sm,
+                            ),
+                            child: Column(
+                              children: [
+                                for (
+                                  var i = 0;
+                                  i < destinations.length;
+                                  i++
+                                ) ...[
+                                  if (i > 0)
+                                    const SizedBox(height: DsSpacing.sm),
+                                  _DsNavItem(
+                                    label: destinations[i].label,
+                                    icon: _sidebarIcon(destinations[i].path),
+                                    selected: i == selectedIndex,
+                                    onTap: () {
+                                      Navigator.of(context).pop();
+                                      _navigate(context, destinations, i);
+                                    },
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                         ),
+                        accountPanel,
                       ],
                     ),
                   ),
-                  Expanded(
-                    child: NavigationRail(
-                      extended: true,
-                      selectedIndex: selectedIndex,
-                      onDestinationSelected: (index) =>
-                          _navigate(context, destinations, index),
-                      destinations: [
-                        for (final destination in destinations)
-                          NavigationRailDestination(
-                            icon: Icon(destination.icon),
-                            selectedIcon: Icon(destination.selectedIcon),
-                            label: Text(destination.label),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  accountPanel,
-                ],
+                );
+              },
+            ),
+          ),
+          body: child,
+        ),
+      );
+    }
+
+    return Theme(
+      data: DsTheme.light,
+      child: Scaffold(
+        appBar: DsTopBar(
+          title: destinations[selectedIndex].label,
+          actions: const [WorkflowNotificationsButton()],
+        ),
+        body: Row(
+          children: [
+            _DsSidebar(
+              dark: isAdmin,
+              destinations: destinations,
+              selectedIndex: selectedIndex,
+              onSelected: (index) => _navigate(context, destinations, index),
+              accountPanel: accountPanel,
+            ),
+            Expanded(child: child),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bordered "CLUB SANDWICH" logo chip shown atop the mobile drawer and the
+/// desktop sidebar (both admin and non-admin variants).
+class _SidebarLogo extends StatelessWidget {
+  const _SidebarLogo();
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<DsTokens>()!;
+    final colors = tokens.colors;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DsSpacing.sm,
+        vertical: DsSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: colors.primary,
+        borderRadius: DsRadius.smRadius,
+        border: Border.all(color: colors.borderStrong, width: DsBorders.thick),
+        boxShadow: DsShadows.card(colors.borderStrong),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: DsRadius.smRadius,
+              border: Border.all(
+                color: colors.borderStrong,
+                width: DsBorders.standard,
               ),
             ),
-            const VerticalDivider(width: 1),
-          ],
-          Expanded(child: child),
+            padding: const EdgeInsets.all(3),
+            child: const ClubSandwichMascot(size: 22, color: MascotColor.orange),
+          ),
+          const SizedBox(width: DsSpacing.sm),
+          Expanded(
+            child: Text(
+              'CLUB SANDWICH',
+              overflow: TextOverflow.ellipsis,
+              style: DsTypography.caption.copyWith(
+                color: colors.textOnColor,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -206,15 +245,9 @@ class AppShell extends ConsumerWidget {
 }
 
 class _UserAccountPanel extends ConsumerStatefulWidget {
-  const _UserAccountPanel({required this.onSignedOut, this.admin = false});
+  const _UserAccountPanel({required this.onSignedOut});
 
   final VoidCallback onSignedOut;
-
-  /// When true, renders the neo-brutalist admin-sidebar variant (ink
-  /// border, hard shadow, thick-bordered sign-out button) instead of the
-  /// plain Material card used by the mobile drawer and non-admin roles.
-  /// Same underlying sign-out logic either way.
-  final bool admin;
 
   @override
   ConsumerState<_UserAccountPanel> createState() => _UserAccountPanelState();
@@ -257,153 +290,49 @@ class _UserAccountPanelState extends ConsumerState<_UserAccountPanel> {
     final primaryLabel = displayName ?? email ?? 'Compte connecté';
     final showEmail =
         email != null && email.isNotEmpty && email != primaryLabel;
+    final tokens = Theme.of(context).extension<DsTokens>()!;
+    final colors = tokens.colors;
 
-    if (widget.admin) {
-      final tokens = Theme.of(context).extension<DsTokens>()!;
-      final colors = tokens.colors;
-      return Container(
-        margin: const EdgeInsets.all(DsSpacing.lg),
-        padding: const EdgeInsets.all(DsSpacing.md),
-        decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: DsRadius.mdRadius,
-          border: Border.all(
-            color: colors.borderStrong,
-            width: DsBorders.thick,
-          ),
-          boxShadow: DsShadows.card(colors.borderStrong),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: colors.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: colors.borderStrong,
-                      width: DsBorders.standard,
-                    ),
-                  ),
-                  child: Text(
-                    _accountInitial(primaryLabel),
-                    semanticsLabel: 'Compte utilisateur',
-                    style: DsTypography.body.copyWith(
-                      color: colors.textOnColor,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: DsSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Tooltip(
-                        message: primaryLabel,
-                        child: Text(
-                          primaryLabel,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: DsTypography.body.copyWith(
-                            color: colors.textPrimary,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      if (showEmail)
-                        Tooltip(
-                          message: email,
-                          child: Text(
-                            email,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: DsTypography.caption.copyWith(
-                              color: colors.textSecondary,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: DsSpacing.md),
-            DsPressable(
-              enabled: !_isSigningOut,
-              onTap: _signOut,
-              builder: (context, state) {
-                final shadow = DsShadows.card(colors.borderStrong);
-                final pressDelta = state.pressed
-                    ? shadow.first.offset
-                    : Offset.zero;
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  transform: Matrix4.translationValues(
-                    pressDelta.dx,
-                    pressDelta.dy,
-                    0,
-                  ),
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: DsSpacing.sm + 2,
-                  ),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: colors.primary,
-                    borderRadius: DsRadius.smRadius,
-                    border: Border.all(
-                      color: colors.borderStrong,
-                      width: DsBorders.thick,
-                    ),
-                    boxShadow: state.pressed ? const [] : shadow,
-                  ),
-                  child: _isSigningOut
-                      ? SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: colors.textOnColor,
-                          ),
-                        )
-                      : Text(
-                          'SE DÉCONNECTER',
-                          style: DsTypography.caption.copyWith(
-                            color: colors.textOnColor,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                );
-              },
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
+    return Container(
+      margin: const EdgeInsets.all(DsSpacing.lg),
+      padding: const EdgeInsets.all(DsSpacing.md),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: DsRadius.mdRadius,
+        border: Border.all(color: colors.borderStrong, width: DsBorders.thick),
+        boxShadow: DsShadows.card(colors.borderStrong),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              CircleAvatar(
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colors.primary,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: colors.borderStrong,
+                    width: DsBorders.standard,
+                  ),
+                ),
                 child: Text(
                   _accountInitial(primaryLabel),
                   semanticsLabel: 'Compte utilisateur',
+                  style: DsTypography.body.copyWith(
+                    color: colors.textOnColor,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: DsSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Tooltip(
                       message: primaryLabel,
@@ -411,7 +340,10 @@ class _UserAccountPanelState extends ConsumerState<_UserAccountPanel> {
                         primaryLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall,
+                        style: DsTypography.body.copyWith(
+                          color: colors.textPrimary,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                     if (showEmail)
@@ -421,7 +353,9 @@ class _UserAccountPanelState extends ConsumerState<_UserAccountPanel> {
                           email,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall,
+                          style: DsTypography.caption.copyWith(
+                            color: colors.textSecondary,
+                          ),
                         ),
                       ),
                   ],
@@ -429,16 +363,51 @@ class _UserAccountPanelState extends ConsumerState<_UserAccountPanel> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          FilledButton.tonalIcon(
-            onPressed: _isSigningOut ? null : _signOut,
-            icon: _isSigningOut
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.logout),
-            label: Text(_isSigningOut ? 'Déconnexion…' : 'Se déconnecter'),
+          const SizedBox(height: DsSpacing.md),
+          DsPressable(
+            enabled: !_isSigningOut,
+            onTap: _signOut,
+            builder: (context, state) {
+              final shadow = DsShadows.card(colors.borderStrong);
+              final pressDelta = state.pressed
+                  ? shadow.first.offset
+                  : Offset.zero;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                transform: Matrix4.translationValues(
+                  pressDelta.dx,
+                  pressDelta.dy,
+                  0,
+                ),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: DsSpacing.sm + 2),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colors.primary,
+                  borderRadius: DsRadius.smRadius,
+                  border: Border.all(
+                    color: colors.borderStrong,
+                    width: DsBorders.thick,
+                  ),
+                  boxShadow: state.pressed ? const [] : shadow,
+                ),
+                child: _isSigningOut
+                    ? SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: colors.textOnColor,
+                        ),
+                      )
+                    : Text(
+                        'SE DÉCONNECTER',
+                        style: DsTypography.caption.copyWith(
+                          color: colors.textOnColor,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+              );
+            },
           ),
         ],
       ),
@@ -457,18 +426,20 @@ String _accountInitial(String label) {
   return normalizedLabel.isEmpty ? '?' : normalizedLabel[0].toUpperCase();
 }
 
-/// Neo-brutalist admin sidebar (desktop only) — same [_AppDestination]
-/// route list and navigation behavior as the stock rail it replaces, only
-/// the visuals differ: navy background, ink-bordered logo chip and nav
-/// pills, a mascot widget, and the restyled [_UserAccountPanel].
-class _AdminDesktopSidebar extends StatelessWidget {
-  const _AdminDesktopSidebar({
+/// Neo-brutalist desktop sidebar. [dark] switches between the navy
+/// admin-only treatment (with mascot widget) and the light canvas
+/// treatment used by every other role — same [_AppDestination] route list
+/// and navigation behavior either way, only the visuals differ.
+class _DsSidebar extends StatelessWidget {
+  const _DsSidebar({
+    required this.dark,
     required this.destinations,
     required this.selectedIndex,
     required this.onSelected,
     required this.accountPanel,
   });
 
+  final bool dark;
   final List<_AppDestination> destinations;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
@@ -480,65 +451,25 @@ class _AdminDesktopSidebar extends StatelessWidget {
     final colors = tokens.colors;
 
     return Container(
+      key: AppShell.desktopSidebarKey,
       width: 280,
-      color: colors.secondary,
+      decoration: BoxDecoration(
+        color: dark ? colors.secondary : colors.canvas,
+        border: Border(
+          right: BorderSide(color: colors.borderStrong, width: DsBorders.thick),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
+          const Padding(
+            padding: EdgeInsets.fromLTRB(
               DsSpacing.lg,
               DsSpacing.lg,
               DsSpacing.lg,
               DsSpacing.sm,
             ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: DsSpacing.sm,
-                vertical: DsSpacing.sm,
-              ),
-              decoration: BoxDecoration(
-                color: colors.primary,
-                borderRadius: DsRadius.smRadius,
-                border: Border.all(
-                  color: colors.borderStrong,
-                  width: DsBorders.thick,
-                ),
-                boxShadow: DsShadows.card(colors.borderStrong),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: colors.surface,
-                      borderRadius: DsRadius.smRadius,
-                      border: Border.all(
-                        color: colors.borderStrong,
-                        width: DsBorders.standard,
-                      ),
-                    ),
-                    padding: const EdgeInsets.all(3),
-                    child: const ClubSandwichMascot(
-                      size: 22,
-                      color: MascotColor.orange,
-                    ),
-                  ),
-                  const SizedBox(width: DsSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      'CLUB SANDWICH',
-                      overflow: TextOverflow.ellipsis,
-                      style: DsTypography.caption.copyWith(
-                        color: colors.textOnColor,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: _SidebarLogo(),
           ),
           Expanded(
             child: SingleChildScrollView(
@@ -550,15 +481,18 @@ class _AdminDesktopSidebar extends StatelessWidget {
                 children: [
                   for (var i = 0; i < destinations.length; i++) ...[
                     if (i > 0) const SizedBox(height: DsSpacing.sm),
-                    _AdminNavItem(
+                    _DsNavItem(
                       label: destinations[i].label,
-                      icon: _adminSidebarIcon(destinations[i].path),
+                      icon: _sidebarIcon(destinations[i].path),
                       selected: i == selectedIndex,
+                      dark: dark,
                       onTap: () => onSelected(i),
                     ),
                   ],
-                  const SizedBox(height: DsSpacing.xl),
-                  const _AdminMascotWidget(),
+                  if (dark) ...[
+                    const SizedBox(height: DsSpacing.xl),
+                    const _AdminMascotWidget(),
+                  ],
                 ],
               ),
             ),
@@ -570,29 +504,37 @@ class _AdminDesktopSidebar extends StatelessWidget {
   }
 }
 
-/// Maps an admin route path to the Lucide icon shown in the neo-brutalist
-/// sidebar. Purely a visual lookup — does not affect routing.
-IconData _adminSidebarIcon(String path) => switch (path) {
+/// Maps a route path to the Lucide icon shown in the desktop sidebar and
+/// mobile drawer. Purely a visual lookup — does not affect routing.
+IconData _sidebarIcon(String path) => switch (path) {
   '/maraudes' => DsIcons.truck,
   '/invitations' => DsIcons.mail,
   '/organizations' => DsIcons.building2,
   '/volunteers' => DsIcons.users2,
   '/administration' => DsIcons.settings,
+  '/profile' || '/account' => DsIcons.user,
+  '/dashboard' => DsIcons.home,
   _ => DsIcons.layoutDashboard,
 };
 
-class _AdminNavItem extends StatelessWidget {
-  const _AdminNavItem({
+class _DsNavItem extends StatelessWidget {
+  const _DsNavItem({
     required this.label,
     required this.icon,
     required this.selected,
     required this.onTap,
+    this.dark = false,
   });
 
   final String label;
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
+
+  /// Whether this item sits on the navy admin sidebar (unselected items
+  /// render as white cards) versus the light canvas sidebar/drawer
+  /// (unselected items are transparent with a subtle hover tint).
+  final bool dark;
 
   @override
   Widget build(BuildContext context) {
@@ -604,7 +546,9 @@ class _AdminNavItem extends StatelessWidget {
       builder: (context, state) {
         final background = selected
             ? colors.primary
-            : (state.hovered ? colors.secondaryHover : colors.surface);
+            : dark
+            ? (state.hovered ? colors.secondaryHover : colors.surface)
+            : (state.hovered ? colors.neutralHoverOverlay : Colors.transparent);
         final foreground = selected ? colors.textOnColor : colors.textPrimary;
 
         return Semantics(

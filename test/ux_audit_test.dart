@@ -122,13 +122,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Accueil'), findsWidgets);
-    expect(find.byType(NavigationRail), findsNothing);
+    expect(find.byKey(AppShell.desktopSidebarKey), findsNothing);
     expect(tester.takeException(), isNull);
 
     await _setViewport(tester, const Size(1280, 800));
     await tester.pumpAndSettle();
 
-    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byKey(AppShell.desktopSidebarKey), findsOneWidget);
     expect(find.text('Accueil'), findsWidgets);
     expect(tester.takeException(), isNull);
   });

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:club_sandwich/core/router/app_router.dart';
+import 'package:club_sandwich/design_system/icons/ds_icons.dart';
 import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/data/auth_repository.dart';
@@ -110,7 +111,7 @@ void main() {
       expect(find.text('Antoine Vignol'), findsOneWidget);
       expect(find.text('antoine@clubsandwich-records.com'), findsOneWidget);
 
-      await tester.tap(find.text('Se déconnecter'));
+      await tester.tap(find.text('SE DÉCONNECTER'));
       await tester.pumpAndSettle();
 
       expect(authRepository.signOutCount, 1);
@@ -241,11 +242,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.menu));
+      await tester.tap(find.byIcon(DsIcons.menu));
       await tester.pumpAndSettle();
 
       expect(find.text('antoine@clubsandwich-records.com'), findsOneWidget);
-      expect(find.text('Se déconnecter'), findsOneWidget);
+      expect(find.text('SE DÉCONNECTER'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

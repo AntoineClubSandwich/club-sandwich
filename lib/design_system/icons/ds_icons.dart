@@ -20,6 +20,7 @@ abstract final class DsIcons {
   static const IconData eyeOff = LucideIcons.eyeOff;
   static const IconData logOut = LucideIcons.logOut;
   static const IconData settings = LucideIcons.settings;
+  static const IconData menu = LucideIcons.menu;
 
   // Navigation
   static const IconData home = LucideIcons.home;
