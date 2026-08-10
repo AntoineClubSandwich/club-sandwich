@@ -1,5 +1,27 @@
 import 'package:flutter/widgets.dart';
 
+import '../tokens/ds_motion.dart';
+
+/// Wraps [child] in a subtle scale-down transform when [pressed] — the
+/// "Bento Soft Modern" press affordance shared by [DsCard]/`DsPrimaryButton`/
+/// `DsSecondaryButton`. Replaces the old neo-brutalist illusion of the
+/// widget translating into its own hard offset shadow, which doesn't read
+/// as a press against this style's soft blurred shadows.
+class DsPressScale extends StatelessWidget {
+  const DsPressScale({super.key, required this.pressed, required this.child});
+
+  final bool pressed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedScale(
+    scale: pressed ? 0.98 : 1,
+    duration: DsMotion.standard,
+    curve: DsMotion.curve,
+    child: child,
+  );
+}
+
 /// Hover/press state passed to a [DsPressable] builder.
 class DsInteractionState {
   const DsInteractionState({this.hovered = false, this.pressed = false});

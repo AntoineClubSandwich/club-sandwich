@@ -26,10 +26,10 @@ class DsBottomSheet extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.surfaceElevated,
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(DsRadius.lg),
-          topRight: Radius.circular(DsRadius.lg),
+          topLeft: Radius.circular(DsRadius.xxl),
+          topRight: Radius.circular(DsRadius.xxl),
         ),
-        boxShadow: DsShadows.elevated(colors.borderStrong),
+        boxShadow: DsShadows.ambientElevated(colors.textPrimary),
       ),
       padding: const EdgeInsets.fromLTRB(
         DsSpacing.xl,
@@ -51,7 +51,7 @@ class DsBottomSheet extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: DsSpacing.lg),
                   decoration: BoxDecoration(
                     color: colors.border,
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: DsRadius.pillRadius,
                   ),
                 ),
               ),

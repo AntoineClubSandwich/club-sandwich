@@ -34,7 +34,7 @@ class DsTopBar extends StatelessWidget implements PreferredSizeWidget {
       padding: const EdgeInsets.symmetric(horizontal: DsSpacing.xl),
       decoration: BoxDecoration(
         color: colors.surface,
-        boxShadow: DsShadows.card(colors.borderStrong),
+        boxShadow: DsShadows.ambient(colors.textPrimary),
       ),
       child: Row(
         children: [

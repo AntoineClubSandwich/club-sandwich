@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../icons/ds_icons.dart';
+import '../../tokens/ds_radius.dart';
 import '../../tokens/ds_spacing.dart';
 import '../../tokens/ds_tokens.dart';
 import '../../tokens/ds_typography.dart';
@@ -57,7 +58,7 @@ class DsMetricCard extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: colors.primarySelectedBg,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: DsRadius.mdRadius,
                   ),
                   child: Icon(icon, size: 16, color: colors.primary),
                 ),

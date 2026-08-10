@@ -46,10 +46,13 @@ class DsVolunteerCard extends StatelessWidget {
                   children: [
                     Icon(DsIcons.check, size: 12, color: colors.textSecondary),
                     const SizedBox(width: 4),
-                    Text(
-                      '${data.maraudesCompleted} maraudes réalisées',
-                      style: DsTypography.caption.copyWith(
-                        color: colors.textSecondary,
+                    Flexible(
+                      child: Text(
+                        '${data.maraudesCompleted} maraudes réalisées',
+                        overflow: TextOverflow.ellipsis,
+                        style: DsTypography.caption.copyWith(
+                          color: colors.textSecondary,
+                        ),
                       ),
                     ),
                   ],

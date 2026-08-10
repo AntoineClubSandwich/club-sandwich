@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../tokens/ds_tokens.dart';
 import '../../tokens/ds_typography.dart';
 
 enum DsAvatarSize { sm, md, lg }
@@ -28,27 +29,6 @@ extension on DsAvatarSize {
   };
 }
 
-/// A restrained, muted palette an avatar's background is deterministically
-/// picked from (by hashing [DsAvatar.initials]) — never the saturated
-/// brand orange/blue, to keep a wall of avatars calm rather than busy.
-const List<Color> _avatarPalette = [
-  Color(0xFFE7E9F7), // secondary tint
-  Color(0xFFFCE9E3), // primary tint
-  Color(0xFFE7F6EE), // success tint
-  Color(0xFFEAF2FD), // info tint
-  Color(0xFFFCF1DC), // warning tint
-  Color(0xFFF1F2F4), // neutral tint
-];
-
-const List<Color> _avatarForeground = [
-  Color(0xFF293283),
-  Color(0xFFB93A1A),
-  Color(0xFF187A45),
-  Color(0xFF1F5BB0),
-  Color(0xFFA66C0B),
-  Color(0xFF5B6270),
-];
-
 /// A person/organisation avatar — initials on a deterministic muted tint,
 /// or an image with initials as the loading/error fallback.
 class DsAvatar extends StatelessWidget {
@@ -70,11 +50,31 @@ class DsAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    // A restrained, muted palette an avatar's background is deterministically
+    // picked from (by hashing initials) — never the saturated brand purple,
+    // to keep a wall of avatars calm rather than busy.
+    final palette = [
+      colors.secondarySelectedBg,
+      colors.primarySelectedBg,
+      colors.successBg,
+      colors.infoBg,
+      colors.warningBg,
+      colors.neutralSelectedBg,
+    ];
+    final foregrounds = [
+      colors.secondary,
+      colors.primary,
+      colors.success,
+      colors.info,
+      colors.warning,
+      colors.textSecondary,
+    ];
     final index = initials.isEmpty
         ? 0
-        : initials.codeUnitAt(0) % _avatarPalette.length;
-    final background = _avatarPalette[index];
-    final foreground = _avatarForeground[index];
+        : initials.codeUnitAt(0) % palette.length;
+    final background = palette[index];
+    final foreground = foregrounds[index];
     final diameter = size.diameter;
 
     final fallback = Container(

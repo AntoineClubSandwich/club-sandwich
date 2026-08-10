@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../tokens/ds_borders.dart';
 import '../../tokens/ds_colors.dart';
 import '../../tokens/ds_motion.dart';
 import '../../tokens/ds_radius.dart';
-import '../../tokens/ds_shadows.dart';
 import '../../tokens/ds_spacing.dart';
 import '../../tokens/ds_tokens.dart';
 import '../../tokens/ds_typography.dart';
@@ -92,14 +90,7 @@ class DsNavigationRail extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             color: background,
-            borderRadius: DsRadius.lgRadius,
-            border: selected
-                ? Border.all(
-                    color: colors.borderStrong,
-                    width: DsBorders.standard,
-                  )
-                : null,
-            boxShadow: selected ? DsShadows.card(colors.borderStrong) : null,
+            borderRadius: DsRadius.mdRadius,
           ),
           child: Row(
             children: [
@@ -109,11 +100,14 @@ class DsNavigationRail extends StatelessWidget {
                 color: foreground,
               ),
               const SizedBox(width: DsSpacing.md),
-              Text(
-                item.label,
-                style: DsTypography.body.copyWith(
-                  color: foreground,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              Expanded(
+                child: Text(
+                  item.label,
+                  overflow: TextOverflow.ellipsis,
+                  style: DsTypography.body.copyWith(
+                    color: foreground,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  ),
                 ),
               ),
             ],

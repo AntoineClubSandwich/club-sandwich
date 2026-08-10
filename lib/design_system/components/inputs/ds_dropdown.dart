@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../icons/ds_icons.dart';
+import '../../tokens/ds_borders.dart';
 import '../../tokens/ds_radius.dart';
 import '../../tokens/ds_spacing.dart';
 import '../../tokens/ds_tokens.dart';
@@ -69,8 +70,8 @@ class DsDropdown<T> extends StatelessWidget {
           shadowColor: Colors.black.withValues(alpha: 0.12),
           surfaceTintColor: Colors.transparent,
           shape: RoundedRectangleBorder(
-            borderRadius: DsRadius.lgRadius,
-            side: BorderSide(color: colors.border),
+            borderRadius: DsRadius.smRadius,
+            side: BorderSide(color: colors.border, width: DsBorders.hairline),
           ),
           itemBuilder: (context) => [
             for (final item in items)
@@ -97,8 +98,11 @@ class DsDropdown<T> extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: DsSpacing.md),
             decoration: BoxDecoration(
               color: colors.surface,
-              borderRadius: DsRadius.lgRadius,
-              border: Border.all(color: colors.border),
+              borderRadius: DsRadius.smRadius,
+              border: Border.all(
+                color: colors.border,
+                width: DsBorders.hairline,
+              ),
             ),
             child: Row(
               children: [

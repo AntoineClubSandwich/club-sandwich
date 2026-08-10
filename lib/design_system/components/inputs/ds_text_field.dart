@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../tokens/ds_borders.dart';
 import '../../tokens/ds_motion.dart';
 import '../../tokens/ds_radius.dart';
 import '../../tokens/ds_spacing.dart';
@@ -92,8 +93,11 @@ class _DsTextFieldState extends State<DsTextField> {
           curve: DsMotion.curve,
           decoration: BoxDecoration(
             color: widget.enabled ? colors.surface : colors.disabledBg,
-            borderRadius: DsRadius.lgRadius,
-            border: Border.all(color: borderColor, width: _focused ? 2 : 1),
+            borderRadius: DsRadius.smRadius,
+            border: Border.all(
+              color: borderColor,
+              width: _focused ? DsBorders.standard : DsBorders.hairline,
+            ),
           ),
           child: TextField(
             controller: widget.controller,

@@ -8,12 +8,11 @@ import '../../tokens/ds_tokens.dart';
 import '../ds_pressable.dart';
 
 /// The base "floating card" surface of the design system: white, a hair
-/// of border, a hard offset ink shadow — the neo-brutalist signature,
-/// never a soft Material elevation. Every other surface component
-/// (`DsMetricCard`, the domain showcase cards) is built on top of this
-/// one. When [onTap] is set, pressing the card shrinks its shadow offset
-/// and nudges the card toward it — simulating it physically pressing
-/// onto its own shadow.
+/// of border, a soft blurred ambient shadow — never a hard offset "ink"
+/// shadow. Every other surface component (`DsMetricCard`, the domain
+/// showcase cards) is built on top of this one. When [onTap] is set,
+/// pressing the card scales it down slightly ([DsPressScale]) and drops
+/// its shadow.
 class DsCard extends StatelessWidget {
   const DsCard({
     super.key,
@@ -34,27 +33,24 @@ class DsCard extends StatelessWidget {
     final colors = tokens.colors;
 
     Widget buildSurface(bool hovered, bool pressed) {
-      final shadowOffsets = elevated
-          ? DsShadows.elevated(colors.borderStrong)
-          : (hovered
-                ? DsShadows.elevated(colors.borderStrong)
-                : DsShadows.card(colors.borderStrong));
-      final pressDelta = pressed && shadowOffsets.isNotEmpty
-          ? shadowOffsets.first.offset
-          : Offset.zero;
+      final shadow = elevated || hovered
+          ? DsShadows.ambientElevated(colors.textPrimary)
+          : DsShadows.ambient(colors.textPrimary);
 
-      return AnimatedContainer(
-        duration: DsMotion.standard,
-        curve: DsMotion.curve,
-        transform: Matrix4.translationValues(pressDelta.dx, pressDelta.dy, 0),
-        padding: padding,
-        decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: DsRadius.mdRadius,
-          border: Border.all(color: colors.border),
-          boxShadow: pressed ? const [] : shadowOffsets,
+      return DsPressScale(
+        pressed: pressed,
+        child: AnimatedContainer(
+          duration: DsMotion.standard,
+          curve: DsMotion.curve,
+          padding: padding,
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: DsRadius.lgRadius,
+            border: Border.all(color: colors.border),
+            boxShadow: pressed ? const [] : shadow,
+          ),
+          child: child,
         ),
-        child: child,
       );
     }
 

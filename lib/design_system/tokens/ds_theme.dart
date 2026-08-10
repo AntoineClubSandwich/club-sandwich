@@ -14,12 +14,12 @@ import 'ds_typography.dart';
 /// directly. The Material component themes below (`cardTheme`,
 /// `inputDecorationTheme`, `dialogTheme`, button themes, ...) exist so that
 /// screens not yet converted to `Ds*` components still render with the
-/// neo-brutalist palette/type/shape instead of stock Material — a
+/// Bento Soft Modern palette/type/shape instead of stock Material — a
 /// consistent stopgap during the screen-by-screen rollout, not a
 /// replacement for adopting `Ds*` components directly. Material's `Card`/
-/// `Dialog` elevation model can't express `DsShadows`' hard offset shadow,
-/// so these only carry the ink border + shape; the full hard-shadow
-/// treatment is specific to `DsCard`/`DsDialog`.
+/// `Dialog` elevation model can't express `DsShadows`' soft blurred shadow,
+/// so these only carry the border + shape; the full soft-shadow treatment
+/// is specific to `DsCard`/`DsDialog`.
 abstract final class DsTheme {
   static ThemeData get light {
     const colors = DsColorTokens.light;
@@ -77,8 +77,8 @@ abstract final class DsTheme {
         color: colors.surface,
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
-          borderRadius: DsRadius.mdRadius,
-          side: BorderSide(color: colors.border, width: DsBorders.standard),
+          borderRadius: DsRadius.lgRadius,
+          side: BorderSide(color: colors.border, width: DsBorders.hairline),
         ),
       ),
       dialogTheme: DialogThemeData(
@@ -86,11 +86,8 @@ abstract final class DsTheme {
         backgroundColor: colors.surfaceElevated,
         insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         shape: RoundedRectangleBorder(
-          borderRadius: DsRadius.lgRadius,
-          side: BorderSide(
-            color: colors.borderStrong,
-            width: DsBorders.standard,
-          ),
+          borderRadius: DsRadius.xxlRadius,
+          side: BorderSide(color: colors.border, width: DsBorders.hairline),
         ),
       ),
       popupMenuTheme: PopupMenuThemeData(
@@ -107,14 +104,14 @@ abstract final class DsTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size(48, 48),
-          shape: RoundedRectangleBorder(borderRadius: DsRadius.lgRadius),
+          shape: RoundedRectangleBorder(borderRadius: DsRadius.mdRadius),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(48, 48),
-          shape: RoundedRectangleBorder(borderRadius: DsRadius.lgRadius),
-          side: BorderSide(color: colors.border, width: DsBorders.standard),
+          shape: RoundedRectangleBorder(borderRadius: DsRadius.mdRadius),
+          side: BorderSide(color: colors.border, width: DsBorders.hairline),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -122,7 +119,7 @@ abstract final class DsTheme {
           backgroundColor: colors.primary,
           foregroundColor: colors.textOnColor,
           minimumSize: const Size.fromHeight(48),
-          shape: RoundedRectangleBorder(borderRadius: DsRadius.lgRadius),
+          shape: RoundedRectangleBorder(borderRadius: DsRadius.mdRadius),
         ),
       ),
       dividerTheme: DividerThemeData(color: colors.border, space: 24),

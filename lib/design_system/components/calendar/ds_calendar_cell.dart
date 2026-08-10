@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../tokens/ds_borders.dart';
 import '../../tokens/ds_motion.dart';
 import '../../tokens/ds_radius.dart';
 import '../../tokens/ds_tokens.dart';
@@ -65,7 +66,7 @@ class DsCalendarCell extends StatelessWidget {
             color: background,
             borderRadius: DsRadius.smRadius,
             border: today && !selected
-                ? Border.all(color: colors.primary, width: 1.5)
+                ? Border.all(color: colors.primary, width: DsBorders.standard)
                 : null,
           ),
           child: Stack(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../icons/ds_icons.dart';
+import '../../tokens/ds_borders.dart';
 import '../../tokens/ds_motion.dart';
 import '../../tokens/ds_radius.dart';
 import '../../tokens/ds_spacing.dart';
@@ -68,10 +69,10 @@ class _DsSearchBarState extends State<DsSearchBar> {
       curve: DsMotion.curve,
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: DsRadius.lgRadius,
+        borderRadius: DsRadius.smRadius,
         border: Border.all(
           color: _focused ? colors.borderFocus : colors.border,
-          width: _focused ? 2 : 1,
+          width: _focused ? DsBorders.standard : DsBorders.hairline,
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: DsSpacing.md),

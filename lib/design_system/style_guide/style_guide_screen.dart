@@ -574,7 +574,7 @@ class _FeedbackShowcase extends StatelessWidget {
           children: [
             SizedBox(
               width: 260,
-              height: 260,
+              height: 340,
               child: DsCard(
                 child: const DsEmptyState(
                   illustration: DsEmptyBoxIllustration(),
@@ -585,7 +585,7 @@ class _FeedbackShowcase extends StatelessWidget {
             ),
             SizedBox(
               width: 260,
-              height: 260,
+              height: 340,
               child: DsCard(
                 child: const DsEmptyState(
                   illustration: DsSearchIllustration(),
@@ -596,7 +596,7 @@ class _FeedbackShowcase extends StatelessWidget {
             ),
             SizedBox(
               width: 260,
-              height: 260,
+              height: 340,
               child: DsCard(
                 child: const DsEmptyState(
                   illustration: DsAllDoneIllustration(),

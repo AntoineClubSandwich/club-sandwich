@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../icons/ds_icons.dart';
 import '../../mock/style_guide_mock_data.dart';
+import '../../tokens/ds_radius.dart';
 import '../../tokens/ds_spacing.dart';
 import '../../tokens/ds_tokens.dart';
 import '../../tokens/ds_typography.dart';
@@ -63,10 +64,13 @@ class DsMaraudeCard extends StatelessWidget {
             children: [
               Icon(DsIcons.calendar, size: 14, color: colors.textSecondary),
               const SizedBox(width: DsSpacing.xs),
-              Text(
-                data.dateLabel,
-                style: DsTypography.caption.copyWith(
-                  color: colors.textSecondary,
+              Flexible(
+                child: Text(
+                  data.dateLabel,
+                  overflow: TextOverflow.ellipsis,
+                  style: DsTypography.caption.copyWith(
+                    color: colors.textSecondary,
+                  ),
                 ),
               ),
             ],
@@ -92,18 +96,21 @@ class DsMaraudeCard extends StatelessWidget {
             children: [
               Icon(DsIcons.users, size: 14, color: colors.textSecondary),
               const SizedBox(width: DsSpacing.xs),
-              Text(
-                '${data.volunteersRegistered}/${data.volunteersRequired} bénévoles',
-                style: DsTypography.caption.copyWith(
-                  color: colors.textSecondary,
-                  fontWeight: FontWeight.w600,
+              Flexible(
+                child: Text(
+                  '${data.volunteersRegistered}/${data.volunteersRequired} bénévoles',
+                  overflow: TextOverflow.ellipsis,
+                  style: DsTypography.caption.copyWith(
+                    color: colors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: DsSpacing.xs),
           ClipRRect(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: DsRadius.pillRadius,
             child: LayoutBuilder(
               builder: (context, constraints) => Stack(
                 children: [

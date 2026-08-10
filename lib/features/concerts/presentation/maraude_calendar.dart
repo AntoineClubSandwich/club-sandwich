@@ -4,6 +4,7 @@ import 'package:club_sandwich/design_system/icons/ds_icons.dart';
 import 'package:club_sandwich/design_system/tokens/ds_borders.dart';
 import 'package:club_sandwich/design_system/tokens/ds_motion.dart';
 import 'package:club_sandwich/design_system/tokens/ds_radius.dart';
+import 'package:club_sandwich/design_system/tokens/ds_shadows.dart';
 import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
 import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
 import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
@@ -128,12 +129,7 @@ class _ViewModeSegment extends StatelessWidget {
           decoration: BoxDecoration(
             color: background,
             borderRadius: DsRadius.smRadius,
-            border: selected
-                ? Border.all(
-                    color: colors.borderStrong,
-                    width: DsBorders.standard,
-                  )
-                : null,
+            boxShadow: selected ? DsShadows.accent(colors.primary) : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -368,7 +364,7 @@ class _CalendarDay extends StatelessWidget {
       decoration: BoxDecoration(
         color: isCurrentMonth ? colors.surface : colors.canvas,
         border: Border.all(
-          color: isToday ? colors.borderStrong : colors.border,
+          color: isToday ? colors.primary : colors.border,
           width: isToday ? DsBorders.standard : DsBorders.hairline,
         ),
         borderRadius: DsRadius.smRadius,
@@ -433,7 +429,7 @@ class _CalendarTile extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: DsRadius.smRadius,
-            border: Border.all(color: colors.borderStrong, width: 1),
+            border: Border.all(color: color, width: DsBorders.hairline),
           ),
           child: InkWell(
             key: ValueKey('agenda-concert-${item.id}'),
@@ -480,7 +476,6 @@ class _CalendarTile extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: color,
                           shape: BoxShape.circle,
-                          border: Border.all(color: colors.borderStrong),
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -571,7 +566,6 @@ class _MobileCalendarCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: color,
               borderRadius: DsRadius.smRadius,
-              border: Border.all(color: colors.borderStrong),
             ),
           ),
           const SizedBox(width: DsSpacing.md),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../tokens/ds_borders.dart';
 import '../../tokens/ds_motion.dart';
 import '../../tokens/ds_radius.dart';
 import '../../tokens/ds_spacing.dart';
@@ -50,7 +51,7 @@ class DsFilterChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: background,
             borderRadius: DsRadius.pillRadius,
-            border: Border.all(color: border),
+            border: Border.all(color: border, width: DsBorders.hairline),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

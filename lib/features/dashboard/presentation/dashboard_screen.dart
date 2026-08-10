@@ -658,9 +658,8 @@ class _DashboardHero extends StatelessWidget {
       padding: const EdgeInsets.all(DsSpacing.xl),
       decoration: BoxDecoration(
         color: colors.primary,
-        borderRadius: DsRadius.mdRadius,
-        border: Border.all(color: colors.borderStrong, width: DsBorders.thick),
-        boxShadow: DsShadows.elevated(colors.borderStrong),
+        borderRadius: DsRadius.xxlRadius,
+        boxShadow: DsShadows.ambientElevated(colors.textPrimary),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -727,8 +726,7 @@ class _AdminHeroBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: DsRadius.pillRadius,
-        border: Border.all(color: colors.borderStrong, width: DsBorders.thick),
-        boxShadow: DsShadows.card(colors.borderStrong),
+        boxShadow: DsShadows.accent(colors.primary),
       ),
       child: Text(
         'ADMIN',
@@ -877,40 +875,37 @@ class _QuickActionTile extends StatelessWidget {
     return DsPressable(
       onTap: onTap,
       builder: (context, state) {
-        final shadow = DsShadows.card(colors.borderStrong);
-        final pressDelta = state.pressed ? shadow.first.offset : Offset.zero;
-        return AnimatedContainer(
-          duration: DsMotion.standard,
-          curve: DsMotion.curve,
-          transform: Matrix4.translationValues(pressDelta.dx, pressDelta.dy, 0),
-          padding: const EdgeInsets.symmetric(
-            horizontal: DsSpacing.lg,
-            vertical: DsSpacing.lg,
-          ),
-          decoration: BoxDecoration(
-            color: colors.primary,
-            borderRadius: DsRadius.mdRadius,
-            border: Border.all(
-              color: colors.borderStrong,
-              width: DsBorders.thick,
+        final shadow = DsShadows.accent(colors.primary);
+        return DsPressScale(
+          pressed: state.pressed,
+          child: AnimatedContainer(
+            duration: DsMotion.standard,
+            curve: DsMotion.curve,
+            padding: const EdgeInsets.symmetric(
+              horizontal: DsSpacing.lg,
+              vertical: DsSpacing.lg,
             ),
-            boxShadow: state.pressed ? const [] : shadow,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 24, color: colors.textOnColor),
-              const SizedBox(width: DsSpacing.md),
-              Expanded(
-                child: Text(
-                  label,
-                  style: DsTypography.body.copyWith(
-                    color: colors.textOnColor,
-                    fontWeight: FontWeight.w800,
+            decoration: BoxDecoration(
+              color: colors.primary,
+              borderRadius: DsRadius.mdRadius,
+              boxShadow: state.pressed ? const [] : shadow,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 24, color: colors.textOnColor),
+                const SizedBox(width: DsSpacing.md),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: DsTypography.body.copyWith(
+                      color: colors.textOnColor,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },

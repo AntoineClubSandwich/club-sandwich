@@ -48,19 +48,25 @@ class DsOrganisationCard extends StatelessWidget {
                   children: [
                     Icon(DsIcons.mapPin, size: 12, color: colors.textSecondary),
                     const SizedBox(width: 4),
-                    Text(
-                      data.city,
-                      style: DsTypography.caption.copyWith(
-                        color: colors.textSecondary,
+                    Flexible(
+                      child: Text(
+                        data.city,
+                        overflow: TextOverflow.ellipsis,
+                        style: DsTypography.caption.copyWith(
+                          color: colors.textSecondary,
+                        ),
                       ),
                     ),
                     const SizedBox(width: DsSpacing.sm),
                     Icon(DsIcons.users, size: 12, color: colors.textSecondary),
                     const SizedBox(width: 4),
-                    Text(
-                      '${data.memberCount} membres',
-                      style: DsTypography.caption.copyWith(
-                        color: colors.textSecondary,
+                    Flexible(
+                      child: Text(
+                        '${data.memberCount} membres',
+                        overflow: TextOverflow.ellipsis,
+                        style: DsTypography.caption.copyWith(
+                          color: colors.textSecondary,
+                        ),
                       ),
                     ),
                   ],

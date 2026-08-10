@@ -107,8 +107,8 @@ class AppShell extends ConsumerWidget {
                     color: colors.canvas,
                     border: Border(
                       right: BorderSide(
-                        color: colors.borderStrong,
-                        width: DsBorders.thick,
+                        color: colors.border,
+                        width: DsBorders.hairline,
                       ),
                     ),
                   ),
@@ -208,8 +208,7 @@ class _SidebarLogo extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.primary,
         borderRadius: DsRadius.smRadius,
-        border: Border.all(color: colors.borderStrong, width: DsBorders.thick),
-        boxShadow: DsShadows.card(colors.borderStrong),
+        boxShadow: DsShadows.accent(colors.primary),
       ),
       child: Row(
         children: [
@@ -219,10 +218,6 @@ class _SidebarLogo extends StatelessWidget {
             decoration: BoxDecoration(
               color: colors.surface,
               borderRadius: DsRadius.smRadius,
-              border: Border.all(
-                color: colors.borderStrong,
-                width: DsBorders.standard,
-              ),
             ),
             padding: const EdgeInsets.all(3),
             child: const ClubSandwichMascot(size: 22, color: MascotColor.orange),
@@ -298,9 +293,9 @@ class _UserAccountPanelState extends ConsumerState<_UserAccountPanel> {
       padding: const EdgeInsets.all(DsSpacing.md),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: DsRadius.mdRadius,
-        border: Border.all(color: colors.borderStrong, width: DsBorders.thick),
-        boxShadow: DsShadows.card(colors.borderStrong),
+        borderRadius: DsRadius.lgRadius,
+        border: Border.all(color: colors.border, width: DsBorders.hairline),
+        boxShadow: DsShadows.ambient(colors.textPrimary),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -314,10 +309,6 @@ class _UserAccountPanelState extends ConsumerState<_UserAccountPanel> {
                 decoration: BoxDecoration(
                   color: colors.primary,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: colors.borderStrong,
-                    width: DsBorders.standard,
-                  ),
                 ),
                 child: Text(
                   _accountInitial(primaryLabel),
@@ -368,44 +359,37 @@ class _UserAccountPanelState extends ConsumerState<_UserAccountPanel> {
             enabled: !_isSigningOut,
             onTap: _signOut,
             builder: (context, state) {
-              final shadow = DsShadows.card(colors.borderStrong);
-              final pressDelta = state.pressed
-                  ? shadow.first.offset
-                  : Offset.zero;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                transform: Matrix4.translationValues(
-                  pressDelta.dx,
-                  pressDelta.dy,
-                  0,
-                ),
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: DsSpacing.sm + 2),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: colors.primary,
-                  borderRadius: DsRadius.smRadius,
-                  border: Border.all(
-                    color: colors.borderStrong,
-                    width: DsBorders.thick,
+              final shadow = DsShadows.accent(colors.primary);
+              return DsPressScale(
+                pressed: state.pressed,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: DsSpacing.sm + 2,
                   ),
-                  boxShadow: state.pressed ? const [] : shadow,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: colors.primary,
+                    borderRadius: DsRadius.mdRadius,
+                    boxShadow: state.pressed ? const [] : shadow,
+                  ),
+                  child: _isSigningOut
+                      ? SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: colors.textOnColor,
+                          ),
+                        )
+                      : Text(
+                          'SE DÉCONNECTER',
+                          style: DsTypography.caption.copyWith(
+                            color: colors.textOnColor,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                 ),
-                child: _isSigningOut
-                    ? SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colors.textOnColor,
-                        ),
-                      )
-                    : Text(
-                        'SE DÉCONNECTER',
-                        style: DsTypography.caption.copyWith(
-                          color: colors.textOnColor,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
               );
             },
           ),
@@ -426,7 +410,7 @@ String _accountInitial(String label) {
   return normalizedLabel.isEmpty ? '?' : normalizedLabel[0].toUpperCase();
 }
 
-/// Neo-brutalist desktop sidebar. [dark] switches between the navy
+/// Desktop sidebar. [dark] switches between the navy
 /// admin-only treatment (with mascot widget) and the light canvas
 /// treatment used by every other role — same [_AppDestination] route list
 /// and navigation behavior either way, only the visuals differ.
@@ -456,7 +440,7 @@ class _DsSidebar extends StatelessWidget {
       decoration: BoxDecoration(
         color: dark ? colors.secondary : colors.canvas,
         border: Border(
-          right: BorderSide(color: colors.borderStrong, width: DsBorders.thick),
+          right: BorderSide(color: colors.border, width: DsBorders.hairline),
         ),
       ),
       child: Column(
@@ -565,14 +549,8 @@ class _DsNavItem extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               color: background,
-              borderRadius: DsRadius.smRadius,
-              border: selected
-                  ? Border.all(
-                      color: colors.borderStrong,
-                      width: DsBorders.standard,
-                    )
-                  : null,
-              boxShadow: selected ? DsShadows.card(colors.borderStrong) : null,
+              borderRadius: DsRadius.mdRadius,
+              boxShadow: selected ? DsShadows.accent(colors.primary) : null,
             ),
             child: Row(
               children: [
@@ -611,9 +589,9 @@ class _AdminMascotWidget extends StatelessWidget {
       padding: const EdgeInsets.all(DsSpacing.md),
       decoration: BoxDecoration(
         color: colors.surfaceElevated,
-        borderRadius: DsRadius.smRadius,
-        border: Border.all(color: colors.borderStrong, width: DsBorders.heavy),
-        boxShadow: DsShadows.elevated(colors.borderStrong),
+        borderRadius: DsRadius.lgRadius,
+        border: Border.all(color: colors.border, width: DsBorders.hairline),
+        boxShadow: DsShadows.ambientElevated(colors.textPrimary),
       ),
       child: Column(
         children: [
@@ -628,11 +606,7 @@ class _AdminMascotWidget extends StatelessWidget {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: colors.primary,
-                  borderRadius: DsRadius.smRadius,
-                  border: Border.all(
-                    color: colors.borderStrong,
-                    width: DsBorders.thick,
-                  ),
+                  borderRadius: DsRadius.mdRadius,
                 ),
                 child: Text(
                   'PERSONNALISER',

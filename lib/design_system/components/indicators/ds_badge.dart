@@ -36,7 +36,7 @@ class DsBadge extends StatelessWidget {
         color: semantic.background,
         borderRadius: DsRadius.pillRadius,
         border: Border.all(
-          color: colors.borderStrong,
+          color: semantic.foreground,
           width: DsBorders.hairline,
         ),
       ),

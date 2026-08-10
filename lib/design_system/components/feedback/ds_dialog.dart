@@ -36,12 +36,9 @@ class DsDialog extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: colors.surfaceElevated,
-            borderRadius: DsRadius.lgRadius,
-            border: Border.all(
-              color: colors.borderStrong,
-              width: DsBorders.standard,
-            ),
-            boxShadow: DsShadows.elevated(colors.borderStrong),
+            borderRadius: DsRadius.xxlRadius,
+            border: Border.all(color: colors.border, width: DsBorders.hairline),
+            boxShadow: DsShadows.ambientElevated(colors.textPrimary),
           ),
           padding: const EdgeInsets.all(DsSpacing.xl),
           child: Column(

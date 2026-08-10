@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../tokens/ds_borders.dart';
 import '../../tokens/ds_motion.dart';
+import '../../tokens/ds_radius.dart';
 import '../../tokens/ds_tokens.dart';
 import '../../tokens/ds_typography.dart';
 
@@ -41,8 +43,11 @@ class DsNotificationBadge extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
                 color: colors.error,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: colors.surface, width: 1.5),
+                borderRadius: DsRadius.pillRadius,
+                border: Border.all(
+                  color: colors.surface,
+                  width: DsBorders.standard,
+                ),
               ),
               alignment: Alignment.center,
               child: Text(

@@ -1,12 +1,12 @@
 import 'package:flutter/painting.dart';
 
-/// Color tokens for the Club Sandwich design system.
-///
-/// `primary` (`#EA5133`) and `secondary` (`#293283`) are sampled directly
-/// from the real Club Sandwich logo — not invented. Every other token is a
-/// deliberately restrained, desaturated neutral so the two brand colors
-/// stay the only saturated accents on the page (Linear/Stripe/Notion-style
-/// "calm premium", not Material defaults).
+/// Color tokens for the Club Sandwich design system — "Bento Soft Modern":
+/// a warm off-white canvas, white cards, a single saturated purple brand
+/// accent, and soft low-opacity tints for everything else. Extracted
+/// directly from the Figma "Bento Soft Modern" reference (page
+/// "05 - Inspiration"), not invented — except `error`/`info`, which have
+/// no swatch in that reference and were chosen to match its low-saturation
+/// character (flag for design confirmation if precision matters later).
 class DsColorTokens {
   const DsColorTokens({
     required this.primary,
@@ -54,6 +54,9 @@ class DsColorTokens {
   final Color primarySelectedBg;
   final Color primaryDisabled;
 
+  /// A medium-emphasis neutral, not a second brand hue — the Figma
+  /// reference has exactly one saturated accent (`primary`). Used for
+  /// outline-style secondary actions.
   final Color secondary;
   final Color secondaryHover;
   final Color secondaryPressed;
@@ -68,10 +71,10 @@ class DsColorTokens {
   final Color borderSubtle;
   final Color borderFocus;
 
-  /// Structural "ink" border/shadow color for the neo-brutalist surfaces
-  /// (`DsCard`, buttons, chips): a thick outline or a hard offset shadow,
-  /// as opposed to [border]'s hairline dividers. Same hex as [textPrimary]
-  /// — it's the same near-black ink, just named for its structural role.
+  /// Same ink as [textPrimary] — kept as a distinct field for call sites
+  /// that reason about "the ink color" semantically (dark surfaces, text)
+  /// rather than "border color". No longer used for card/button borders,
+  /// which are 1px [border] in this style, not a thick ink outline.
   final Color borderStrong;
 
   final Color success;
@@ -101,43 +104,43 @@ class DsColorTokens {
   final Color disabledBg;
 
   static const DsColorTokens light = DsColorTokens(
-    primary: Color(0xFFEA5133),
-    primaryHover: Color(0xFFD6431F),
-    primaryPressed: Color(0xFFB93A1A),
-    primarySelectedBg: Color(0xFFFCE9E3),
-    primaryDisabled: Color(0x62EA5133), // #EA5133 @ 38%
-    secondary: Color(0xFF293283),
-    secondaryHover: Color(0xFF212868),
-    secondaryPressed: Color(0xFF1A2050),
-    secondarySelectedBg: Color(0xFFE7E9F7),
-    secondaryDisabled: Color(0x62293283), // #293283 @ 38%
-    canvas: Color(0xFFFAFBFC),
+    primary: Color(0xFF6C5CE7),
+    primaryHover: Color(0xFF5D4DD8),
+    primaryPressed: Color(0xFF4E3EC9),
+    primarySelectedBg: Color(0x0F6C5CE7), // primary @ ~6%
+    primaryDisabled: Color(0x616C5CE7), // primary @ 38%
+    secondary: Color(0xFF1A1A2E),
+    secondaryHover: Color(0xFF141422),
+    secondaryPressed: Color(0xFF0E0E18),
+    secondarySelectedBg: Color(0xFFF1F0EE),
+    secondaryDisabled: Color(0x611A1A2E), // secondary @ 38%
+    canvas: Color(0xFFF8F7F4),
     surface: Color(0xFFFFFFFF),
     surfaceElevated: Color(0xFFFFFFFF),
-    border: Color(0xFFE5E7EB),
-    borderSubtle: Color(0xFFEEF0F3),
-    borderFocus: Color(0xFFEA5133),
-    borderStrong: Color(0xFF14161A),
-    success: Color(0xFF1F9254),
-    successBg: Color(0xFFE7F6EE),
-    successHover: Color(0xFF187A45),
-    warning: Color(0xFFC8850E),
-    warningBg: Color(0xFFFCF1DC),
-    warningHover: Color(0xFFA66C0B),
-    error: Color(0xFFD92D20),
-    errorBg: Color(0xFFFDECEA),
-    errorHover: Color(0xFFB7241A),
-    info: Color(0xFF2970D6),
-    infoBg: Color(0xFFEAF2FD),
-    infoHover: Color(0xFF1F5BB0),
-    textPrimary: Color(0xFF14161A),
-    textSecondary: Color(0xFF5B6270),
-    textDisabled: Color(0xFF9AA1AE),
+    border: Color(0xFFEAE9E2),
+    borderSubtle: Color(0xFFF1EFEB),
+    borderFocus: Color(0xFF6C5CE7),
+    borderStrong: Color(0xFF1A1A2E),
+    success: Color(0xFF00D2A0),
+    successBg: Color(0x1400D2A0), // success @ ~8%
+    successHover: Color(0xFF00B489),
+    warning: Color(0xFFFFC857),
+    warningBg: Color(0x14FFC857), // warning @ ~8%
+    warningHover: Color(0xFFE6B24E),
+    error: Color(0xFFE5484D),
+    errorBg: Color(0x14E5484D), // error @ ~8%
+    errorHover: Color(0xFFCC3F44),
+    info: Color(0xFF5B8DEF),
+    infoBg: Color(0x145B8DEF), // info @ ~8%
+    infoHover: Color(0xFF4A78D6),
+    textPrimary: Color(0xFF1A1A2E),
+    textSecondary: Color(0xFF5B5A6E),
+    textDisabled: Color(0xFF9E9DA8),
     textOnColor: Color(0xFFFFFFFF),
-    neutralHoverOverlay: Color(0x0A000000), // #000000 @ 4%
-    neutralPressedOverlay: Color(0x14000000), // #000000 @ 8%
-    neutralSelectedBg: Color(0xFFF1F2F4),
-    disabledBg: Color(0xFFF1F2F4),
+    neutralHoverOverlay: Color(0x081A1A2E), // ink @ ~3%
+    neutralPressedOverlay: Color(0x0F1A1A2E), // ink @ ~6%
+    neutralSelectedBg: Color(0xFFFAFAF9),
+    disabledBg: Color(0xFFF4F3EE),
   );
 
   DsColorTokens lerp(DsColorTokens other, double t) {
