@@ -1,3 +1,12 @@
+import 'package:club_sandwich/design_system/components/buttons/ds_ghost_button.dart';
+import 'package:club_sandwich/design_system/components/feedback/ds_dialog.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_notification_badge.dart';
+import 'package:club_sandwich/design_system/components/ds_pressable.dart';
+import 'package:club_sandwich/design_system/icons/ds_icons.dart';
+import 'package:club_sandwich/design_system/tokens/ds_radius.dart';
+import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
+import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
+import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
 import 'package:club_sandwich/features/notifications/data/workflow_notification_providers.dart';
 import 'package:club_sandwich/features/notifications/domain/workflow_notification.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
@@ -11,12 +20,21 @@ class WorkflowNotificationsButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return IconButton(
-      tooltip: 'Notifications',
-      icon: const Icon(Icons.notifications_outlined),
-      onPressed: () => showDialog<void>(
-        context: context,
-        builder: (context) => const _WorkflowNotificationsDialog(),
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    final unreadCount = ref
+        .watch(workflowNotificationsProvider)
+        .value
+        ?.where((item) => !item.isRead)
+        .length;
+    return DsNotificationBadge(
+      count: unreadCount ?? 0,
+      child: IconButton(
+        tooltip: 'Notifications',
+        icon: Icon(DsIcons.bell, color: colors.textPrimary),
+        onPressed: () => showDialog<void>(
+          context: context,
+          builder: (context) => const _WorkflowNotificationsDialog(),
+        ),
       ),
     );
   }
@@ -27,44 +45,51 @@ class _WorkflowNotificationsDialog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = Theme.of(context).extension<DsTokens>()!;
+    final colors = tokens.colors;
     final notifications = ref.watch(workflowNotificationsProvider);
-    return AlertDialog(
-      title: const Text('Notifications'),
-      content: SizedBox(
-        width: 520,
-        child: notifications.when(
-          loading: () => const SizedBox(
-            height: 160,
-            child: AppLoadingState(label: 'Chargement des notifications'),
+    return DsDialog(
+      title: 'Notifications',
+      content: notifications.when(
+        loading: () => const SizedBox(
+          height: 160,
+          child: AppLoadingState(label: 'Chargement des notifications'),
+        ),
+        error: (_, _) => SizedBox(
+          height: 160,
+          child: AppErrorState(
+            message: 'Impossible de charger les notifications.',
+            onRetry: () => ref.invalidate(workflowNotificationsProvider),
           ),
-          error: (_, _) => SizedBox(
-            height: 160,
-            child: AppErrorState(
-              message: 'Impossible de charger les notifications.',
-              onRetry: () => ref.invalidate(workflowNotificationsProvider),
-            ),
-          ),
-          data: (items) => items.isEmpty
-              ? const SizedBox(
-                  height: 120,
-                  child: Center(child: Text('Aucune notification.')),
-                )
-              : ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 520),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: items.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
-                    itemBuilder: (context, index) =>
-                        _NotificationTile(notification: items[index]),
+        ),
+        data: (items) => items.isEmpty
+            ? SizedBox(
+                height: 120,
+                child: Center(
+                  child: Text(
+                    'Aucune notification.',
+                    style: DsTypography.body.copyWith(
+                      color: colors.textSecondary,
+                    ),
                   ),
                 ),
-        ),
+              )
+            : ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 480),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: items.length,
+                  separatorBuilder: (_, _) =>
+                      Divider(height: DsSpacing.md, color: colors.border),
+                  itemBuilder: (context, index) =>
+                      _NotificationTile(notification: items[index]),
+                ),
+              ),
       ),
       actions: [
-        TextButton(
+        DsGhostButton(
+          label: 'Fermer',
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Fermer'),
         ),
       ],
     );
@@ -78,35 +103,82 @@ class _NotificationTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(vertical: 4),
-      leading: Icon(
-        notification.isRead
-            ? Icons.notifications_none
-            : Icons.notifications_active,
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+
+    Future<void> open() async {
+      if (!notification.isRead) {
+        await ref
+            .read(workflowNotificationRepositoryProvider)
+            .markAsRead(notification.id);
+        ref.invalidate(workflowNotificationsProvider);
+      }
+      if (!context.mounted || notification.concertId == null) return;
+      Navigator.of(context).pop();
+      context.go('/concerts/${notification.concertId}');
+    }
+
+    return DsPressable(
+      onTap: open,
+      builder: (context, state) => AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(
+          horizontal: DsSpacing.sm,
+          vertical: DsSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: state.hovered ? colors.neutralHoverOverlay : null,
+          borderRadius: DsRadius.smRadius,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: notification.isRead
+                      ? Colors.transparent
+                      : colors.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            const SizedBox(width: DsSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    notification.title,
+                    style: DsTypography.body.copyWith(
+                      color: colors.textPrimary,
+                      fontWeight: notification.isRead
+                          ? FontWeight.w600
+                          : FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    notification.body,
+                    style: DsTypography.caption.copyWith(
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    formatFrenchDateTime(notification.createdAt),
+                    style: DsTypography.caption.copyWith(
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-      title: Text(
-        notification.title,
-        style: notification.isRead
-            ? null
-            : const TextStyle(fontWeight: FontWeight.bold),
-      ),
-      subtitle: Text(
-        '${notification.body}\n'
-        '${formatFrenchDateTime(notification.createdAt)}',
-      ),
-      isThreeLine: true,
-      onTap: () async {
-        if (!notification.isRead) {
-          await ref
-              .read(workflowNotificationRepositoryProvider)
-              .markAsRead(notification.id);
-          ref.invalidate(workflowNotificationsProvider);
-        }
-        if (!context.mounted || notification.concertId == null) return;
-        Navigator.of(context).pop();
-        context.go('/concerts/${notification.concertId}');
-      },
     );
   }
 }
