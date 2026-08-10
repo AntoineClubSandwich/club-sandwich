@@ -1,9 +1,17 @@
+import 'package:club_sandwich/design_system/components/buttons/ds_secondary_button.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_avatar.dart';
+import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
+import 'package:club_sandwich/design_system/icons/ds_icons.dart';
+import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
+import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
+import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
+import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
+import 'package:club_sandwich/design_system/widgets/club_sandwich_mascot.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
-import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_calendar.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_list_section.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
@@ -107,54 +115,90 @@ class _VolunteerDirectory extends StatelessWidget {
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.transparent,
-    body: users.when(
-      loading: () => const AppLoadingState(label: 'Chargement des bénévoles'),
-      error: (_, _) => AppErrorState(
-        message: 'Impossible de charger les bénévoles.',
-        onRetry: onRetry,
-      ),
-      data: (items) {
-        final volunteers = items
-            .where((item) => item.role == AppUserRole.volunteer)
-            .toList(growable: false);
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 48),
-          children: [
-            Text(
-              'Bénévoles',
-              style: Theme.of(context).textTheme.headlineMedium,
+  Widget build(BuildContext context) => Theme(
+    data: DsTheme.light,
+    child: Builder(
+      builder: (context) {
+        final colors = Theme.of(context).extension<DsTokens>()!.colors;
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: users.when(
+            loading: () =>
+                const AppLoadingState(label: 'Chargement des bénévoles'),
+            error: (_, _) => AppErrorState(
+              message: 'Impossible de charger les bénévoles.',
+              onRetry: onRetry,
             ),
-            const SizedBox(height: 6),
-            Text('${volunteers.length} bénévole(s)'),
-            const SizedBox(height: 18),
-            if (volunteers.isEmpty)
-              const AppEmptyState(
-                title: 'Aucun bénévole',
-                message: 'Aucun compte bénévole n’est enregistré.',
-                icon: Icons.groups_outlined,
-              )
-            else
-              for (final volunteer in volunteers)
-                Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      child: Text(volunteer.displayName.characters.first),
-                    ),
-                    title: Text(volunteer.displayName),
-                    subtitle: Text(
-                      '${volunteer.email}\n${volunteer.status.label}',
-                    ),
-                    isThreeLine: true,
-                    trailing: OutlinedButton.icon(
-                      onPressed: () => _showDocuments(context, volunteer),
-                      icon: const Icon(Icons.folder_outlined),
-                      label: const Text('Documents'),
+            data: (items) {
+              final volunteers = items
+                  .where((item) => item.role == AppUserRole.volunteer)
+                  .toList(growable: false);
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 48),
+                children: [
+                  Text(
+                    'Bénévoles',
+                    style: DsTypography.h2.copyWith(color: colors.textPrimary),
+                  ),
+                  const SizedBox(height: DsSpacing.xs),
+                  Text(
+                    '${volunteers.length} bénévole(s)',
+                    style: DsTypography.body.copyWith(
+                      color: colors.textSecondary,
                     ),
                   ),
-                ),
-          ],
+                  const SizedBox(height: DsSpacing.lg),
+                  if (volunteers.isEmpty)
+                    const _EmptyVolunteers()
+                  else
+                    for (final volunteer in volunteers)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: DsSpacing.md),
+                        child: DsCard(
+                          child: Row(
+                            children: [
+                              DsAvatar(
+                                initials: volunteer.displayName.characters.first
+                                    .toUpperCase(),
+                              ),
+                              const SizedBox(width: DsSpacing.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      volunteer.displayName,
+                                      style: DsTypography.body.copyWith(
+                                        color: colors.textPrimary,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${volunteer.email}\n'
+                                      '${volunteer.status.label}',
+                                      style: DsTypography.caption.copyWith(
+                                        color: colors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: DsSpacing.md),
+                              DsSecondaryButton(
+                                icon: DsIcons.fileDown,
+                                label: 'Documents',
+                                onPressed: () =>
+                                    _showDocuments(context, volunteer),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                ],
+              );
+            },
+          ),
         );
       },
     ),
@@ -177,6 +221,36 @@ class _VolunteerDirectory extends StatelessWidget {
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text('Fermer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyVolunteers extends StatelessWidget {
+  const _EmptyVolunteers();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ClubSandwichMascot(size: 96, color: MascotColor.orange),
+            const SizedBox(height: DsSpacing.lg),
+            Text(
+              'Aucun bénévole',
+              style: DsTypography.h2.copyWith(color: colors.textPrimary),
+            ),
+            const SizedBox(height: DsSpacing.sm),
+            Text(
+              'Aucun compte bénévole n’est enregistré.',
+              style: DsTypography.body.copyWith(color: colors.textSecondary),
             ),
           ],
         ),
@@ -239,7 +313,15 @@ class _VolunteerMaraudes extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 48),
       children: [
         if (open.isEmpty && upcoming.isEmpty && toRegularize.isEmpty)
-          const Text('Aucune maraude à venir.'),
+          Builder(
+            builder: (context) {
+              final colors = Theme.of(context).extension<DsTokens>()!.colors;
+              return Text(
+                'Aucune maraude à venir.',
+                style: DsTypography.body.copyWith(color: colors.textSecondary),
+              );
+            },
+          ),
         MaraudeListSection(
           title: 'Maraudes ouvertes',
           items: open,
