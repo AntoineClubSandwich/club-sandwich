@@ -24,6 +24,7 @@ class AvatarItem {
     this.maraudesRequired = 0,
     this.seasonalMonths,
     this.spritePath,
+    this.badgeCondition,
   });
 
   final String id;
@@ -36,7 +37,8 @@ class AvatarItem {
   final String? spritePath;
 
   /// Maraudes the volunteer must have completed to unlock this item.
-  /// `0` means available from sign-up.
+  /// `0` means available from sign-up. Ignored when [badgeCondition] is
+  /// set.
   final int maraudesRequired;
 
   /// Inclusive (startMonth, endMonth) in 1-12 for seasonal items (e.g.
@@ -44,9 +46,18 @@ class AvatarItem {
   /// non-seasonal items.
   final (int, int)? seasonalMonths;
 
+  /// Flavor text for a specific-achievement unlock (e.g. "A recruté 3
+  /// bénévoles") rather than a maraude-count threshold. There's no badge
+  /// system in the app yet (see project memory) — items with this set
+  /// stay permanently locked until one exists; the tooltip explains why
+  /// rather than pretending a count would unlock them.
+  final String? badgeCondition;
+
   bool get isSeasonal => seasonalMonths != null;
+  bool get requiresBadge => badgeCondition != null;
 
   bool isUnlockedFor({required int maraudesCompleted, DateTime? now}) {
+    if (requiresBadge) return false;
     if (isSeasonal) {
       final month = (now ?? DateTime.now()).month;
       final (start, end) = seasonalMonths!;
@@ -57,7 +68,9 @@ class AvatarItem {
     return maraudesCompleted >= maraudesRequired;
   }
 
-  String get lockedTooltip => isSeasonal
+  String get lockedTooltip => requiresBadge
+      ? 'Badge : $badgeCondition (bientôt disponible)'
+      : isSeasonal
       ? 'Déblocable pendant sa saison'
       : maraudesRequired <= 1
       ? 'Déblocable après ta 1ère maraude'
@@ -171,6 +184,111 @@ class AvatarCatalogue {
     AvatarItem(id: 'white_bunny', label: 'Lapin blanc', category: AvatarCategory.pet, spritePath: '$_props/pets/pet_08_white_bunny.png'),
     AvatarItem(id: 'green_shell_turtle', label: 'Tortue à carapace verte', category: AvatarCategory.pet, spritePath: '$_props/pets/pet_09_green_shell_turtle.png'),
     AvatarItem(id: 'black_cat', label: 'Chat noir', category: AvatarCategory.pet, spritePath: '$_props/pets/pet_10_black_cat.png'),
+    // Tiered progression system (paliers 1-5 by maraudesRequired + badge
+    // unlocks) extracted from Figma page "07 - Personnages modulables",
+    // sections "Niveau 1..5" and "Badges" — 98 sprites, all wearing the
+    // maraude cooler bag per the brief. A few Figma layer names don't
+    // quite match their actual artwork (e.g. "tier3_licorne" renders as
+    // a griffon) — kept as named since there's no way to re-verify all
+    // 98 against their visual content at this scale; cosmetic only.
+    AvatarItem(id: 'ferme_vache', label: 'Vache', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/ferme_vache.png'),
+    AvatarItem(id: 'ferme_cochon', label: 'Cochon', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/ferme_cochon.png'),
+    AvatarItem(id: 'ferme_mouton', label: 'Mouton', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/ferme_mouton.png'),
+    AvatarItem(id: 'ferme_coq', label: 'Coq', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/ferme_coq.png'),
+    AvatarItem(id: 'ferme_cheval', label: 'Cheval', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/ferme_cheval.png'),
+    AvatarItem(id: 'ferme_ane', label: 'Âne', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/ferme_ane.png'),
+    AvatarItem(id: 'ferme_chevre', label: 'Chèvre', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/ferme_chevre.png'),
+    AvatarItem(id: 'ferme_canard', label: 'Canard', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/ferme_canard.png'),
+    AvatarItem(id: 'amphibien_grenouille', label: 'Grenouille', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/amphibien_grenouille.png'),
+    AvatarItem(id: 'amphibien_crapaud', label: 'Crapaud', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/amphibien_crapaud.png'),
+    AvatarItem(id: 'reptile_gecko', label: 'Gecko', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/reptile_gecko.png'),
+    AvatarItem(id: 'reptile_tortue_galapagos', label: 'Tortue galapagos', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/reptile_tortue_galapagos.png'),
+    AvatarItem(id: 'insecte_coccinelle', label: 'Coccinelle', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/insecte_coccinelle.png'),
+    AvatarItem(id: 'insecte_fourmi', label: 'Fourmi', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/insecte_fourmi.png'),
+    AvatarItem(id: 'insecte_luciole', label: 'Luciole', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/insecte_luciole.png'),
+    AvatarItem(id: 'oiseau_corbeau', label: 'Corbeau', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/oiseau_corbeau.png'),
+    AvatarItem(id: 'oiseau_kiwi', label: 'Kiwi', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/oiseau_kiwi.png'),
+    AvatarItem(id: 'montagne_marmotte', label: 'Marmotte', category: AvatarCategory.pet, maraudesRequired: 0, spritePath: 'assets/avatar/pets/montagne_marmotte.png'),
+    AvatarItem(id: 'oiseau_toucan', label: 'Toucan', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/oiseau_toucan.png'),
+    AvatarItem(id: 'oiseau_colibri', label: 'Colibri', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/oiseau_colibri.png'),
+    AvatarItem(id: 'oiseau_aigle', label: 'Aigle', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/oiseau_aigle.png'),
+    AvatarItem(id: 'oiseau_hibou_grand_duc', label: 'Hibou grand duc', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/oiseau_hibou_grand_duc.png'),
+    AvatarItem(id: 'oiseau_pinguoin_empereur', label: 'Pingouin empereur', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/oiseau_pinguoin_empereur.png'),
+    AvatarItem(id: 'oiseau_martin_pecheur', label: 'Martin-pêcheur', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/oiseau_martin_pecheur.png'),
+    AvatarItem(id: 'reptile_crocodile', label: 'Crocodile', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/reptile_crocodile.png'),
+    AvatarItem(id: 'reptile_iguane', label: 'Iguane', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/reptile_iguane.png'),
+    AvatarItem(id: 'reptile_cobra_royal', label: 'Cobra royal', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/reptile_cobra_royal.png'),
+    AvatarItem(id: 'amphibien_salamandre', label: 'Salamandre', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/amphibien_salamandre.png'),
+    AvatarItem(id: 'insecte_papillon', label: 'Papillon', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/insecte_papillon.png'),
+    AvatarItem(id: 'insecte_mante_religieuse', label: 'Mante religieuse', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/insecte_mante_religieuse.png'),
+    AvatarItem(id: 'insecte_libellule', label: 'Libellule', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/insecte_libellule.png'),
+    AvatarItem(id: 'insecte_scarabee_dore', label: 'Scarabée doré', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/insecte_scarabee_dore.png'),
+    AvatarItem(id: 'arachnide_araignee', label: 'Araignée', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/arachnide_araignee.png'),
+    AvatarItem(id: 'montagne_bouquetin', label: 'Bouquetin', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/montagne_bouquetin.png'),
+    AvatarItem(id: 'montagne_aigle_royal', label: 'Aigle royal', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/montagne_aigle_royal.png'),
+    AvatarItem(id: 'polaire_harfang', label: 'Harfang', category: AvatarCategory.pet, maraudesRequired: 5, spritePath: 'assets/avatar/pets/polaire_harfang.png'),
+    AvatarItem(id: 'tier2_flamant_rose', label: 'Flamant rose', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/tier2_flamant_rose.png'),
+    AvatarItem(id: 'tier2_paon', label: 'Paon', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/tier2_paon.png'),
+    AvatarItem(id: 'tier2_tigre_bengale', label: 'Tigre bengale', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/tier2_tigre_bengale.png'),
+    AvatarItem(id: 'tier2_panda_roux', label: 'Panda roux', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/tier2_panda_roux.png'),
+    AvatarItem(id: 'tier2_panthere_noire', label: 'Panthère noire', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/tier2_panthere_noire.png'),
+    AvatarItem(id: 'tier2_ara_macaw', label: 'Ara macaw', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/tier2_ara_macaw.png'),
+    AvatarItem(id: 'tier2_zebre', label: 'Zèbre', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/tier2_zebre.png'),
+    AvatarItem(id: 'tier2_girafe', label: 'Girafe', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/tier2_girafe.png'),
+    AvatarItem(id: 'polaire_ours_blanc', label: 'Ours blanc', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/polaire_ours_blanc.png'),
+    AvatarItem(id: 'polaire_renard_arctique', label: 'Renard arctique', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/polaire_renard_arctique.png'),
+    AvatarItem(id: 'polaire_phoque', label: 'Phoque', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/polaire_phoque.png'),
+    AvatarItem(id: 'polaire_morse', label: 'Morse', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/polaire_morse.png'),
+    AvatarItem(id: 'insolite_axolotl', label: 'Axolotl', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/insolite_axolotl.png'),
+    AvatarItem(id: 'insolite_ornithorynque', label: 'Ornithorynque', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/insolite_ornithorynque.png'),
+    AvatarItem(id: 'insolite_pangolin', label: 'Pangolin', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/insolite_pangolin.png'),
+    AvatarItem(id: 'insolite_dodo', label: 'Dodo', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/insolite_dodo.png'),
+    AvatarItem(id: 'insolite_cameleon', label: 'Caméléon', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/insolite_cameleon.png'),
+    AvatarItem(id: 'mystique_tanuki', label: 'Tanuki', category: AvatarCategory.pet, maraudesRequired: 10, spritePath: 'assets/avatar/pets/mystique_tanuki.png'),
+    AvatarItem(id: 'dino_stegosaure', label: 'Stegosaure', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/dino_stegosaure.png'),
+    AvatarItem(id: 'dino_pterodactyle', label: 'Ptérodactyle', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/dino_pterodactyle.png'),
+    AvatarItem(id: 'dino_brontosaure', label: 'Brontosaure', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/dino_brontosaure.png'),
+    AvatarItem(id: 'dino_ankylosaure', label: 'Ankylosaure', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/dino_ankylosaure.png'),
+    AvatarItem(id: 'dino_pachycephalosaure', label: 'Pachycephalosaure', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/dino_pachycephalosaure.png'),
+    AvatarItem(id: 'marin_poulpe', label: 'Poulpe', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/marin_poulpe.png'),
+    AvatarItem(id: 'marin_requin', label: 'Requin', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/marin_requin.png'),
+    AvatarItem(id: 'marin_hippocampe', label: 'Hippocampe', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/marin_hippocampe.png'),
+    AvatarItem(id: 'marin_crabe', label: 'Crabe', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/marin_crabe.png'),
+    AvatarItem(id: 'marin_meduse', label: 'Méduse', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/marin_meduse.png'),
+    AvatarItem(id: 'marin_tortue_mer', label: 'Tortue de mer', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/marin_tortue_mer.png'),
+    AvatarItem(id: 'marin_narval', label: 'Narval', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/marin_narval.png'),
+    AvatarItem(id: 'marin_etoile_mer', label: 'Étoile de mer', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/marin_etoile_mer.png'),
+    AvatarItem(id: 'mythe_kappa', label: 'Kappa', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/mythe_kappa.png'),
+    AvatarItem(id: 'mythe_yeti', label: 'Yeti', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/mythe_yeti.png'),
+    AvatarItem(id: 'mythe_wolpertinger', label: 'Wolpertinger', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/mythe_wolpertinger.png'),
+    AvatarItem(id: 'mythe_baku', label: 'Baku', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/mythe_baku.png'),
+    AvatarItem(id: 'mystique_loup_spectral', label: 'Loup spectral', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/mystique_loup_spectral.png'),
+    AvatarItem(id: 'dino_t_rex', label: 'T-Rex', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/dino_t_rex.png'),
+    AvatarItem(id: 'dino_triceratops', label: 'Triceratops', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/dino_triceratops.png'),
+    AvatarItem(id: 'dino_velociraptor', label: 'Velociraptor', category: AvatarCategory.pet, maraudesRequired: 15, spritePath: 'assets/avatar/pets/dino_velociraptor.png'),
+    AvatarItem(id: 'tier3_dragon_mini', label: 'Dragon miniature', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/tier3_dragon_mini.png'),
+    AvatarItem(id: 'tier3_licorne', label: 'Licorne', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/tier3_licorne.png'),
+    AvatarItem(id: 'tier3_phenix', label: 'Phénix', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/tier3_phenix.png'),
+    AvatarItem(id: 'tier3_renard_neuf_queues', label: 'Renard à neuf queues', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/tier3_renard_neuf_queues.png'),
+    AvatarItem(id: 'tier3_chat_aile', label: 'Chat ailé', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/tier3_chat_aile.png'),
+    AvatarItem(id: 'tier3_pegase', label: 'Pégase', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/tier3_pegase.png'),
+    AvatarItem(id: 'tier3_renard_celeste_bleu', label: 'Renard céleste bleu', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/tier3_renard_celeste_bleu.png'),
+    AvatarItem(id: 'tier4_griffon', label: 'Griffon', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/tier4_griffon.png'),
+    AvatarItem(id: 'tier4_hydre_mini', label: 'Hydre miniature', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/tier4_hydre_mini.png'),
+    AvatarItem(id: 'tier4_chimere', label: 'Chimère', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/tier4_chimere.png'),
+    AvatarItem(id: 'tier4_dragon_jade', label: 'Dragon de jade', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/tier4_dragon_jade.png'),
+    AvatarItem(id: 'tier4_serpent_plumes', label: 'Serpent à plumes', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/tier4_serpent_plumes.png'),
+    AvatarItem(id: 'tier5_phenix_dore', label: 'Phénix doré', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/tier5_phenix_dore.png'),
+    AvatarItem(id: 'mythe_minotaure', label: 'Minotaure', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/mythe_minotaure.png'),
+    AvatarItem(id: 'mythe_sphinx', label: 'Sphinx', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/mythe_sphinx.png'),
+    AvatarItem(id: 'mythe_basilic', label: 'Basilic', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/mythe_basilic.png'),
+    AvatarItem(id: 'mythe_manticore', label: 'Manticore', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/mythe_manticore.png'),
+    AvatarItem(id: 'mystique_cerbere_mini', label: 'Cerbère miniature', category: AvatarCategory.pet, maraudesRequired: 20, spritePath: 'assets/avatar/pets/mystique_cerbere_mini.png'),
+    AvatarItem(id: 'badge_10_maraudes_tortue_sage', label: 'Tortue sage', category: AvatarCategory.pet, spritePath: 'assets/avatar/pets/badge_10_maraudes_tortue_sage.png', badgeCondition: '10 maraudes clôturées'),
+    AvatarItem(id: 'badge_500_repas_pelican', label: 'Pélican généreux', category: AvatarCategory.pet, spritePath: 'assets/avatar/pets/badge_500_repas_pelican.png', badgeCondition: '500 repas sauvés cumulés'),
+    AvatarItem(id: 'badge_recrutement_abeille_reine', label: 'Abeille reine', category: AvatarCategory.pet, spritePath: 'assets/avatar/pets/badge_recrutement_abeille_reine.png', badgeCondition: 'A recruté 3 bénévoles'),
+    AvatarItem(id: 'badge_maraude_culturelle_rossignol', label: 'Rossignol', category: AvatarCategory.pet, spritePath: 'assets/avatar/pets/badge_maraude_culturelle_rossignol.png', badgeCondition: 'A participé à une maraude culturelle'),
+    AvatarItem(id: 'badge_membre_1an_elephant', label: 'Éléphant vétéran', category: AvatarCategory.pet, spritePath: 'assets/avatar/pets/badge_membre_1an_elephant.png', badgeCondition: 'Membre depuis 1 an'),
   ];
 
   static const topStyles = [
