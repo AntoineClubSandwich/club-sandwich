@@ -4,7 +4,7 @@ import 'package:flutter/widgets.dart';
 /// soft, blurred, low-opacity shadows, never a hard offset "ink" shadow.
 /// `ambient` is for resting neutral surfaces (cards, top bar), `accent` is
 /// for branded/interactive elements (primary button, avatar, active nav —
-/// anything that should read as "purple-lit" rather than "just elevated").
+/// anything that should read as "brand-lit" rather than "just elevated").
 /// `ambientElevated` is `ambient`'s larger-blur variant for surfaces that
 /// float above the page (dialogs, bottom sheets). `focusRing` itself is a
 /// keyboard-focus indicator, not a shadow proper.

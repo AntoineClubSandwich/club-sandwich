@@ -1,11 +1,10 @@
 import 'package:flutter/painting.dart';
 
 /// Color tokens for the Club Sandwich design system — "Bento Soft Modern":
-/// a warm off-white canvas, white cards, a single saturated purple brand
-/// accent, and soft low-opacity tints for everything else. Values come
-/// from the project's `design-system/CLAUDE.md` brief (the authoritative
-/// source where it's explicit); a handful of tints/hovers not spelled out
-/// there are still derived from the initial Figma extraction.
+/// a warm off-white canvas, white cards, a single saturated blue brand
+/// accent (`#2563EB` — purple was retired per the design-system/CLAUDE.md
+/// rewrite: "Couleur interactive = #2563EB (bleu) — PAS vert, PAS violet
+/// pour les boutons"), and soft low-opacity tints for everything else.
 class DsColorTokens {
   const DsColorTokens({
     required this.primary,
@@ -64,9 +63,10 @@ class DsColorTokens {
   final Color secondaryDisabled;
 
   /// A deep, softened indigo — [secondary]'s near-black ink lightened
-  /// with a hint of [primary]'s purple. For dark surfaces that want depth
-  /// and brand warmth (e.g. the admin sidebar) without reading as a stark
-  /// neo-brutalist black block.
+  /// with a hint of brand warmth. For dark surfaces that want depth (e.g.
+  /// the admin sidebar) without reading as a stark neo-brutalist black
+  /// block. Currently unused: the sidebar background ended up staying
+  /// plain [secondary] per the live design review.
   final Color secondaryMuted;
 
   final Color canvas;
@@ -110,11 +110,11 @@ class DsColorTokens {
   final Color disabledBg;
 
   static const DsColorTokens light = DsColorTokens(
-    primary: Color(0xFF6C5CE7),
-    primaryHover: Color(0xFF5D4DD8),
-    primaryPressed: Color(0xFF4E3EC9),
-    primarySelectedBg: Color(0x0F6C5CE7), // primary @ ~6%
-    primaryDisabled: Color(0x616C5CE7), // primary @ 38%
+    primary: Color(0xFF2563EB),
+    primaryHover: Color(0xFF1D4ED8),
+    primaryPressed: Color(0xFF1E40AF),
+    primarySelectedBg: Color(0xFFEFF6FF), // matches badge/pill bg-[#EFF6FF]
+    primaryDisabled: Color(0x612563EB), // primary @ 38%
     secondary: Color(0xFF1A1A2E),
     secondaryHover: Color(0xFF141422),
     secondaryPressed: Color(0xFF0E0E18),
@@ -126,7 +126,7 @@ class DsColorTokens {
     surfaceElevated: Color(0xFFFFFFFF),
     border: Color(0xFFE5E7EB),
     borderSubtle: Color(0xFFF1EFEB),
-    borderFocus: Color(0xFF6C5CE7),
+    borderFocus: Color(0xFF2563EB),
     borderStrong: Color(0xFF1A1A2E),
     // Functional colors: `success`/`warning`/`error`/`info` hold the
     // *text/icon* tone (readable on the pale `*Bg`), not the mid-tone
