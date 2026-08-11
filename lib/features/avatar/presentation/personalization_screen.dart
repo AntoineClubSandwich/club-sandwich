@@ -226,7 +226,10 @@ class _PreviewCard extends StatelessWidget {
         _labelFor(AvatarCatalogue.jewelryItems, config.jewelry!),
       if (config.tattoo != null)
         _labelFor(AvatarCatalogue.tattoos, config.tattoo!),
-      if (config.pet != null) _labelFor(AvatarCatalogue.pets, config.pet!),
+      // config.pet is deliberately excluded: it replaces the displayed
+      // character (see AvatarCharacter), it isn't a stacked accessory —
+      // showing it again as a pill here would be redundant with the big
+      // preview image itself.
     ].whereType<String>().toList();
 
     return DsCard(
@@ -437,8 +440,14 @@ class _TabContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
     switch (tab) {
       case _CustomizerTab.body:
+        // Picking a human portrait clears any selected pet — the two are
+        // mutually exclusive "who's my character" choices, not stacking
+        // accessories (see AvatarCharacter: pet takes precedence when set).
+        void selectCharacter(String id) =>
+            onUpdate((c) => c.copyWith(characterId: id, pet: null));
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -446,24 +455,66 @@ class _TabContent extends StatelessWidget {
             const SizedBox(height: DsSpacing.sm),
             _CharacterGrid(
               portraits: CharacterCatalogue.volunteers,
-              selectedId: config.characterId,
-              onSelect: (id) => onUpdate((c) => c.copyWith(characterId: id)),
+              selectedId: config.pet == null ? config.characterId : null,
+              onSelect: selectCharacter,
             ),
             const SizedBox(height: DsSpacing.lg),
             Text('Tourneurs', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: DsSpacing.sm),
             _CharacterGrid(
               portraits: CharacterCatalogue.promoters,
-              selectedId: config.characterId,
-              onSelect: (id) => onUpdate((c) => c.copyWith(characterId: id)),
+              selectedId: config.pet == null ? config.characterId : null,
+              onSelect: selectCharacter,
             ),
             const SizedBox(height: DsSpacing.lg),
             Text('Autres looks', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: DsSpacing.sm),
             _CharacterGrid(
               portraits: CharacterCatalogue.generic,
-              selectedId: config.characterId,
-              onSelect: (id) => onUpdate((c) => c.copyWith(characterId: id)),
+              selectedId: config.pet == null ? config.characterId : null,
+              onSelect: selectCharacter,
+            ),
+            const SizedBox(height: DsSpacing.xl),
+            Text(
+              'Ou deviens un animal',
+              style: DsTypography.h3.copyWith(color: colors.textPrimary),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Un animal remplace ton personnage — plus tu fais de maraudes, plus tu débloques d\'animaux stylés.',
+              style: DsTypography.meta.copyWith(color: colors.textSecondary),
+            ),
+            const SizedBox(height: DsSpacing.lg),
+            for (final tier in const [
+              (0, '⭐ Niveau 1 — Communs (dès l\'inscription)'),
+              (5, '⭐⭐ Niveau 2 — Peu communs (5 maraudes)'),
+              (10, '⭐⭐⭐ Niveau 3 — Rares (10 maraudes)'),
+              (15, '💎 Niveau 4 — Épiques (15 maraudes)'),
+              (20, '👑 Niveau 5 — Légendaires (20 maraudes)'),
+            ]) ...[
+              Text(tier.$2, style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: DsSpacing.sm),
+              _ItemGrid(
+                category: AvatarCategory.pet,
+                items: AvatarCatalogue.pets
+                    .where((p) => !p.requiresBadge && p.maraudesRequired == tier.$1)
+                    .toList(),
+                selectedId: config.pet,
+                maraudesCompleted: maraudesCompleted,
+                clearable: true,
+                onSelect: (id) => onUpdate((c) => c.copyWith(pet: id)),
+              ),
+              const SizedBox(height: DsSpacing.lg),
+            ],
+            Text('🏅 Badges (accomplissements)', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: DsSpacing.sm),
+            _ItemGrid(
+              category: AvatarCategory.pet,
+              items: AvatarCatalogue.pets.where((p) => p.requiresBadge).toList(),
+              selectedId: config.pet,
+              maraudesCompleted: maraudesCompleted,
+              clearable: true,
+              onSelect: (id) => onUpdate((c) => c.copyWith(pet: id)),
             ),
           ],
         );
@@ -553,17 +604,6 @@ class _TabContent extends StatelessWidget {
               maraudesCompleted: maraudesCompleted,
               clearable: true,
               onSelect: (id) => onUpdate((c) => c.copyWith(tattoo: id)),
-            ),
-            const SizedBox(height: DsSpacing.lg),
-            Text('Animal de compagnie', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: DsSpacing.sm),
-            _ItemGrid(
-              category: AvatarCategory.pet,
-              items: AvatarCatalogue.pets,
-              selectedId: config.pet,
-              maraudesCompleted: maraudesCompleted,
-              clearable: true,
-              onSelect: (id) => onUpdate((c) => c.copyWith(pet: id)),
             ),
           ],
         );
@@ -729,7 +769,7 @@ class _CharacterGrid extends StatelessWidget {
   });
 
   final List<CharacterPortrait> portraits;
-  final String selectedId;
+  final String? selectedId;
   final ValueChanged<String> onSelect;
 
   @override
