@@ -1,7 +1,20 @@
 /// Static catalogue of everything a user can equip on their avatar, plus
 /// the gamification thresholds that unlock each item. There is no backend
 /// table for this — it's a fixed content list, versioned with the app.
-enum AvatarCategory { body, face, hair, top, bottom, shoes, head, back, held }
+enum AvatarCategory {
+  body,
+  face,
+  hair,
+  top,
+  bottom,
+  shoes,
+  head,
+  back,
+  held,
+  jewelry,
+  tattoo,
+  pet,
+}
 
 class AvatarItem {
   const AvatarItem({
@@ -118,6 +131,48 @@ class AvatarCatalogue {
     AvatarItem(id: 'red_backpack', label: 'Sac à dos rouge', category: AvatarCategory.back, spritePath: '$_props/accessories/acc_05_red_backpack.png'),
   ];
 
+  static const jewelryItems = [
+    AvatarItem(id: 'gold_chain_necklace', label: 'Collier chaîne dorée', category: AvatarCategory.jewelry, spritePath: '$_props/jewelry/jewelry_01_gold_chain_necklace.png'),
+    AvatarItem(id: 'silver_hoop_earrings', label: 'Créoles argentées', category: AvatarCategory.jewelry, spritePath: '$_props/jewelry/jewelry_02_silver_hoop_earrings.png'),
+    AvatarItem(id: 'nose_ring_gold', label: 'Piercing nez doré', category: AvatarCategory.jewelry, spritePath: '$_props/jewelry/jewelry_03_nose_ring_gold.png'),
+    AvatarItem(id: 'diamond_stud_earring', label: 'Puce diamant', category: AvatarCategory.jewelry, spritePath: '$_props/jewelry/jewelry_04_diamond_stud_earring.png'),
+    AvatarItem(id: 'leather_choker', label: 'Ras-de-cou cuir', category: AvatarCategory.jewelry, spritePath: '$_props/jewelry/jewelry_05_leather_choker.png'),
+    AvatarItem(id: 'pearl_necklace', label: 'Collier de perles', category: AvatarCategory.jewelry, spritePath: '$_props/jewelry/jewelry_06_pearl_necklace.png'),
+    AvatarItem(id: 'lip_ring_silver', label: 'Piercing lèvre argenté', category: AvatarCategory.jewelry, spritePath: '$_props/jewelry/jewelry_07_lip_ring_silver.png'),
+    AvatarItem(id: 'beaded_bracelet', label: 'Bracelet de perles', category: AvatarCategory.jewelry, spritePath: '$_props/jewelry/jewelry_08_beaded_bracelet.png'),
+    AvatarItem(id: 'dog_tag_necklace', label: 'Plaques militaires', category: AvatarCategory.jewelry, spritePath: '$_props/jewelry/jewelry_09_dog_tag_necklace.png'),
+    AvatarItem(id: 'anklet_gold_chain', label: 'Bracelet de cheville doré', category: AvatarCategory.jewelry, spritePath: '$_props/jewelry/jewelry_10_anklet_gold_chain.png'),
+    AvatarItem(id: 'watch', label: 'Montre', category: AvatarCategory.jewelry, spritePath: '$_props/accessories/acc_12_watch.png'),
+    AvatarItem(id: 'yellow_scarf', label: 'Écharpe jaune', category: AvatarCategory.jewelry, spritePath: '$_props/accessories/acc_13_yellow_scarf.png'),
+    AvatarItem(id: 'necklace_chain', label: 'Chaîne collier', category: AvatarCategory.jewelry, spritePath: '$_props/accessories/acc_14_necklace_chain.png'),
+  ];
+
+  static const tattoos = [
+    AvatarItem(id: 'tribal_arm_band', label: 'Brassard tribal', category: AvatarCategory.tattoo, spritePath: '$_props/tattoos/tattoo_01_tribal_arm_band.png'),
+    AvatarItem(id: 'crimson_rose', label: 'Rose pourpre', category: AvatarCategory.tattoo, spritePath: '$_props/tattoos/tattoo_02_crimson_rose.png'),
+    AvatarItem(id: 'retro_skull', label: 'Crâne rétro', category: AvatarCategory.tattoo, spritePath: '$_props/tattoos/tattoo_03_retro_skull.png'),
+    AvatarItem(id: 'jade_dragon', label: 'Dragon de jade', category: AvatarCategory.tattoo, spritePath: '$_props/tattoos/tattoo_04_jade_dragon.png'),
+    AvatarItem(id: 'heart_and_arrow', label: 'Cœur et flèche', category: AvatarCategory.tattoo, spritePath: '$_props/tattoos/tattoo_05_heart_and_arrow.png'),
+    AvatarItem(id: 'sailor_anchor', label: 'Ancre marine', category: AvatarCategory.tattoo, spritePath: '$_props/tattoos/tattoo_06_sailor_anchor.png'),
+    AvatarItem(id: 'serpent_wrap', label: 'Serpent enroulé', category: AvatarCategory.tattoo, spritePath: '$_props/tattoos/tattoo_07_serpent_wrap.png'),
+    AvatarItem(id: 'constellation', label: 'Constellation', category: AvatarCategory.tattoo, spritePath: '$_props/tattoos/tattoo_08_constellation.png'),
+    AvatarItem(id: 'classic_flame', label: 'Flamme classique', category: AvatarCategory.tattoo, spritePath: '$_props/tattoos/tattoo_09_classic_flame.png'),
+    AvatarItem(id: 'pixel_mandala', label: 'Mandala pixel', category: AvatarCategory.tattoo, spritePath: '$_props/tattoos/tattoo_10_pixel_mandala.png'),
+  ];
+
+  static const pets = [
+    AvatarItem(id: 'orange_tabby_cat', label: 'Chat roux tigré', category: AvatarCategory.pet, spritePath: '$_props/pets/pet_01_orange_tabby_cat.png'),
+    AvatarItem(id: 'small_brown_dog', label: 'Petit chien brun', category: AvatarCategory.pet, spritePath: '$_props/pets/pet_02_small_brown_dog.png'),
+    AvatarItem(id: 'green_parrot', label: 'Perroquet vert', category: AvatarCategory.pet, spritePath: '$_props/pets/pet_03_green_parrot.png'),
+    AvatarItem(id: 'tiny_beige_hamster', label: 'Petit hamster beige', category: AvatarCategory.pet, spritePath: '$_props/pets/pet_04_tiny_beige_hamster.png'),
+    AvatarItem(id: 'green_coiled_snake', label: 'Serpent vert lové', category: AvatarCategory.pet, spritePath: '$_props/pets/pet_05_green_coiled_snake.png'),
+    AvatarItem(id: 'small_brown_owl', label: 'Petite chouette brune', category: AvatarCategory.pet, spritePath: '$_props/pets/pet_06_small_brown_owl.png'),
+    AvatarItem(id: 'goldfish_in_bowl', label: 'Poisson rouge en bocal', category: AvatarCategory.pet, spritePath: '$_props/pets/pet_07_goldfish_in_bowl.png'),
+    AvatarItem(id: 'white_bunny', label: 'Lapin blanc', category: AvatarCategory.pet, spritePath: '$_props/pets/pet_08_white_bunny.png'),
+    AvatarItem(id: 'green_shell_turtle', label: 'Tortue à carapace verte', category: AvatarCategory.pet, spritePath: '$_props/pets/pet_09_green_shell_turtle.png'),
+    AvatarItem(id: 'black_cat', label: 'Chat noir', category: AvatarCategory.pet, spritePath: '$_props/pets/pet_10_black_cat.png'),
+  ];
+
   static const topStyles = [
     AvatarItem(id: 'tshirt', label: 'T-shirt', category: AvatarCategory.top),
     AvatarItem(id: 'hoodie', label: 'Hoodie', category: AvatarCategory.top),
@@ -209,6 +264,9 @@ class AvatarCatalogue {
     ...heldObjects,
     ...headAccessories,
     ...backItems,
+    ...jewelryItems,
+    ...tattoos,
+    ...pets,
   ];
 
   static List<AvatarItem> itemsFor(AvatarCategory category) => switch (category) {
@@ -221,5 +279,8 @@ class AvatarCatalogue {
     AvatarCategory.head => headAccessories,
     AvatarCategory.back => backItems,
     AvatarCategory.held => heldObjects,
+    AvatarCategory.jewelry => jewelryItems,
+    AvatarCategory.tattoo => tattoos,
+    AvatarCategory.pet => pets,
   };
 }

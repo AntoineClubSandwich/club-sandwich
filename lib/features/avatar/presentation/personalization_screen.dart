@@ -218,6 +218,11 @@ class _PreviewCard extends StatelessWidget {
         _labelFor(AvatarCatalogue.headAccessories, config.headAccessory!),
       if (config.backItem != null)
         _labelFor(AvatarCatalogue.backItems, config.backItem!),
+      if (config.jewelry != null)
+        _labelFor(AvatarCatalogue.jewelryItems, config.jewelry!),
+      if (config.tattoo != null)
+        _labelFor(AvatarCatalogue.tattoos, config.tattoo!),
+      if (config.pet != null) _labelFor(AvatarCatalogue.pets, config.pet!),
     ].whereType<String>().toList();
 
     return DsCard(
@@ -515,6 +520,39 @@ class _TabContent extends StatelessWidget {
               maraudesCompleted: maraudesCompleted,
               clearable: true,
               onSelect: (id) => onUpdate((c) => c.copyWith(backItem: id)),
+            ),
+            const SizedBox(height: DsSpacing.lg),
+            Text('Bijoux', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: DsSpacing.sm),
+            _ItemGrid(
+              category: AvatarCategory.jewelry,
+              items: AvatarCatalogue.jewelryItems,
+              selectedId: config.jewelry,
+              maraudesCompleted: maraudesCompleted,
+              clearable: true,
+              onSelect: (id) => onUpdate((c) => c.copyWith(jewelry: id)),
+            ),
+            const SizedBox(height: DsSpacing.lg),
+            Text('Tatouage', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: DsSpacing.sm),
+            _ItemGrid(
+              category: AvatarCategory.tattoo,
+              items: AvatarCatalogue.tattoos,
+              selectedId: config.tattoo,
+              maraudesCompleted: maraudesCompleted,
+              clearable: true,
+              onSelect: (id) => onUpdate((c) => c.copyWith(tattoo: id)),
+            ),
+            const SizedBox(height: DsSpacing.lg),
+            Text('Animal de compagnie', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: DsSpacing.sm),
+            _ItemGrid(
+              category: AvatarCategory.pet,
+              items: AvatarCatalogue.pets,
+              selectedId: config.pet,
+              maraudesCompleted: maraudesCompleted,
+              clearable: true,
+              onSelect: (id) => onUpdate((c) => c.copyWith(pet: id)),
             ),
           ],
         );

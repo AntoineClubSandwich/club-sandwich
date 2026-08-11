@@ -16,6 +16,9 @@ class AvatarConfig {
     required this.heldObject,
     this.headAccessory,
     this.backItem,
+    this.jewelry,
+    this.tattoo,
+    this.pet,
   });
 
   final int bodyType;
@@ -32,6 +35,9 @@ class AvatarConfig {
   final String heldObject;
   final String? headAccessory;
   final String? backItem;
+  final String? jewelry;
+  final String? tattoo;
+  final String? pet;
 
   static const defaultConfig = AvatarConfig(
     bodyType: 1,
@@ -65,6 +71,9 @@ class AvatarConfig {
       heldObject: json['held_object'] as String? ?? defaultConfig.heldObject,
       headAccessory: json['head_accessory'] as String?,
       backItem: json['back_item'] as String?,
+      jewelry: json['jewelry'] as String?,
+      tattoo: json['tattoo'] as String?,
+      pet: json['pet'] as String?,
     );
   }
 
@@ -84,6 +93,9 @@ class AvatarConfig {
       'held_object': heldObject,
       'head_accessory': headAccessory,
       'back_item': backItem,
+      'jewelry': jewelry,
+      'tattoo': tattoo,
+      'pet': pet,
     };
   }
 
@@ -102,6 +114,9 @@ class AvatarConfig {
     String? heldObject,
     Object? headAccessory = _unset,
     Object? backItem = _unset,
+    Object? jewelry = _unset,
+    Object? tattoo = _unset,
+    Object? pet = _unset,
   }) {
     return AvatarConfig(
       bodyType: bodyType ?? this.bodyType,
@@ -122,6 +137,9 @@ class AvatarConfig {
       backItem: identical(backItem, _unset)
           ? this.backItem
           : backItem as String?,
+      jewelry: identical(jewelry, _unset) ? this.jewelry : jewelry as String?,
+      tattoo: identical(tattoo, _unset) ? this.tattoo : tattoo as String?,
+      pet: identical(pet, _unset) ? this.pet : pet as String?,
     );
   }
 }

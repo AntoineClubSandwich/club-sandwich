@@ -42,6 +42,9 @@ IconData avatarItemIcon(AvatarCategory category, String id) {
       AvatarCategory.head => LucideIcons.gem,
       AvatarCategory.back => LucideIcons.backpack,
       AvatarCategory.held => LucideIcons.sandwich,
+      AvatarCategory.jewelry => LucideIcons.gem,
+      AvatarCategory.tattoo => LucideIcons.pencilSparkles,
+      AvatarCategory.pet => LucideIcons.bird,
     },
   };
 }
