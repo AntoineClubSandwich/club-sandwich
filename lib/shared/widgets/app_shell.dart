@@ -12,6 +12,9 @@ import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
 import 'package:club_sandwich/design_system/widgets/club_sandwich_mascot.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
+import 'package:club_sandwich/features/avatar/data/avatar_providers.dart';
+import 'package:club_sandwich/features/avatar/presentation/avatar_character.dart';
+import 'package:club_sandwich/features/avatar/presentation/avatar_sidebar_popover.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/organizations/data/organization_providers.dart';
 import 'package:club_sandwich/features/invitations/data/invitation_providers.dart';
@@ -74,6 +77,9 @@ class AppShell extends ConsumerWidget {
     }
 
     final accountPanel = _UserAccountPanel(onSignedOut: onSignedOut);
+    final characterWidget = _CharacterWidget(
+      onTap: () => ref.read(avatarPopoverOpenProvider.notifier).setOpen(true),
+    );
     final isAdmin =
         (userContext?.role ?? AppUserRole.volunteer) == AppUserRole.admin;
 
@@ -149,6 +155,17 @@ class AppShell extends ConsumerWidget {
                                     },
                                   ),
                                 ],
+                                const SizedBox(height: DsSpacing.xl),
+                                _CharacterWidget(
+                                  onTap: () {
+                                    Navigator.of(context).pop();
+                                    // Mirrors AppRoutes.personalization —
+                                    // not imported directly to avoid a
+                                    // cycle (app_router.dart imports this
+                                    // file for AppShell itself).
+                                    context.go('/personnalisation');
+                                  },
+                                ),
                               ],
                             ),
                           ),
@@ -173,16 +190,36 @@ class AppShell extends ConsumerWidget {
           title: destinations[selectedIndex].label,
           actions: const [WorkflowNotificationsButton()],
         ),
-        body: Row(
+        body: Stack(
           children: [
-            _DsSidebar(
-              dark: isAdmin,
-              destinations: destinations,
-              selectedIndex: selectedIndex,
-              onSelected: (index) => _navigate(context, destinations, index),
-              accountPanel: accountPanel,
+            Row(
+              children: [
+                _DsSidebar(
+                  dark: isAdmin,
+                  destinations: destinations,
+                  selectedIndex: selectedIndex,
+                  onSelected: (index) =>
+                      _navigate(context, destinations, index),
+                  accountPanel: accountPanel,
+                  characterWidget: characterWidget,
+                ),
+                Expanded(child: child),
+              ],
             ),
-            Expanded(child: child),
+            if (ref.watch(avatarPopoverOpenProvider)) ...[
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () =>
+                      ref.read(avatarPopoverOpenProvider.notifier).setOpen(false),
+                ),
+              ),
+              const Positioned(
+                left: 292,
+                bottom: 24,
+                child: AvatarSidebarPopover(),
+              ),
+            ],
           ],
         ),
       ),
@@ -456,6 +493,7 @@ class _DsSidebar extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelected,
     required this.accountPanel,
+    required this.characterWidget,
   });
 
   final bool dark;
@@ -463,6 +501,7 @@ class _DsSidebar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
   final Widget accountPanel;
+  final Widget characterWidget;
 
   @override
   Widget build(BuildContext context) {
@@ -517,10 +556,8 @@ class _DsSidebar extends StatelessWidget {
                       onTap: () => onSelected(i),
                     ),
                   ],
-                  if (dark) ...[
-                    const SizedBox(height: DsSpacing.xl),
-                    const _AdminMascotWidget(),
-                  ],
+                  const SizedBox(height: DsSpacing.xl),
+                  characterWidget,
                 ],
               ),
             ),
@@ -640,51 +677,63 @@ class _DsNavItem extends StatelessWidget {
 /// near-black; kept local rather than added to the global palette.
 const _sidebarMutedText = Color(0xFFA1A1AA);
 
-/// Decorative mascot widget in the admin sidebar. The "Personnaliser"
-/// button is intentionally disabled — no mascot-customization feature
-/// exists yet; this reserves the spot without simulating one.
-class _AdminMascotWidget extends StatelessWidget {
-  const _AdminMascotWidget();
+/// The sidebar's "character widget" — every role's entry point into
+/// avatar customization (see `lib/features/avatar/`). Tapping it opens
+/// the quick popover on desktop (mode 1), or navigates straight to the
+/// full customizer when there's no room for an overlay (mobile drawer).
+/// The caller decides which via [onTap] rather than this widget branching
+/// internally, so the mobile drawer can close itself before navigating
+/// without nesting a second `GestureDetector` around this one.
+class _CharacterWidget extends ConsumerWidget {
+  const _CharacterWidget({required this.onTap});
+
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<DsTokens>()!;
     final colors = tokens.colors;
+    final config = ref
+        .watch(currentAvatarConfigProvider)
+        .maybeWhen(data: (value) => value, orElse: () => null);
 
-    return Container(
-      padding: const EdgeInsets.all(DsSpacing.md),
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: DsRadius.xlRadius,
-        border: Border.all(color: colors.border, width: DsBorders.hairline),
-        boxShadow: DsShadows.ambientElevated(colors.textPrimary),
-      ),
-      child: Column(
-        children: [
-          const ClubSandwichMascot(size: 140, color: MascotColor.orange),
-          const SizedBox(height: DsSpacing.md),
-          ExcludeSemantics(
-            child: Opacity(
-              opacity: 0.5,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: DsSpacing.sm),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: colors.primary,
-                  borderRadius: DsRadius.mdRadius,
-                ),
-                child: Text(
-                  'PERSONNALISER',
-                  style: DsTypography.caption.copyWith(
-                    color: colors.textOnColor,
-                    fontWeight: FontWeight.w800,
-                  ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(DsSpacing.md),
+        decoration: BoxDecoration(
+          color: colors.surfaceElevated,
+          borderRadius: DsRadius.xlRadius,
+          border: Border.all(color: colors.border, width: DsBorders.hairline),
+          boxShadow: DsShadows.ambientElevated(colors.textPrimary),
+        ),
+        child: Column(
+          children: [
+            SizedBox(
+              height: 140,
+              child: config == null
+                  ? const ClubSandwichMascot(size: 140, color: MascotColor.orange)
+                  : AvatarCharacter(config: config, size: 140),
+            ),
+            const SizedBox(height: DsSpacing.md),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: DsSpacing.sm),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: colors.primary,
+                borderRadius: DsRadius.mdRadius,
+              ),
+              child: Text(
+                'PERSONNALISER',
+                style: DsTypography.caption.copyWith(
+                  color: colors.textOnColor,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
