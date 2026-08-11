@@ -14,6 +14,7 @@ import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
 import 'package:club_sandwich/features/avatar/data/avatar_providers.dart';
 import 'package:club_sandwich/features/avatar/domain/avatar_catalogue.dart';
 import 'package:club_sandwich/features/avatar/domain/avatar_config.dart';
+import 'package:club_sandwich/features/avatar/domain/character_portrait.dart';
 import 'package:club_sandwich/features/avatar/presentation/avatar_character.dart';
 import 'package:club_sandwich/features/avatar/presentation/avatar_item_icons.dart';
 import 'package:club_sandwich/features/avatar/presentation/avatar_progress.dart';
@@ -113,6 +114,9 @@ class _PersonalizationScreenState extends ConsumerState<PersonalizationScreen> {
 
     setState(() {
       _draft = _draft!.copyWith(
+        characterId: CharacterCatalogue
+            .all[random.nextInt(CharacterCatalogue.all.length)]
+            .id,
         bodyType: random.nextInt(AvatarCatalogue.bodyTypes.length) + 1,
         skinTone:
             AvatarCatalogue.skinTones[random.nextInt(AvatarCatalogue.skinTones.length)],
@@ -438,21 +442,28 @@ class _TabContent extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _ItemGrid(
-              category: AvatarCategory.body,
-              items: AvatarCatalogue.bodyTypes,
-              selectedId: '${config.bodyType}',
-              maraudesCompleted: maraudesCompleted,
-              onSelect: (id) => onUpdate(
-                (c) => c.copyWith(bodyType: int.parse(id!)),
-              ),
+            Text('Bénévoles', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: DsSpacing.sm),
+            _CharacterGrid(
+              portraits: CharacterCatalogue.volunteers,
+              selectedId: config.characterId,
+              onSelect: (id) => onUpdate((c) => c.copyWith(characterId: id)),
             ),
             const SizedBox(height: DsSpacing.lg),
-            _ColorRow(
-              label: 'Teint de peau',
-              colors: AvatarCatalogue.skinTones,
-              selected: config.skinTone,
-              onSelect: (hex) => onUpdate((c) => c.copyWith(skinTone: hex)),
+            Text('Tourneurs', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: DsSpacing.sm),
+            _CharacterGrid(
+              portraits: CharacterCatalogue.promoters,
+              selectedId: config.characterId,
+              onSelect: (id) => onUpdate((c) => c.copyWith(characterId: id)),
+            ),
+            const SizedBox(height: DsSpacing.lg),
+            Text('Autres looks', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: DsSpacing.sm),
+            _CharacterGrid(
+              portraits: CharacterCatalogue.generic,
+              selectedId: config.characterId,
+              onSelect: (id) => onUpdate((c) => c.copyWith(characterId: id)),
             ),
           ],
         );
@@ -703,6 +714,90 @@ class _ItemCell extends StatelessWidget {
     return Tooltip(
       message: locked ? (lockedTooltip ?? 'Verrouillé') : label,
       child: GestureDetector(onTap: locked ? null : onTap, child: cell),
+    );
+  }
+}
+
+/// Picker for [CharacterPortrait]s — the "Corps" tab's real payoff:
+/// unlike every other tab's [_ItemGrid], picking here actually changes
+/// what's drawn on screen (see [AvatarCharacter]).
+class _CharacterGrid extends StatelessWidget {
+  const _CharacterGrid({
+    required this.portraits,
+    required this.selectedId,
+    required this.onSelect,
+  });
+
+  final List<CharacterPortrait> portraits;
+  final String selectedId;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: DsSpacing.sm,
+      runSpacing: DsSpacing.sm,
+      children: [
+        for (final portrait in portraits)
+          _CharacterCell(
+            portrait: portrait,
+            selected: portrait.id == selectedId,
+            onTap: () => onSelect(portrait.id),
+          ),
+      ],
+    );
+  }
+}
+
+class _CharacterCell extends StatelessWidget {
+  const _CharacterCell({
+    required this.portrait,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final CharacterPortrait portrait;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<DsTokens>()!;
+    final colors = tokens.colors;
+
+    return Tooltip(
+      message: portrait.role == null
+          ? portrait.label
+          : '${portrait.label} · ${portrait.role}',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 64,
+          height: 85,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: DsRadius.mdRadius,
+            border: Border.all(
+              color: selected ? colors.primary : colors.border,
+              width: selected ? 2 : DsBorders.hairline,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: colors.primary.withValues(alpha: 0.1),
+                      blurRadius: 0,
+                      spreadRadius: 3,
+                    ),
+                  ]
+                : const [],
+          ),
+          child: ClipRRect(
+            borderRadius: DsRadius.smRadius,
+            child: Image.asset(portrait.spritePath, fit: BoxFit.cover),
+          ),
+        ),
+      ),
     );
   }
 }

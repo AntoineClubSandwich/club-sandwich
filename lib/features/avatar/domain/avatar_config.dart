@@ -1,7 +1,15 @@
 /// A user's pixel-art character customization. Purely cosmetic — no
 /// operational impact — stored as JSON in `avatar_configs.config`.
+///
+/// [characterId] is the real visual payoff: a ready-made portrait picked
+/// from [CharacterCatalogue] (see that file's doc comment for why —
+/// per-piece compositing isn't possible for worn items with the sprites
+/// currently available). The other fields (body/hair/top/.../pet) are a
+/// collectible/badge layer shown as "ÉQUIPÉ" pills — cosmetic progression
+/// that doesn't (yet) change what's drawn on screen.
 class AvatarConfig {
   const AvatarConfig({
+    required this.characterId,
     required this.bodyType,
     required this.skinTone,
     required this.eyes,
@@ -21,6 +29,7 @@ class AvatarConfig {
     this.pet,
   });
 
+  final String characterId;
   final int bodyType;
   final String skinTone;
   final String eyes;
@@ -40,6 +49,7 @@ class AvatarConfig {
   final String? pet;
 
   static const defaultConfig = AvatarConfig(
+    characterId: 'volunteer_lucas',
     bodyType: 1,
     skinTone: '#E8B084',
     eyes: 'default',
@@ -57,6 +67,7 @@ class AvatarConfig {
   factory AvatarConfig.fromJson(Map<String, dynamic> json) {
     if (json.isEmpty) return defaultConfig;
     return AvatarConfig(
+      characterId: json['character_id'] as String? ?? defaultConfig.characterId,
       bodyType: (json['body_type'] as num?)?.toInt() ?? defaultConfig.bodyType,
       skinTone: json['skin_tone'] as String? ?? defaultConfig.skinTone,
       eyes: json['eyes'] as String? ?? defaultConfig.eyes,
@@ -79,6 +90,7 @@ class AvatarConfig {
 
   Map<String, dynamic> toJson() {
     return {
+      'character_id': characterId,
       'body_type': bodyType,
       'skin_tone': skinTone,
       'eyes': eyes,
@@ -100,6 +112,7 @@ class AvatarConfig {
   }
 
   AvatarConfig copyWith({
+    String? characterId,
     int? bodyType,
     String? skinTone,
     String? eyes,
@@ -119,6 +132,7 @@ class AvatarConfig {
     Object? pet = _unset,
   }) {
     return AvatarConfig(
+      characterId: characterId ?? this.characterId,
       bodyType: bodyType ?? this.bodyType,
       skinTone: skinTone ?? this.skinTone,
       eyes: eyes ?? this.eyes,
