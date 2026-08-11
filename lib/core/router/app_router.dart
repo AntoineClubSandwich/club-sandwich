@@ -1,3 +1,4 @@
+import 'package:club_sandwich/core/router/ds_page_transition.dart';
 import 'package:club_sandwich/design_system/style_guide/style_guide_screen.dart';
 import 'package:club_sandwich/features/administration/presentation/administration_screen.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
@@ -140,8 +141,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '${AppRoutes.maraudes}/:concertId',
-            builder: (context, state) => ConcertDetailScreen(
-              concertId: state.pathParameters['concertId']!,
+            pageBuilder: (context, state) => dsFadeScalePage(
+              key: state.pageKey,
+              child: ConcertDetailScreen(
+                concertId: state.pathParameters['concertId']!,
+              ),
             ),
           ),
           GoRoute(

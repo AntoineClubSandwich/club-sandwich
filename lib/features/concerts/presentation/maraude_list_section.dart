@@ -1,3 +1,4 @@
+import 'package:club_sandwich/design_system/components/ds_reveal_on_scroll.dart';
 import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
 import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
@@ -41,11 +42,14 @@ class MaraudeListSection extends StatelessWidget {
                   style: DsTypography.h3.copyWith(color: colors.textPrimary),
                 ),
                 const SizedBox(height: DsSpacing.sm),
-                for (final item in items)
-                  MaraudeOverviewCard(
-                    maraude: item,
-                    actionLabel: actionLabelFor?.call(item) ?? actionLabel,
-                    canOpen: canOpenFor?.call(item) ?? true,
+                for (final (index, item) in items.indexed)
+                  DsRevealOnScroll(
+                    delay: Duration(milliseconds: 40 * (index % 6)),
+                    child: MaraudeOverviewCard(
+                      maraude: item,
+                      actionLabel: actionLabelFor?.call(item) ?? actionLabel,
+                      canOpen: canOpenFor?.call(item) ?? true,
+                    ),
                   ),
               ],
             ),

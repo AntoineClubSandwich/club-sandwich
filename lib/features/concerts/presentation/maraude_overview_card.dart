@@ -1,3 +1,4 @@
+import 'package:club_sandwich/design_system/components/ds_hover_spotlight.dart';
 import 'package:club_sandwich/design_system/components/indicators/ds_status_chip.dart';
 import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
 import 'package:club_sandwich/design_system/icons/ds_icons.dart';
@@ -36,152 +37,155 @@ class MaraudeOverviewCard extends StatelessWidget {
           final colors = Theme.of(context).extension<DsTokens>()!.colors;
           return Padding(
             padding: const EdgeInsets.only(bottom: DsSpacing.md),
-            child: DsCard(
-              onTap: canOpen
-                  ? () => context.go('/maraudes/${maraude.concertId}')
-                  : null,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          maraude.artist,
-                          style: DsTypography.h3.copyWith(
-                            color: colors.textPrimary,
+            child: DsHoverSpotlight(
+              enabled: canOpen,
+              child: DsCard(
+                onTap: canOpen
+                    ? () => context.go('/maraudes/${maraude.concertId}')
+                    : null,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            maraude.artist,
+                            style: DsTypography.h3.copyWith(
+                              color: colors.textPrimary,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: DsSpacing.sm),
-                      DsStatusChip(
-                        label: maraude.maraudeStatus.label,
-                        status: _maraudeChipStatus(maraude.maraudeStatus),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: DsSpacing.sm),
-                  _CardInfo(
-                    icon: DsIcons.mapPin,
-                    text:
-                        '${formatLongFrenchDate(maraude.date)} · '
-                        '${maraude.venueName}'
-                        '${maraude.time == null ? '' : ' · ${_shortTime(maraude.time!)}'}',
-                  ),
-                  if (maraude.venueAddress != null) ...[
-                    const SizedBox(height: DsSpacing.xs),
+                        const SizedBox(width: DsSpacing.sm),
+                        DsStatusChip(
+                          label: maraude.maraudeStatus.label,
+                          status: _maraudeChipStatus(maraude.maraudeStatus),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: DsSpacing.sm),
                     _CardInfo(
                       icon: DsIcons.mapPin,
-                      text: maraude.venueAddress!,
-                    ),
-                  ],
-                  if (maraude.cateringName != null) ...[
-                    const SizedBox(height: DsSpacing.xs),
-                    _CardInfo(
-                      icon: DsIcons.utensils,
-                      text: 'Catering : ${maraude.cateringName}',
-                    ),
-                  ],
-                  if (maraude.ownTeamRole != null) ...[
-                    const SizedBox(height: DsSpacing.xs),
-                    _CardInfo(
-                      icon: DsIcons.user,
-                      text: 'Rôle : ${maraude.ownTeamRole!.label}',
-                    ),
-                  ],
-                  if (maraude.cateringClosesAt != null) ...[
-                    const SizedBox(height: DsSpacing.xs),
-                    _CardInfo(
-                      icon: DsIcons.footprints,
                       text:
-                          'Arrivée recommandée : '
-                          '${_time(maraude.recommendedArrival)}',
+                          '${formatLongFrenchDate(maraude.date)} · '
+                          '${maraude.venueName}'
+                          '${maraude.time == null ? '' : ' · ${_shortTime(maraude.time!)}'}',
                     ),
-                  ],
-                  if (maraude.isAdmin &&
-                      maraude.maraudeStatus != MaraudeStatus.completed &&
-                      maraude.maraudeStatus != MaraudeStatus.cancelled) ...[
-                    const SizedBox(height: DsSpacing.sm),
-                    Wrap(
-                      spacing: DsSpacing.lg,
-                      runSpacing: DsSpacing.xs,
-                      children: [
-                        Text(
-                          maraude.selectedCount == 0
-                              ? 'Équipe non constituée'
-                              : '${maraude.selectedCount} bénévole'
-                                    '${maraude.selectedCount > 1 ? 's' : ''} '
-                                    'sélectionné'
-                                    '${maraude.selectedCount > 1 ? 's' : ''}',
-                          style: DsTypography.caption.copyWith(
-                            color: colors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (maraude.pendingApplicationCount > 0)
-                          Text(
-                            '${maraude.pendingApplicationCount} candidature'
-                            '${maraude.pendingApplicationCount > 1 ? 's' : ''} '
-                            'à examiner',
-                            style: DsTypography.caption.copyWith(
-                              color: colors.textSecondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        if (maraude.pendingConfirmationCount > 0)
-                          Text(
-                            '${maraude.pendingConfirmationCount} confirmation'
-                            '${maraude.pendingConfirmationCount > 1 ? 's' : ''} '
-                            'attendue'
-                            '${maraude.pendingConfirmationCount > 1 ? 's' : ''}',
-                            style: DsTypography.caption.copyWith(
-                              color: colors.textSecondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                  if (maraude.maraudeStatus == MaraudeStatus.completed ||
-                      maraude.maraudeStatus == MaraudeStatus.cancelled) ...[
-                    const SizedBox(height: DsSpacing.sm),
-                    Wrap(
-                      spacing: DsSpacing.lg,
-                      runSpacing: DsSpacing.xs,
-                      children: [
-                        Text(
-                          '${maraude.selectedCount} bénévole'
-                          '${maraude.selectedCount > 1 ? 's' : ''}',
-                          style: DsTypography.caption.copyWith(
-                            color: colors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          maraude.totalWeightKg == null
-                              ? 'Poids : —'
-                              : '${_number(maraude.totalWeightKg!)} kg',
-                          style: DsTypography.caption.copyWith(
-                            color: colors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  if (actionLabel != null) ...[
-                    const SizedBox(height: DsSpacing.sm),
-                    Text(
-                      actionLabel!,
-                      style: DsTypography.body.copyWith(
-                        color: colors.primary,
-                        fontWeight: FontWeight.w700,
+                    if (maraude.venueAddress != null) ...[
+                      const SizedBox(height: DsSpacing.xs),
+                      _CardInfo(
+                        icon: DsIcons.mapPin,
+                        text: maraude.venueAddress!,
                       ),
-                    ),
+                    ],
+                    if (maraude.cateringName != null) ...[
+                      const SizedBox(height: DsSpacing.xs),
+                      _CardInfo(
+                        icon: DsIcons.utensils,
+                        text: 'Catering : ${maraude.cateringName}',
+                      ),
+                    ],
+                    if (maraude.ownTeamRole != null) ...[
+                      const SizedBox(height: DsSpacing.xs),
+                      _CardInfo(
+                        icon: DsIcons.user,
+                        text: 'Rôle : ${maraude.ownTeamRole!.label}',
+                      ),
+                    ],
+                    if (maraude.cateringClosesAt != null) ...[
+                      const SizedBox(height: DsSpacing.xs),
+                      _CardInfo(
+                        icon: DsIcons.footprints,
+                        text:
+                            'Arrivée recommandée : '
+                            '${_time(maraude.recommendedArrival)}',
+                      ),
+                    ],
+                    if (maraude.isAdmin &&
+                        maraude.maraudeStatus != MaraudeStatus.completed &&
+                        maraude.maraudeStatus != MaraudeStatus.cancelled) ...[
+                      const SizedBox(height: DsSpacing.sm),
+                      Wrap(
+                        spacing: DsSpacing.lg,
+                        runSpacing: DsSpacing.xs,
+                        children: [
+                          Text(
+                            maraude.selectedCount == 0
+                                ? 'Équipe non constituée'
+                                : '${maraude.selectedCount} bénévole'
+                                      '${maraude.selectedCount > 1 ? 's' : ''} '
+                                      'sélectionné'
+                                      '${maraude.selectedCount > 1 ? 's' : ''}',
+                            style: DsTypography.caption.copyWith(
+                              color: colors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (maraude.pendingApplicationCount > 0)
+                            Text(
+                              '${maraude.pendingApplicationCount} candidature'
+                              '${maraude.pendingApplicationCount > 1 ? 's' : ''} '
+                              'à examiner',
+                              style: DsTypography.caption.copyWith(
+                                color: colors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          if (maraude.pendingConfirmationCount > 0)
+                            Text(
+                              '${maraude.pendingConfirmationCount} confirmation'
+                              '${maraude.pendingConfirmationCount > 1 ? 's' : ''} '
+                              'attendue'
+                              '${maraude.pendingConfirmationCount > 1 ? 's' : ''}',
+                              style: DsTypography.caption.copyWith(
+                                color: colors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                    if (maraude.maraudeStatus == MaraudeStatus.completed ||
+                        maraude.maraudeStatus == MaraudeStatus.cancelled) ...[
+                      const SizedBox(height: DsSpacing.sm),
+                      Wrap(
+                        spacing: DsSpacing.lg,
+                        runSpacing: DsSpacing.xs,
+                        children: [
+                          Text(
+                            '${maraude.selectedCount} bénévole'
+                            '${maraude.selectedCount > 1 ? 's' : ''}',
+                            style: DsTypography.caption.copyWith(
+                              color: colors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            maraude.totalWeightKg == null
+                                ? 'Poids : —'
+                                : '${_number(maraude.totalWeightKg!)} kg',
+                            style: DsTypography.caption.copyWith(
+                              color: colors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (actionLabel != null) ...[
+                      const SizedBox(height: DsSpacing.sm),
+                      Text(
+                        actionLabel!,
+                        style: DsTypography.body.copyWith(
+                          color: colors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           );
