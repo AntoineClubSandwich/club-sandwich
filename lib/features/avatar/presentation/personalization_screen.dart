@@ -582,6 +582,7 @@ class _ItemGrid extends StatelessWidget {
         for (final item in items)
           _ItemCell(
             icon: avatarItemIcon(category, item.id),
+            spritePath: item.spritePath,
             label: item.label,
             selected: item.id == selectedId,
             locked: !item.isUnlockedFor(maraudesCompleted: maraudesCompleted),
@@ -601,9 +602,11 @@ class _ItemCell extends StatelessWidget {
     required this.locked,
     required this.onTap,
     this.lockedTooltip,
+    this.spritePath,
   });
 
   final IconData icon;
+  final String? spritePath;
   final String label;
   final bool selected;
   final bool locked;
@@ -641,7 +644,13 @@ class _ItemCell extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Icon(icon, size: 22, color: colors.textPrimary),
+            if (spritePath != null)
+              Padding(
+                padding: const EdgeInsets.all(6),
+                child: Image.asset(spritePath!, fit: BoxFit.contain),
+              )
+            else
+              Icon(icon, size: 22, color: colors.textPrimary),
             if (locked)
               Positioned(
                 right: 4,

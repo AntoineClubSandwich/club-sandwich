@@ -29,6 +29,13 @@ final avatarPopoverOpenProvider = NotifierProvider<AvatarPopoverOpen, bool>(
   AvatarPopoverOpen.new,
 );
 
+/// Held objects with real sprites shown first, so the quick popover
+/// showcases actual art rather than only Lucide-glyph placeholders.
+final _quickHeldObjects = [
+  ...AvatarCatalogue.heldObjects.where((item) => item.spritePath != null),
+  ...AvatarCatalogue.heldObjects.where((item) => item.spritePath == null),
+].take(8).toList();
+
 /// Slide-in panel anchored to the sidebar's right edge — a quick "swap
 /// what I'm holding" surface, with a link out to the full customizer.
 class AvatarSidebarPopover extends ConsumerWidget {
@@ -106,9 +113,10 @@ class AvatarSidebarPopover extends ConsumerWidget {
                 spacing: DsSpacing.sm,
                 runSpacing: DsSpacing.sm,
                 children: [
-                  for (final item in AvatarCatalogue.heldObjects.take(8))
+                  for (final item in _quickHeldObjects)
                     _QuickObjectButton(
                       icon: avatarItemIcon(AvatarCategory.held, item.id),
+                      spritePath: item.spritePath,
                       selected: item.id == config.heldObject,
                       locked: !item.isUnlockedFor(
                         maraudesCompleted: maraudesCompleted,
@@ -159,9 +167,11 @@ class _QuickObjectButton extends StatelessWidget {
     required this.selected,
     required this.locked,
     required this.onTap,
+    this.spritePath,
   });
 
   final IconData icon;
+  final String? spritePath;
   final bool selected;
   final bool locked;
   final VoidCallback onTap;
@@ -187,7 +197,12 @@ class _QuickObjectButton extends StatelessWidget {
               width: selected ? 2 : DsBorders.hairline,
             ),
           ),
-          child: Icon(icon, size: 18, color: colors.textPrimary),
+          child: spritePath != null
+              ? Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Image.asset(spritePath!, fit: BoxFit.contain),
+                )
+              : Icon(icon, size: 18, color: colors.textPrimary),
         ),
       ),
     );
