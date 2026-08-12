@@ -7,7 +7,6 @@ import 'package:club_sandwich/features/auth/presentation/activation_screen.dart'
 import 'package:club_sandwich/features/auth/presentation/forgot_password_screen.dart';
 import 'package:club_sandwich/features/auth/presentation/login_screen.dart';
 import 'package:club_sandwich/features/auth/presentation/reset_password_screen.dart';
-import 'package:club_sandwich/features/avatar/presentation/personalization_screen.dart';
 import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
 import 'package:club_sandwich/features/dashboard/presentation/dashboard_screen.dart';
@@ -32,11 +31,6 @@ abstract final class AppRoutes {
   static const administration = '/administration';
   static const profile = '/profile';
   static const account = '/account';
-
-  /// Character customization — reachable from every role via the sidebar
-  /// character widget/popover, deliberately absent from `AppShell`'s main
-  /// nav list (see `_destinationsFor`).
-  static const personalization = '/personnalisation';
 
   /// Design-system showcase — admin-only, deliberately absent from
   /// `AppShell`'s navigation menu (see `_destinationsFor` in
@@ -172,10 +166,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.account,
             builder: (context, state) => const ProfileScreen(),
           ),
-          GoRoute(
-            path: AppRoutes.personalization,
-            builder: (context, state) => const PersonalizationScreen(),
-          ),
         ],
       ),
     ],
@@ -184,9 +174,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
 bool _isAllowed(AppUserRole role, String location) {
   if (location.startsWith('${AppRoutes.maraudes}/')) return true;
-  // Every role gets a character to personalize, regardless of what else
-  // they can see.
-  if (location == AppRoutes.personalization) return true;
   final allowed = switch (role) {
     AppUserRole.admin => {
       AppRoutes.dashboard,

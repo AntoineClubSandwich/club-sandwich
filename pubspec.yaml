@@ -75,7 +75,6 @@ flutter:
   assets:
     - assets/fonts/
     - assets/branding/
-    - assets/avatar/pets/
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 
