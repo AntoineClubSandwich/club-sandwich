@@ -13,7 +13,7 @@ class ConcertRepository {
       '*, '
       'venue:venues!concerts_venue_id_fkey('
       'id, name, public_address_line1, public_address_line2, '
-      'postal_code, city, '
+      'postal_code, city, photo_url, '
       'access_details:venue_access_details('
       'artist_entrance_address_line1, artist_entrance_address_line2, '
       'artist_entrance_postal_code, artist_entrance_city, access_instructions'

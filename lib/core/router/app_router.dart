@@ -13,6 +13,7 @@ import 'package:club_sandwich/features/dashboard/presentation/dashboard_screen.d
 import 'package:club_sandwich/features/invitations/presentation/invitations_screen.dart';
 import 'package:club_sandwich/features/organizations/presentation/organizations_screen.dart';
 import 'package:club_sandwich/features/profiles/presentation/profile_screen.dart';
+import 'package:club_sandwich/features/venues/presentation/venues_screen.dart';
 import 'package:club_sandwich/features/volunteers/presentation/volunteers_screen.dart';
 import 'package:club_sandwich/shared/widgets/app_shell.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,6 +28,7 @@ abstract final class AppRoutes {
   static const maraudes = '/maraudes';
   static const invitations = '/invitations';
   static const organizations = '/organizations';
+  static const venues = '/venues';
   static const volunteers = '/volunteers';
   static const administration = '/administration';
   static const profile = '/profile';
@@ -151,6 +153,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const OrganizationsScreen(),
           ),
           GoRoute(
+            path: AppRoutes.venues,
+            builder: (context, state) => const VenuesScreen(),
+          ),
+          GoRoute(
             path: AppRoutes.volunteers,
             builder: (context, state) => const VolunteersScreen(),
           ),
@@ -180,6 +186,7 @@ bool _isAllowed(AppUserRole role, String location) {
       AppRoutes.maraudes,
       AppRoutes.invitations,
       AppRoutes.organizations,
+      AppRoutes.venues,
       AppRoutes.volunteers,
       AppRoutes.administration,
       AppRoutes.styleGuide,

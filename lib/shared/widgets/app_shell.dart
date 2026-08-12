@@ -534,6 +534,7 @@ IconData _sidebarIcon(String path) => switch (path) {
   '/maraudes' => DsIcons.truck,
   '/invitations' => DsIcons.mail,
   '/organizations' => DsIcons.building2,
+  '/venues' => DsIcons.building,
   '/volunteers' => DsIcons.users2,
   '/administration' => DsIcons.settings,
   '/profile' || '/account' => DsIcons.user,
@@ -679,6 +680,12 @@ List<_AppDestination> _destinationsFor(AppUserRole role) {
         icon: Icons.business_outlined,
         selectedIcon: Icons.business,
         path: '/organizations',
+      ),
+      _AppDestination(
+        label: 'Salles',
+        icon: Icons.theater_comedy_outlined,
+        selectedIcon: Icons.theater_comedy,
+        path: '/venues',
       ),
       _AppDestination(
         label: 'Bénévoles',

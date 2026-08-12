@@ -543,110 +543,151 @@ class _ConcertCard extends ConsumerWidget {
     final colors = tokens.colors;
     final (statusLabel, tone) = _concertCalendarStatus(concert);
 
+    final photoUrl = concert.venue?.photoUrl;
+
     return DsHoverSpotlight(
       key: ValueKey('concert-card-spotlight-${concert.id}'),
       child: DsCard(
         key: ValueKey('concert-card-${concert.id}'),
+        padding: EdgeInsets.zero,
         onTap: () => context.go('/maraudes/${concert.id}'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    concert.artist,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: DsTypography.h3.copyWith(color: colors.textPrimary),
-                  ),
-                ),
-                if (role == AppUserRole.admin || role == AppUserRole.promoter)
-                  PopupMenuButton<_ConcertAction>(
-                    tooltip: 'Actions',
-                    icon: Icon(Icons.more_vert, color: colors.textSecondary),
-                    onSelected: (action) {
-                      switch (action) {
-                        case _ConcertAction.edit:
-                          _edit(context, ref);
-                        case _ConcertAction.delete:
-                          deleteConcertWithConfirmation(context, ref, concert);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: _ConcertAction.edit,
-                        child: ListTile(
-                          leading: Icon(Icons.edit_outlined),
-                          title: Text('Modifier'),
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                      if (role == AppUserRole.admin)
-                        const PopupMenuItem(
-                          value: _ConcertAction.delete,
-                          child: ListTile(
-                            leading: Icon(Icons.delete_outline),
-                            title: Text('Supprimer'),
-                            contentPadding: EdgeInsets.zero,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(DsSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            concert.artist,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: DsTypography.h3.copyWith(
+                              color: colors.textPrimary,
+                            ),
                           ),
                         ),
+                        if (role == AppUserRole.admin ||
+                            role == AppUserRole.promoter)
+                          PopupMenuButton<_ConcertAction>(
+                            tooltip: 'Actions',
+                            icon: Icon(
+                              Icons.more_vert,
+                              color: colors.textSecondary,
+                            ),
+                            onSelected: (action) {
+                              switch (action) {
+                                case _ConcertAction.edit:
+                                  _edit(context, ref);
+                                case _ConcertAction.delete:
+                                  deleteConcertWithConfirmation(
+                                    context,
+                                    ref,
+                                    concert,
+                                  );
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: _ConcertAction.edit,
+                                child: ListTile(
+                                  leading: Icon(Icons.edit_outlined),
+                                  title: Text('Modifier'),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                              ),
+                              if (role == AppUserRole.admin)
+                                const PopupMenuItem(
+                                  value: _ConcertAction.delete,
+                                  child: ListTile(
+                                    leading: Icon(Icons.delete_outline),
+                                    title: Text('Supprimer'),
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                ),
+                            ],
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: DsSpacing.sm),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: DsStatusChip(
+                        label: statusLabel,
+                        status: _chipStatusFor(tone),
+                      ),
+                    ),
+                    const SizedBox(height: DsSpacing.md),
+                    _CardInformation(
+                      icon: DsIcons.mapPin,
+                      text: concert.venueName ?? '—',
+                    ),
+                    const SizedBox(height: DsSpacing.sm),
+                    _CardInformation(
+                      icon: DsIcons.calendar,
+                      text: formatLongFrenchDate(concert.date),
+                    ),
+                    if (concert.cateringClosesAt != null) ...[
+                      const SizedBox(height: DsSpacing.sm),
+                      _CardInformation(
+                        icon: DsIcons.clock,
+                        text:
+                            'Catering : ${formatDatabaseTime(concert.cateringClosesAt!)}',
+                      ),
+                      const SizedBox(height: DsSpacing.sm),
+                      _CardInformation(
+                        icon: DsIcons.footprints,
+                        text:
+                            'Arrivée recommandée : '
+                            '${recommendedArrivalFromDatabase(concert.cateringClosesAt!)}',
+                      ),
                     ],
+                    const SizedBox(height: DsSpacing.md),
+                    Divider(height: 1, color: colors.border),
+                    const SizedBox(height: DsSpacing.md),
+                    Wrap(
+                      spacing: 24,
+                      runSpacing: 8,
+                      children: [
+                        _Metadata(
+                          label: 'Producteur',
+                          value: concert.promoterOrganizationName ?? '—',
+                        ),
+                        _Metadata(
+                          label: 'Équipe',
+                          value: _volunteerCountLabel(
+                            concert.selectedVolunteerCount,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (photoUrl != null)
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(DsRadius.xl),
+                  bottomRight: Radius.circular(DsRadius.xl),
+                ),
+                child: SizedBox(
+                  width: 140,
+                  child: Image.network(
+                    photoUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox(),
                   ),
-              ],
-            ),
-            const SizedBox(height: DsSpacing.sm),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: DsStatusChip(
-                label: statusLabel,
-                status: _chipStatusFor(tone),
-              ),
-            ),
-            const SizedBox(height: DsSpacing.md),
-            _CardInformation(
-              icon: DsIcons.mapPin,
-              text: concert.venueName ?? '—',
-            ),
-            const SizedBox(height: DsSpacing.sm),
-            _CardInformation(
-              icon: DsIcons.calendar,
-              text: formatLongFrenchDate(concert.date),
-            ),
-            if (concert.cateringClosesAt != null) ...[
-              const SizedBox(height: DsSpacing.sm),
-              _CardInformation(
-                icon: DsIcons.clock,
-                text:
-                    'Catering : ${formatDatabaseTime(concert.cateringClosesAt!)}',
-              ),
-              const SizedBox(height: DsSpacing.sm),
-              _CardInformation(
-                icon: DsIcons.footprints,
-                text:
-                    'Arrivée recommandée : '
-                    '${recommendedArrivalFromDatabase(concert.cateringClosesAt!)}',
-              ),
-            ],
-            const SizedBox(height: DsSpacing.md),
-            Divider(height: 1, color: colors.border),
-            const SizedBox(height: DsSpacing.md),
-            Wrap(
-              spacing: 24,
-              runSpacing: 8,
-              children: [
-                _Metadata(
-                  label: 'Producteur',
-                  value: concert.promoterOrganizationName ?? '—',
                 ),
-                _Metadata(
-                  label: 'Équipe',
-                  value: _volunteerCountLabel(concert.selectedVolunteerCount),
-                ),
-              ],
-            ),
+              ),
           ],
         ),
       ),

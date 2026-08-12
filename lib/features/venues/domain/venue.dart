@@ -11,6 +11,7 @@ class Venue {
     this.artistEntrancePostalCode,
     this.artistEntranceCity,
     this.accessInstructions,
+    this.photoUrl,
   });
 
   final String id;
@@ -24,6 +25,10 @@ class Venue {
   final String? artistEntrancePostalCode;
   final String? artistEntranceCity;
   final String? accessInstructions;
+
+  /// Public URL in the `venue-photos` storage bucket, set by an admin from
+  /// the Salles screen. `null` until someone uploads one.
+  final String? photoUrl;
 
   String get formattedAddress {
     final line2 = publicAddressLine2;
@@ -72,6 +77,7 @@ class Venue {
       ),
       artistEntranceCity: _accessDetail(json, 'artist_entrance_city'),
       accessInstructions: _accessDetail(json, 'access_instructions'),
+      photoUrl: json['photo_url'] as String?,
     );
   }
 }
