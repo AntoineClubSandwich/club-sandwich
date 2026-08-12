@@ -71,4 +71,26 @@ class VenueRepository {
     );
     return photoUrl;
   }
+
+  /// `venue_id` is the primary key of `venue_access_details`, so this
+  /// upserts on it directly — first edit creates the row, later ones
+  /// update it in place.
+  Future<void> updateAccessDetails({
+    required String venueId,
+    String? artistEntranceAddressLine1,
+    String? artistEntranceAddressLine2,
+    String? artistEntrancePostalCode,
+    String? artistEntranceCity,
+    String? accessInstructions,
+  }) async {
+    await _client.from('venue_access_details').upsert({
+      'venue_id': venueId,
+      'artist_entrance_address_line1': artistEntranceAddressLine1,
+      'artist_entrance_address_line2': artistEntranceAddressLine2,
+      'artist_entrance_postal_code': artistEntrancePostalCode,
+      'artist_entrance_city': artistEntranceCity,
+      'access_instructions': accessInstructions,
+      'updated_by': _client.auth.currentUser?.id,
+    });
+  }
 }

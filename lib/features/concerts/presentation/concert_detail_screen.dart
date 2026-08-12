@@ -2154,6 +2154,12 @@ class _VenueSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final venue = concert.venue;
+    final artistEntrance = venue?.formattedArtistEntrance;
+    final accessInstructions = venue?.accessInstructions?.trim();
+    final hasAccessInfo =
+        artistEntrance != null ||
+        (accessInstructions != null && accessInstructions.isNotEmpty);
+
     return _SectionCard(
       title: 'Salle',
       icon: Icons.location_on_outlined,
@@ -2168,18 +2174,33 @@ class _VenueSection extends StatelessWidget {
           _DetailRow(label: 'Ville', value: venue?.city ?? '—'),
           _DetailRow(label: 'Code postal', value: venue?.postalCode ?? '—'),
           const Divider(height: 24),
-          const Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.lock_outline, size: 20),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Informations d’accès disponibles selon vos autorisations.',
-                ),
+          if (hasAccessInfo) ...[
+            if (artistEntrance != null)
+              _DetailRow(
+                label: 'Entrée artiste',
+                value: artistEntrance,
+                showDivider: accessInstructions != null &&
+                    accessInstructions.isNotEmpty,
               ),
-            ],
-          ),
+            if (accessInstructions != null && accessInstructions.isNotEmpty)
+              _DetailRow(
+                label: 'Instructions d’accès',
+                value: accessInstructions,
+                showDivider: false,
+              ),
+          ] else
+            const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.lock_outline, size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Informations d’accès disponibles selon vos autorisations.',
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );

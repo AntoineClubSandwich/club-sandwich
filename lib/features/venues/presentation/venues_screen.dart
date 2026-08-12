@@ -90,7 +90,10 @@ class _VenuesScreenState extends ConsumerState<VenuesScreen> {
                     Expanded(
                       child: selectedId == null
                           ? const SizedBox()
-                          : _VenueDetailsPane(venueId: selectedId),
+                          : _VenueDetailsPane(
+                              key: ValueKey(selectedId),
+                              venueId: selectedId,
+                            ),
                     ),
                   ],
                 );
@@ -274,7 +277,7 @@ class _VenueListItem extends StatelessWidget {
 }
 
 class _VenueDetailsPane extends ConsumerStatefulWidget {
-  const _VenueDetailsPane({required this.venueId});
+  const _VenueDetailsPane({required this.venueId, super.key});
 
   final String venueId;
 
@@ -284,6 +287,49 @@ class _VenueDetailsPane extends ConsumerStatefulWidget {
 
 class _VenueDetailsPaneState extends ConsumerState<_VenueDetailsPane> {
   bool _uploading = false;
+  bool _savingAccess = false;
+  late final TextEditingController _entranceLine1;
+  late final TextEditingController _entranceLine2;
+  late final TextEditingController _entrancePostalCode;
+  late final TextEditingController _entranceCity;
+  late final TextEditingController _accessInstructions;
+
+  @override
+  void initState() {
+    super.initState();
+    final venue = ref
+        .read(venuesProvider)
+        .maybeWhen(
+          data: (items) =>
+              items.where((v) => v.id == widget.venueId).firstOrNull,
+          orElse: () => null,
+        );
+    _entranceLine1 = TextEditingController(
+      text: venue?.artistEntranceAddressLine1 ?? '',
+    );
+    _entranceLine2 = TextEditingController(
+      text: venue?.artistEntranceAddressLine2 ?? '',
+    );
+    _entrancePostalCode = TextEditingController(
+      text: venue?.artistEntrancePostalCode ?? '',
+    );
+    _entranceCity = TextEditingController(
+      text: venue?.artistEntranceCity ?? '',
+    );
+    _accessInstructions = TextEditingController(
+      text: venue?.accessInstructions ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _entranceLine1.dispose();
+    _entranceLine2.dispose();
+    _entrancePostalCode.dispose();
+    _entranceCity.dispose();
+    _accessInstructions.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -343,9 +389,101 @@ class _VenueDetailsPaneState extends ConsumerState<_VenueDetailsPane> {
               ),
             ],
           ),
+          const SizedBox(height: DsSpacing.xl),
+          Text(
+            'Entrée artiste',
+            style: DsTypography.h3.copyWith(color: colors.textPrimary),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Visible par l\'admin, le tourneur et l\'équipe confirmée sur la '
+            'fiche maraude.',
+            style: DsTypography.meta.copyWith(color: colors.textSecondary),
+          ),
+          const SizedBox(height: DsSpacing.md),
+          TextField(
+            controller: _entranceLine1,
+            decoration: const InputDecoration(labelText: 'Adresse'),
+          ),
+          const SizedBox(height: DsSpacing.sm),
+          TextField(
+            controller: _entranceLine2,
+            decoration: const InputDecoration(labelText: 'Complément'),
+          ),
+          const SizedBox(height: DsSpacing.sm),
+          Row(
+            children: [
+              SizedBox(
+                width: 140,
+                child: TextField(
+                  controller: _entrancePostalCode,
+                  decoration: const InputDecoration(labelText: 'Code postal'),
+                ),
+              ),
+              const SizedBox(width: DsSpacing.sm),
+              Expanded(
+                child: TextField(
+                  controller: _entranceCity,
+                  decoration: const InputDecoration(labelText: 'Ville'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: DsSpacing.sm),
+          TextField(
+            controller: _accessInstructions,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Instructions d\'accès',
+              hintText: 'Ex : sonner à l\'interphone "Régie", accès par la rue...',
+            ),
+          ),
+          const SizedBox(height: DsSpacing.md),
+          DsPrimaryButton(
+            label: 'Enregistrer l\'entrée artiste',
+            isLoading: _savingAccess,
+            onPressed: _savingAccess ? null : _saveAccessDetails,
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _saveAccessDetails() async {
+    setState(() => _savingAccess = true);
+    try {
+      await ref
+          .read(venueRepositoryProvider)
+          .updateAccessDetails(
+            venueId: widget.venueId,
+            artistEntranceAddressLine1: _nullIfBlank(_entranceLine1.text),
+            artistEntranceAddressLine2: _nullIfBlank(_entranceLine2.text),
+            artistEntrancePostalCode: _nullIfBlank(_entrancePostalCode.text),
+            artistEntranceCity: _nullIfBlank(_entranceCity.text),
+            accessInstructions: _nullIfBlank(_accessInstructions.text),
+          );
+      ref.invalidate(venuesProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Entrée artiste enregistrée.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            describeError(error, 'Impossible d\'enregistrer l\'entrée artiste.'),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _savingAccess = false);
+    }
+  }
+
+  String? _nullIfBlank(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   Future<void> _uploadPhoto() async {
