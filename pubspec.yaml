@@ -75,13 +75,6 @@ flutter:
   assets:
     - assets/fonts/
     - assets/branding/
-    - assets/avatar/
-    - assets/avatar/props/accessories/
-    - assets/avatar/props/held_objects/
-    - assets/avatar/props/jewelry/
-    - assets/avatar/props/tattoos/
-    - assets/avatar/props/pets/
-    - assets/avatar/characters/
     - assets/avatar/pets/
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg

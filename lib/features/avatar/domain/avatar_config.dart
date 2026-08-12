@@ -1,161 +1,20 @@
-/// A user's pixel-art character customization. Purely cosmetic — no
-/// operational impact — stored as JSON in `avatar_configs.config`.
-///
-/// [characterId] is the real visual payoff: a ready-made portrait picked
-/// from [CharacterCatalogue] (see that file's doc comment for why —
-/// per-piece compositing isn't possible for worn items with the sprites
-/// currently available). The other fields (body/hair/top/.../pet) are a
-/// collectible/badge layer shown as "ÉQUIPÉ" pills — cosmetic progression
-/// that doesn't (yet) change what's drawn on screen.
+/// A user's chosen animal companion. Purely cosmetic — no operational
+/// impact — stored as JSON in `avatar_configs.config`. [pet] is an
+/// [AvatarCatalogue] id; which ones are selectable depends on maraudes
+/// completed (see [AvatarItem.isUnlockedFor]).
 class AvatarConfig {
-  const AvatarConfig({
-    required this.characterId,
-    required this.bodyType,
-    required this.skinTone,
-    required this.eyes,
-    required this.mouth,
-    required this.hairStyle,
-    required this.hairColor,
-    required this.topStyle,
-    required this.topColor,
-    required this.bottomStyle,
-    required this.bottomColor,
-    required this.shoesStyle,
-    required this.heldObject,
-    this.headAccessory,
-    this.backItem,
-    this.jewelry,
-    this.tattoo,
-    this.pet,
-  });
+  const AvatarConfig({required this.pet});
 
-  final String characterId;
-  final int bodyType;
-  final String skinTone;
-  final String eyes;
-  final String mouth;
-  final String hairStyle;
-  final String hairColor;
-  final String topStyle;
-  final String topColor;
-  final String bottomStyle;
-  final String bottomColor;
-  final String shoesStyle;
-  final String heldObject;
-  final String? headAccessory;
-  final String? backItem;
-  final String? jewelry;
-  final String? tattoo;
-  final String? pet;
+  final String pet;
 
-  static const defaultConfig = AvatarConfig(
-    characterId: 'volunteer_lucas',
-    bodyType: 1,
-    skinTone: '#E8B084',
-    eyes: 'default',
-    mouth: 'smile',
-    hairStyle: 'short',
-    hairColor: '#2D2B1F',
-    topStyle: 'hoodie',
-    topColor: '#6C5CE7',
-    bottomStyle: 'jeans',
-    bottomColor: '#2C2C3A',
-    shoesStyle: 'sneakers',
-    heldObject: 'sandwich',
-  );
+  static const defaultConfig = AvatarConfig(pet: 'ferme_vache');
 
   factory AvatarConfig.fromJson(Map<String, dynamic> json) {
     if (json.isEmpty) return defaultConfig;
-    return AvatarConfig(
-      characterId: json['character_id'] as String? ?? defaultConfig.characterId,
-      bodyType: (json['body_type'] as num?)?.toInt() ?? defaultConfig.bodyType,
-      skinTone: json['skin_tone'] as String? ?? defaultConfig.skinTone,
-      eyes: json['eyes'] as String? ?? defaultConfig.eyes,
-      mouth: json['mouth'] as String? ?? defaultConfig.mouth,
-      hairStyle: json['hair_style'] as String? ?? defaultConfig.hairStyle,
-      hairColor: json['hair_color'] as String? ?? defaultConfig.hairColor,
-      topStyle: json['top_style'] as String? ?? defaultConfig.topStyle,
-      topColor: json['top_color'] as String? ?? defaultConfig.topColor,
-      bottomStyle: json['bottom_style'] as String? ?? defaultConfig.bottomStyle,
-      bottomColor: json['bottom_color'] as String? ?? defaultConfig.bottomColor,
-      shoesStyle: json['shoes_style'] as String? ?? defaultConfig.shoesStyle,
-      heldObject: json['held_object'] as String? ?? defaultConfig.heldObject,
-      headAccessory: json['head_accessory'] as String?,
-      backItem: json['back_item'] as String?,
-      jewelry: json['jewelry'] as String?,
-      tattoo: json['tattoo'] as String?,
-      pet: json['pet'] as String?,
-    );
+    return AvatarConfig(pet: json['pet'] as String? ?? defaultConfig.pet);
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'character_id': characterId,
-      'body_type': bodyType,
-      'skin_tone': skinTone,
-      'eyes': eyes,
-      'mouth': mouth,
-      'hair_style': hairStyle,
-      'hair_color': hairColor,
-      'top_style': topStyle,
-      'top_color': topColor,
-      'bottom_style': bottomStyle,
-      'bottom_color': bottomColor,
-      'shoes_style': shoesStyle,
-      'held_object': heldObject,
-      'head_accessory': headAccessory,
-      'back_item': backItem,
-      'jewelry': jewelry,
-      'tattoo': tattoo,
-      'pet': pet,
-    };
-  }
+  Map<String, dynamic> toJson() => {'pet': pet};
 
-  AvatarConfig copyWith({
-    String? characterId,
-    int? bodyType,
-    String? skinTone,
-    String? eyes,
-    String? mouth,
-    String? hairStyle,
-    String? hairColor,
-    String? topStyle,
-    String? topColor,
-    String? bottomStyle,
-    String? bottomColor,
-    String? shoesStyle,
-    String? heldObject,
-    Object? headAccessory = _unset,
-    Object? backItem = _unset,
-    Object? jewelry = _unset,
-    Object? tattoo = _unset,
-    Object? pet = _unset,
-  }) {
-    return AvatarConfig(
-      characterId: characterId ?? this.characterId,
-      bodyType: bodyType ?? this.bodyType,
-      skinTone: skinTone ?? this.skinTone,
-      eyes: eyes ?? this.eyes,
-      mouth: mouth ?? this.mouth,
-      hairStyle: hairStyle ?? this.hairStyle,
-      hairColor: hairColor ?? this.hairColor,
-      topStyle: topStyle ?? this.topStyle,
-      topColor: topColor ?? this.topColor,
-      bottomStyle: bottomStyle ?? this.bottomStyle,
-      bottomColor: bottomColor ?? this.bottomColor,
-      shoesStyle: shoesStyle ?? this.shoesStyle,
-      heldObject: heldObject ?? this.heldObject,
-      headAccessory: identical(headAccessory, _unset)
-          ? this.headAccessory
-          : headAccessory as String?,
-      backItem: identical(backItem, _unset)
-          ? this.backItem
-          : backItem as String?,
-      jewelry: identical(jewelry, _unset) ? this.jewelry : jewelry as String?,
-      tattoo: identical(tattoo, _unset) ? this.tattoo : tattoo as String?,
-      pet: identical(pet, _unset) ? this.pet : pet as String?,
-    );
-  }
+  AvatarConfig copyWith({String? pet}) => AvatarConfig(pet: pet ?? this.pet);
 }
-
-const _unset = Object();

@@ -5,18 +5,14 @@ import 'package:club_sandwich/design_system/components/buttons/ds_secondary_butt
 import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
 import 'package:club_sandwich/design_system/icons/ds_icons.dart';
 import 'package:club_sandwich/design_system/tokens/ds_borders.dart';
-import 'package:club_sandwich/design_system/tokens/ds_motion.dart';
 import 'package:club_sandwich/design_system/tokens/ds_radius.dart';
-import 'package:club_sandwich/design_system/tokens/ds_shadows.dart';
 import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
 import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
 import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
 import 'package:club_sandwich/features/avatar/data/avatar_providers.dart';
 import 'package:club_sandwich/features/avatar/domain/avatar_catalogue.dart';
 import 'package:club_sandwich/features/avatar/domain/avatar_config.dart';
-import 'package:club_sandwich/features/avatar/domain/character_portrait.dart';
 import 'package:club_sandwich/features/avatar/presentation/avatar_character.dart';
-import 'package:club_sandwich/features/avatar/presentation/avatar_item_icons.dart';
 import 'package:club_sandwich/features/avatar/presentation/avatar_progress.dart';
 import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
@@ -26,20 +22,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'dart:math';
 
-enum _CustomizerTab { body, hair, top, bottom, shoes, held, accessories, colors }
-
-extension on _CustomizerTab {
-  String get label => switch (this) {
-    _CustomizerTab.body => 'Corps',
-    _CustomizerTab.hair => 'Tête',
-    _CustomizerTab.top => 'Haut',
-    _CustomizerTab.bottom => 'Bas',
-    _CustomizerTab.shoes => 'Chaussures',
-    _CustomizerTab.held => 'Objet',
-    _CustomizerTab.accessories => 'Accessoires',
-    _CustomizerTab.colors => 'Couleurs',
-  };
-}
+const _tiers = [
+  (0, '⭐ Niveau 1 — Communs (dès l\'inscription)'),
+  (5, '⭐⭐ Niveau 2 — Peu communs (5 maraudes)'),
+  (10, '⭐⭐⭐ Niveau 3 — Rares (10 maraudes)'),
+  (15, '💎 Niveau 4 — Épiques (15 maraudes)'),
+  (20, '👑 Niveau 5 — Légendaires (20 maraudes)'),
+];
 
 class PersonalizationScreen extends ConsumerStatefulWidget {
   const PersonalizationScreen({super.key});
@@ -51,7 +40,6 @@ class PersonalizationScreen extends ConsumerStatefulWidget {
 
 class _PersonalizationScreenState extends ConsumerState<PersonalizationScreen> {
   AvatarConfig? _draft;
-  _CustomizerTab _tab = _CustomizerTab.body;
   bool _saving = false;
 
   @override
@@ -105,29 +93,11 @@ class _PersonalizationScreenState extends ConsumerState<PersonalizationScreen> {
 
   void _randomize(int maraudesCompleted) {
     final random = Random();
-    AvatarItem pickUnlocked(List<AvatarItem> items) {
-      final unlocked = items
-          .where((item) => item.isUnlockedFor(maraudesCompleted: maraudesCompleted))
-          .toList();
-      return unlocked[random.nextInt(unlocked.length)];
-    }
-
+    final unlocked = AvatarCatalogue.pets
+        .where((item) => item.isUnlockedFor(maraudesCompleted: maraudesCompleted))
+        .toList();
     setState(() {
-      _draft = _draft!.copyWith(
-        characterId: CharacterCatalogue
-            .all[random.nextInt(CharacterCatalogue.all.length)]
-            .id,
-        bodyType: random.nextInt(AvatarCatalogue.bodyTypes.length) + 1,
-        skinTone:
-            AvatarCatalogue.skinTones[random.nextInt(AvatarCatalogue.skinTones.length)],
-        hairStyle: pickUnlocked(AvatarCatalogue.hairStyles).id,
-        topStyle: pickUnlocked(AvatarCatalogue.topStyles).id,
-        topColor:
-            AvatarCatalogue.colorPresets[random.nextInt(AvatarCatalogue.colorPresets.length)],
-        bottomStyle: pickUnlocked(AvatarCatalogue.bottomStyles).id,
-        shoesStyle: pickUnlocked(AvatarCatalogue.shoesStyles).id,
-        heldObject: pickUnlocked(AvatarCatalogue.heldObjects).id,
-      );
+      _draft = _draft!.copyWith(pet: unlocked[random.nextInt(unlocked.length)].id);
     });
   }
 
@@ -150,9 +120,7 @@ class _PersonalizationScreenState extends ConsumerState<PersonalizationScreen> {
             fullName: fullName,
             tierLabel: avatarTierLabel(maraudesCompleted),
           );
-          final wardrobe = _WardrobePanel(
-            tab: _tab,
-            onTabChanged: (tab) => setState(() => _tab = tab),
+          final picker = _PetPickerPanel(
             config: config,
             maraudesCompleted: maraudesCompleted,
             onUpdate: _update,
@@ -167,7 +135,7 @@ class _PersonalizationScreenState extends ConsumerState<PersonalizationScreen> {
               Text('Mon personnage', style: DsTypography.h1.copyWith(color: colors.textPrimary)),
               const SizedBox(height: 4),
               Text(
-                'Personnalise ton avatar Club Sandwich',
+                'Choisis l\'animal qui te représente sur Club Sandwich',
                 style: DsTypography.body.copyWith(color: colors.textSecondary),
               ),
               const SizedBox(height: DsSpacing.xl),
@@ -177,7 +145,7 @@ class _PersonalizationScreenState extends ConsumerState<PersonalizationScreen> {
                   children: [
                     preview,
                     const SizedBox(height: DsSpacing.xl),
-                    wardrobe,
+                    picker,
                   ],
                 )
               else
@@ -187,7 +155,7 @@ class _PersonalizationScreenState extends ConsumerState<PersonalizationScreen> {
                     children: [
                       Expanded(flex: 3, child: preview),
                       const SizedBox(width: DsSpacing.xl),
-                      SizedBox(width: 420, child: wardrobe),
+                      SizedBox(width: 420, child: picker),
                     ],
                   ),
                 ),
@@ -214,23 +182,6 @@ class _PreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<DsTokens>()!;
     final colors = tokens.colors;
-    final equipped = <String?>[
-      _labelFor(AvatarCatalogue.topStyles, config.topStyle),
-      _labelFor(AvatarCatalogue.bottomStyles, config.bottomStyle),
-      _labelFor(AvatarCatalogue.heldObjects, config.heldObject),
-      if (config.headAccessory != null)
-        _labelFor(AvatarCatalogue.headAccessories, config.headAccessory!),
-      if (config.backItem != null)
-        _labelFor(AvatarCatalogue.backItems, config.backItem!),
-      if (config.jewelry != null)
-        _labelFor(AvatarCatalogue.jewelryItems, config.jewelry!),
-      if (config.tattoo != null)
-        _labelFor(AvatarCatalogue.tattoos, config.tattoo!),
-      // config.pet is deliberately excluded: it replaces the displayed
-      // character (see AvatarCharacter), it isn't a stacked accessory —
-      // showing it again as a pill here would be redundant with the big
-      // preview image itself.
-    ].whereType<String>().toList();
 
     return DsCard(
       padding: const EdgeInsets.all(DsSpacing.xl),
@@ -252,40 +203,20 @@ class _PreviewCard extends StatelessWidget {
             style: DsTypography.h2.copyWith(color: colors.textPrimary),
           ),
           const SizedBox(height: DsSpacing.sm),
-          DsBadge(label: tierLabel, variant: DsSemanticVariant.info),
-          const SizedBox(height: DsSpacing.lg),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'ÉQUIPÉ',
-              style: DsTypography.caption.copyWith(color: colors.textSecondary),
-            ),
+          Text(
+            AvatarCatalogue.byId(config.pet).label,
+            style: DsTypography.body.copyWith(color: colors.textSecondary),
           ),
           const SizedBox(height: DsSpacing.sm),
-          Wrap(
-            spacing: DsSpacing.sm,
-            runSpacing: DsSpacing.sm,
-            children: [
-              for (final label in equipped) DsBadge(label: label),
-            ],
-          ),
+          DsBadge(label: tierLabel, variant: DsSemanticVariant.info),
         ],
       ),
     );
   }
-
-  String? _labelFor(List<AvatarItem> items, String id) {
-    for (final item in items) {
-      if (item.id == id) return item.label;
-    }
-    return null;
-  }
 }
 
-class _WardrobePanel extends StatelessWidget {
-  const _WardrobePanel({
-    required this.tab,
-    required this.onTabChanged,
+class _PetPickerPanel extends StatelessWidget {
+  const _PetPickerPanel({
     required this.config,
     required this.maraudesCompleted,
     required this.onUpdate,
@@ -294,8 +225,6 @@ class _WardrobePanel extends StatelessWidget {
     required this.onRandom,
   });
 
-  final _CustomizerTab tab;
-  final ValueChanged<_CustomizerTab> onTabChanged;
   final AvatarConfig config;
   final int maraudesCompleted;
   final void Function(AvatarConfig Function(AvatarConfig current)) onUpdate;
@@ -314,40 +243,35 @@ class _WardrobePanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'GARDE-ROBE',
+            'MON ANIMAL',
             style: DsTypography.caption.copyWith(color: colors.textSecondary),
           ),
           const SizedBox(height: 2),
           Text(
-            'Sélectionne un accessoire ou un outil pour tes maraudes',
+            'Plus tu fais de maraudes, plus tu débloques d\'animaux stylés.',
             style: DsTypography.meta.copyWith(color: colors.textSecondary),
           ),
           const SizedBox(height: DsSpacing.lg),
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: colors.secondarySelectedBg,
-              borderRadius: DsRadius.mdRadius,
+          for (final tier in _tiers) ...[
+            Text(tier.$2, style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: DsSpacing.sm),
+            _ItemGrid(
+              items: AvatarCatalogue.pets
+                  .where((p) => !p.requiresBadge && p.maraudesRequired == tier.$1)
+                  .toList(),
+              selectedId: config.pet,
+              maraudesCompleted: maraudesCompleted,
+              onSelect: (id) => onUpdate((c) => c.copyWith(pet: id)),
             ),
-            child: Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              children: [
-                for (final t in _CustomizerTab.values)
-                  _TabPill(
-                    label: t.label,
-                    selected: t == tab,
-                    onTap: () => onTabChanged(t),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: DsSpacing.lg),
-          _TabContent(
-            tab: tab,
-            config: config,
+            const SizedBox(height: DsSpacing.lg),
+          ],
+          Text('🏅 Badges (accomplissements)', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: DsSpacing.sm),
+          _ItemGrid(
+            items: AvatarCatalogue.pets.where((p) => p.requiresBadge).toList(),
+            selectedId: config.pet,
             maraudesCompleted: maraudesCompleted,
-            onUpdate: onUpdate,
+            onSelect: (id) => onUpdate((c) => c.copyWith(pet: id)),
           ),
           const SizedBox(height: DsSpacing.md),
           Row(
@@ -356,7 +280,7 @@ class _WardrobePanel extends StatelessWidget {
               const SizedBox(width: DsSpacing.sm),
               Expanded(
                 child: Text(
-                  'Débloque plus d\'items en participant aux maraudes',
+                  'Débloque plus d\'animaux en participant aux maraudes',
                   style: DsTypography.meta.copyWith(color: colors.textSecondary),
                 ),
               ),
@@ -383,276 +307,18 @@ class _WardrobePanel extends StatelessWidget {
   }
 }
 
-class _TabPill extends StatelessWidget {
-  const _TabPill({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<DsTokens>()!;
-    final colors = tokens.colors;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: DsMotion.standard,
-        curve: DsMotion.curve,
-        padding: const EdgeInsets.symmetric(
-          horizontal: DsSpacing.md,
-          vertical: DsSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color: selected ? colors.surface : Colors.transparent,
-          borderRadius: DsRadius.smRadius,
-          boxShadow: selected ? DsShadows.ambient(colors.textPrimary) : const [],
-        ),
-        child: Text(
-          label,
-          style: DsTypography.meta.copyWith(
-            color: selected ? colors.textPrimary : colors.textSecondary,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TabContent extends StatelessWidget {
-  const _TabContent({
-    required this.tab,
-    required this.config,
-    required this.maraudesCompleted,
-    required this.onUpdate,
-  });
-
-  final _CustomizerTab tab;
-  final AvatarConfig config;
-  final int maraudesCompleted;
-  final void Function(AvatarConfig Function(AvatarConfig current)) onUpdate;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).extension<DsTokens>()!.colors;
-    switch (tab) {
-      case _CustomizerTab.body:
-        // Picking a human portrait clears any selected pet — the two are
-        // mutually exclusive "who's my character" choices, not stacking
-        // accessories (see AvatarCharacter: pet takes precedence when set).
-        void selectCharacter(String id) =>
-            onUpdate((c) => c.copyWith(characterId: id, pet: null));
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Bénévoles', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: DsSpacing.sm),
-            _CharacterGrid(
-              portraits: CharacterCatalogue.volunteers,
-              selectedId: config.pet == null ? config.characterId : null,
-              onSelect: selectCharacter,
-            ),
-            const SizedBox(height: DsSpacing.lg),
-            Text('Tourneurs', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: DsSpacing.sm),
-            _CharacterGrid(
-              portraits: CharacterCatalogue.promoters,
-              selectedId: config.pet == null ? config.characterId : null,
-              onSelect: selectCharacter,
-            ),
-            const SizedBox(height: DsSpacing.lg),
-            Text('Autres looks', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: DsSpacing.sm),
-            _CharacterGrid(
-              portraits: CharacterCatalogue.generic,
-              selectedId: config.pet == null ? config.characterId : null,
-              onSelect: selectCharacter,
-            ),
-            const SizedBox(height: DsSpacing.xl),
-            Text(
-              'Ou deviens un animal',
-              style: DsTypography.h3.copyWith(color: colors.textPrimary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Un animal remplace ton personnage — plus tu fais de maraudes, plus tu débloques d\'animaux stylés.',
-              style: DsTypography.meta.copyWith(color: colors.textSecondary),
-            ),
-            const SizedBox(height: DsSpacing.lg),
-            for (final tier in const [
-              (0, '⭐ Niveau 1 — Communs (dès l\'inscription)'),
-              (5, '⭐⭐ Niveau 2 — Peu communs (5 maraudes)'),
-              (10, '⭐⭐⭐ Niveau 3 — Rares (10 maraudes)'),
-              (15, '💎 Niveau 4 — Épiques (15 maraudes)'),
-              (20, '👑 Niveau 5 — Légendaires (20 maraudes)'),
-            ]) ...[
-              Text(tier.$2, style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
-              const SizedBox(height: DsSpacing.sm),
-              _ItemGrid(
-                category: AvatarCategory.pet,
-                items: AvatarCatalogue.pets
-                    .where((p) => !p.requiresBadge && p.maraudesRequired == tier.$1)
-                    .toList(),
-                selectedId: config.pet,
-                maraudesCompleted: maraudesCompleted,
-                clearable: true,
-                onSelect: (id) => onUpdate((c) => c.copyWith(pet: id)),
-              ),
-              const SizedBox(height: DsSpacing.lg),
-            ],
-            Text('🏅 Badges (accomplissements)', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: DsSpacing.sm),
-            _ItemGrid(
-              category: AvatarCategory.pet,
-              items: AvatarCatalogue.pets.where((p) => p.requiresBadge).toList(),
-              selectedId: config.pet,
-              maraudesCompleted: maraudesCompleted,
-              clearable: true,
-              onSelect: (id) => onUpdate((c) => c.copyWith(pet: id)),
-            ),
-          ],
-        );
-      case _CustomizerTab.hair:
-        return _ItemGrid(
-          category: AvatarCategory.hair,
-          items: AvatarCatalogue.hairStyles,
-          selectedId: config.hairStyle,
-          maraudesCompleted: maraudesCompleted,
-          onSelect: (id) => onUpdate((c) => c.copyWith(hairStyle: id)),
-        );
-      case _CustomizerTab.top:
-        return _ItemGrid(
-          category: AvatarCategory.top,
-          items: AvatarCatalogue.topStyles,
-          selectedId: config.topStyle,
-          maraudesCompleted: maraudesCompleted,
-          onSelect: (id) => onUpdate((c) => c.copyWith(topStyle: id)),
-        );
-      case _CustomizerTab.bottom:
-        return _ItemGrid(
-          category: AvatarCategory.bottom,
-          items: AvatarCatalogue.bottomStyles,
-          selectedId: config.bottomStyle,
-          maraudesCompleted: maraudesCompleted,
-          onSelect: (id) => onUpdate((c) => c.copyWith(bottomStyle: id)),
-        );
-      case _CustomizerTab.shoes:
-        return _ItemGrid(
-          category: AvatarCategory.shoes,
-          items: AvatarCatalogue.shoesStyles,
-          selectedId: config.shoesStyle,
-          maraudesCompleted: maraudesCompleted,
-          onSelect: (id) => onUpdate((c) => c.copyWith(shoesStyle: id)),
-        );
-      case _CustomizerTab.held:
-        return _ItemGrid(
-          category: AvatarCategory.held,
-          items: AvatarCatalogue.heldObjects,
-          selectedId: config.heldObject,
-          maraudesCompleted: maraudesCompleted,
-          onSelect: (id) => onUpdate((c) => c.copyWith(heldObject: id)),
-        );
-      case _CustomizerTab.accessories:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Tête', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: DsSpacing.sm),
-            _ItemGrid(
-              category: AvatarCategory.head,
-              items: AvatarCatalogue.headAccessories,
-              selectedId: config.headAccessory,
-              maraudesCompleted: maraudesCompleted,
-              clearable: true,
-              onSelect: (id) => onUpdate((c) => c.copyWith(headAccessory: id)),
-            ),
-            const SizedBox(height: DsSpacing.lg),
-            Text('Dos', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: DsSpacing.sm),
-            _ItemGrid(
-              category: AvatarCategory.back,
-              items: AvatarCatalogue.backItems,
-              selectedId: config.backItem,
-              maraudesCompleted: maraudesCompleted,
-              clearable: true,
-              onSelect: (id) => onUpdate((c) => c.copyWith(backItem: id)),
-            ),
-            const SizedBox(height: DsSpacing.lg),
-            Text('Bijoux', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: DsSpacing.sm),
-            _ItemGrid(
-              category: AvatarCategory.jewelry,
-              items: AvatarCatalogue.jewelryItems,
-              selectedId: config.jewelry,
-              maraudesCompleted: maraudesCompleted,
-              clearable: true,
-              onSelect: (id) => onUpdate((c) => c.copyWith(jewelry: id)),
-            ),
-            const SizedBox(height: DsSpacing.lg),
-            Text('Tatouage', style: DsTypography.meta.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: DsSpacing.sm),
-            _ItemGrid(
-              category: AvatarCategory.tattoo,
-              items: AvatarCatalogue.tattoos,
-              selectedId: config.tattoo,
-              maraudesCompleted: maraudesCompleted,
-              clearable: true,
-              onSelect: (id) => onUpdate((c) => c.copyWith(tattoo: id)),
-            ),
-          ],
-        );
-      case _CustomizerTab.colors:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ColorRow(
-              label: 'Haut',
-              colors: AvatarCatalogue.colorPresets,
-              selected: config.topColor,
-              onSelect: (hex) => onUpdate((c) => c.copyWith(topColor: hex)),
-            ),
-            const SizedBox(height: DsSpacing.lg),
-            _ColorRow(
-              label: 'Bas',
-              colors: AvatarCatalogue.colorPresets,
-              selected: config.bottomColor,
-              onSelect: (hex) => onUpdate((c) => c.copyWith(bottomColor: hex)),
-            ),
-            const SizedBox(height: DsSpacing.lg),
-            _ColorRow(
-              label: 'Cheveux',
-              colors: AvatarCatalogue.colorPresets,
-              selected: config.hairColor,
-              onSelect: (hex) => onUpdate((c) => c.copyWith(hairColor: hex)),
-            ),
-          ],
-        );
-    }
-  }
-}
-
 class _ItemGrid extends StatelessWidget {
   const _ItemGrid({
-    required this.category,
     required this.items,
     required this.selectedId,
     required this.maraudesCompleted,
     required this.onSelect,
-    this.clearable = false,
   });
 
-  final AvatarCategory category;
   final List<AvatarItem> items;
-  final String? selectedId;
+  final String selectedId;
   final int maraudesCompleted;
-  final ValueChanged<String?> onSelect;
-  final bool clearable;
+  final ValueChanged<String> onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -660,22 +326,11 @@ class _ItemGrid extends StatelessWidget {
       spacing: DsSpacing.sm,
       runSpacing: DsSpacing.sm,
       children: [
-        if (clearable)
-          _ItemCell(
-            icon: DsIcons.close,
-            label: 'Aucun',
-            selected: selectedId == null,
-            locked: false,
-            onTap: () => onSelect(null),
-          ),
         for (final item in items)
           _ItemCell(
-            icon: avatarItemIcon(category, item.id),
-            spritePath: item.spritePath,
-            label: item.label,
+            item: item,
             selected: item.id == selectedId,
             locked: !item.isUnlockedFor(maraudesCompleted: maraudesCompleted),
-            lockedTooltip: item.lockedTooltip,
             onTap: () => onSelect(item.id),
           ),
       ],
@@ -685,21 +340,15 @@ class _ItemGrid extends StatelessWidget {
 
 class _ItemCell extends StatelessWidget {
   const _ItemCell({
-    required this.icon,
-    required this.label,
+    required this.item,
     required this.selected,
     required this.locked,
     required this.onTap,
-    this.lockedTooltip,
-    this.spritePath,
   });
 
-  final IconData icon;
-  final String? spritePath;
-  final String label;
+  final AvatarItem item;
   final bool selected;
   final bool locked;
-  final String? lockedTooltip;
   final VoidCallback onTap;
 
   @override
@@ -733,13 +382,10 @@ class _ItemCell extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            if (spritePath != null)
-              Padding(
-                padding: const EdgeInsets.all(6),
-                child: Image.asset(spritePath!, fit: BoxFit.contain),
-              )
-            else
-              Icon(icon, size: 22, color: colors.textPrimary),
+            Padding(
+              padding: const EdgeInsets.all(6),
+              child: Image.asset(item.spritePath, fit: BoxFit.contain),
+            ),
             if (locked)
               Positioned(
                 right: 4,
@@ -752,173 +398,8 @@ class _ItemCell extends StatelessWidget {
     );
 
     return Tooltip(
-      message: locked ? (lockedTooltip ?? 'Verrouillé') : label,
+      message: locked ? item.lockedTooltip : item.label,
       child: GestureDetector(onTap: locked ? null : onTap, child: cell),
-    );
-  }
-}
-
-/// Picker for [CharacterPortrait]s — the "Corps" tab's real payoff:
-/// unlike every other tab's [_ItemGrid], picking here actually changes
-/// what's drawn on screen (see [AvatarCharacter]).
-class _CharacterGrid extends StatelessWidget {
-  const _CharacterGrid({
-    required this.portraits,
-    required this.selectedId,
-    required this.onSelect,
-  });
-
-  final List<CharacterPortrait> portraits;
-  final String? selectedId;
-  final ValueChanged<String> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: DsSpacing.sm,
-      runSpacing: DsSpacing.sm,
-      children: [
-        for (final portrait in portraits)
-          _CharacterCell(
-            portrait: portrait,
-            selected: portrait.id == selectedId,
-            onTap: () => onSelect(portrait.id),
-          ),
-      ],
-    );
-  }
-}
-
-class _CharacterCell extends StatelessWidget {
-  const _CharacterCell({
-    required this.portrait,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final CharacterPortrait portrait;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<DsTokens>()!;
-    final colors = tokens.colors;
-
-    return Tooltip(
-      message: portrait.role == null
-          ? portrait.label
-          : '${portrait.label} · ${portrait.role}',
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 64,
-          height: 85,
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: colors.surface,
-            borderRadius: DsRadius.mdRadius,
-            border: Border.all(
-              color: selected ? colors.primary : colors.border,
-              width: selected ? 2 : DsBorders.hairline,
-            ),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: colors.primary.withValues(alpha: 0.1),
-                      blurRadius: 0,
-                      spreadRadius: 3,
-                    ),
-                  ]
-                : const [],
-          ),
-          child: ClipRRect(
-            borderRadius: DsRadius.smRadius,
-            child: Image.asset(portrait.spritePath, fit: BoxFit.cover),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ColorRow extends StatelessWidget {
-  const _ColorRow({
-    required this.label,
-    required this.colors,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  final String label;
-  final List<String> colors;
-  final String selected;
-  final ValueChanged<String> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<DsTokens>()!;
-    final dsColors = tokens.colors;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: DsTypography.meta.copyWith(
-            color: dsColors.textSecondary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: DsSpacing.sm),
-        Wrap(
-          spacing: DsSpacing.sm,
-          runSpacing: DsSpacing.sm,
-          children: [
-            for (final hex in colors)
-              _ColorSwatch(
-                hex: hex,
-                selected: hex.toUpperCase() == selected.toUpperCase(),
-                onTap: () => onSelect(hex),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _ColorSwatch extends StatelessWidget {
-  const _ColorSwatch({
-    required this.hex,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String hex;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<DsTokens>()!;
-    final colors = tokens.colors;
-    final value = int.parse(hex.replaceFirst('#', 'FF'), radix: 16);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: Color(value),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: selected ? colors.primary : colors.border,
-            width: selected ? 2 : DsBorders.hairline,
-          ),
-        ),
-      ),
     );
   }
 }

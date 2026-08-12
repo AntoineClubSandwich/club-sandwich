@@ -7,9 +7,7 @@ import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
 import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
 import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
 import 'package:club_sandwich/features/avatar/data/avatar_providers.dart';
-import 'package:club_sandwich/features/avatar/domain/avatar_catalogue.dart';
 import 'package:club_sandwich/features/avatar/presentation/avatar_character.dart';
-import 'package:club_sandwich/features/avatar/presentation/avatar_item_icons.dart';
 import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,15 +27,9 @@ final avatarPopoverOpenProvider = NotifierProvider<AvatarPopoverOpen, bool>(
   AvatarPopoverOpen.new,
 );
 
-/// Held objects with real sprites shown first, so the quick popover
-/// showcases actual art rather than only Lucide-glyph placeholders.
-final _quickHeldObjects = [
-  ...AvatarCatalogue.heldObjects.where((item) => item.spritePath != null),
-  ...AvatarCatalogue.heldObjects.where((item) => item.spritePath == null),
-].take(8).toList();
-
-/// Slide-in panel anchored to the sidebar's right edge — a quick "swap
-/// what I'm holding" surface, with a link out to the full customizer.
+/// Slide-in panel anchored to the sidebar's right edge — a quick preview
+/// of the equipped animal companion, with a link out to the full
+/// customizer where it can actually be changed.
 class AvatarSidebarPopover extends ConsumerWidget {
   const AvatarSidebarPopover({super.key});
 
@@ -47,7 +39,6 @@ class AvatarSidebarPopover extends ConsumerWidget {
     final colors = tokens.colors;
     final asyncConfig = ref.watch(currentAvatarConfigProvider);
     final profile = ref.watch(currentProfileProvider).value;
-    final maraudesCompleted = ref.watch(maraudesCompletedProvider);
 
     return Material(
       color: Colors.transparent,
@@ -76,7 +67,7 @@ class AvatarSidebarPopover extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      profile == null ? 'Mon personnage' : profile.firstName,
+                      profile == null ? 'Mon animal' : profile.firstName,
                       style: DsTypography.h3.copyWith(color: colors.textPrimary),
                     ),
                   ),
@@ -104,35 +95,6 @@ class AvatarSidebarPopover extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: DsSpacing.lg),
-              Text(
-                'OBJET EN MAIN',
-                style: DsTypography.caption.copyWith(color: colors.textSecondary),
-              ),
-              const SizedBox(height: DsSpacing.sm),
-              Wrap(
-                spacing: DsSpacing.sm,
-                runSpacing: DsSpacing.sm,
-                children: [
-                  for (final item in _quickHeldObjects)
-                    _QuickObjectButton(
-                      icon: avatarItemIcon(AvatarCategory.held, item.id),
-                      spritePath: item.spritePath,
-                      selected: item.id == config.heldObject,
-                      locked: !item.isUnlockedFor(
-                        maraudesCompleted: maraudesCompleted,
-                      ),
-                      onTap: () async {
-                        await ref
-                            .read(avatarRepositoryProvider)
-                            .saveCurrentAvatar(
-                              config.copyWith(heldObject: item.id),
-                            );
-                        ref.invalidate(currentAvatarConfigProvider);
-                      },
-                    ),
-                ],
-              ),
-              const SizedBox(height: DsSpacing.lg),
               GestureDetector(
                 onTap: () {
                   ref.read(avatarPopoverOpenProvider.notifier).setOpen(false);
@@ -142,7 +104,7 @@ class AvatarSidebarPopover extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Personnaliser tout',
+                      'Changer d\'animal',
                       style: DsTypography.meta.copyWith(
                         color: colors.primary,
                         fontWeight: FontWeight.w600,
@@ -155,54 +117,6 @@ class AvatarSidebarPopover extends ConsumerWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickObjectButton extends StatelessWidget {
-  const _QuickObjectButton({
-    required this.icon,
-    required this.selected,
-    required this.locked,
-    required this.onTap,
-    this.spritePath,
-  });
-
-  final IconData icon;
-  final String? spritePath;
-  final bool selected;
-  final bool locked;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<DsTokens>()!;
-    final colors = tokens.colors;
-
-    return Opacity(
-      opacity: locked ? 0.4 : 1,
-      child: GestureDetector(
-        onTap: locked ? null : onTap,
-        child: Container(
-          width: 44,
-          height: 44,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: colors.surface,
-            borderRadius: DsRadius.smRadius,
-            border: Border.all(
-              color: selected ? colors.primary : colors.border,
-              width: selected ? 2 : DsBorders.hairline,
-            ),
-          ),
-          child: spritePath != null
-              ? Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: Image.asset(spritePath!, fit: BoxFit.contain),
-                )
-              : Icon(icon, size: 18, color: colors.textPrimary),
         ),
       ),
     );
