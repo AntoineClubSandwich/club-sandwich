@@ -124,6 +124,24 @@ class _ConcertDetailsState extends ConsumerState<_ConcertDetails> {
                 ownApplication?.confirmationStatus ==
                     VolunteerConfirmationStatus.confirmed));
     final isVolunteer = volunteerData?.activeRole == AppUserRole.volunteer;
+    // Whether attendance/credits have been validated for this (completed)
+    // maraude — `get_maraude_attendance` only allows admins and the
+    // confirmed team leader to call it, so most viewers can't use the
+    // aggregate signal; a regular volunteer instead reads their own
+    // application row, which the all-or-nothing validate_maraude_attendance
+    // RPC always sets alongside everyone else's. Viewers with neither
+    // signal (e.g. promoters) keep the previous "assume archived" default
+    // rather than guessing wrong in the other direction.
+    final bool attendanceValidated;
+    if (canManageMaraude && concert.maraudeStatus == MaraudeStatus.completed) {
+      attendanceValidated = ref
+          .watch(maraudeAttendanceProvider(concert.id))
+          .maybeWhen(data: (data) => data.isValidated, orElse: () => false);
+    } else if (ownApplication != null) {
+      attendanceValidated = ownApplication.attendanceValidatedAt != null;
+    } else {
+      attendanceValidated = true;
+    }
     final workspaces = <_MaraudeWorkspace>[
       _MaraudeWorkspace.summary,
       _MaraudeWorkspace.team,
@@ -177,6 +195,7 @@ class _ConcertDetailsState extends ConsumerState<_ConcertDetails> {
                     concert: concert,
                     ownApplication: ownApplication,
                     isVolunteer: isVolunteer,
+                    attendanceValidated: attendanceValidated,
                   ),
                   const SizedBox(height: 16),
                   _NextActionCard(
@@ -184,6 +203,7 @@ class _ConcertDetailsState extends ConsumerState<_ConcertDetails> {
                     ownApplication: ownApplication,
                     isAdmin: canManageMaraude,
                     isVolunteer: isVolunteer,
+                    attendanceValidated: attendanceValidated,
                     onOpen: (workspace) =>
                         setState(() => _selectedWorkspace = workspace),
                     onOpenMission: (role) =>
@@ -385,11 +405,17 @@ class _MaraudeProgress extends StatelessWidget {
     required this.concert,
     required this.ownApplication,
     required this.isVolunteer,
+    required this.attendanceValidated,
   });
 
   final Concert concert;
   final ConcertVolunteerApplication? ownApplication;
   final bool isVolunteer;
+
+  /// Whether attendance/credits have already been validated — distinguishes
+  /// "Bilan" (still pending) from "Archivée" (done) once the maraude is
+  /// completed; see the computation in `_ConcertDetailsState.build`.
+  final bool attendanceValidated;
 
   static const _steps = [
     'Candidature',
@@ -401,9 +427,9 @@ class _MaraudeProgress extends StatelessWidget {
   ];
 
   int get _currentStep {
-    if (concert.maraudeStatus == MaraudeStatus.completed ||
-        concert.maraudeStatus == MaraudeStatus.cancelled) {
-      return 5;
+    if (concert.maraudeStatus == MaraudeStatus.cancelled) return 5;
+    if (concert.maraudeStatus == MaraudeStatus.completed) {
+      return attendanceValidated ? 5 : 4;
     }
     if (concert.maraudeStatus == MaraudeStatus.inProgress) return 3;
     if (!isVolunteer) {
@@ -502,6 +528,7 @@ class _NextActionCard extends StatelessWidget {
     required this.ownApplication,
     required this.isAdmin,
     required this.isVolunteer,
+    required this.attendanceValidated,
     required this.onOpen,
     required this.onOpenMission,
   });
@@ -510,6 +537,7 @@ class _NextActionCard extends StatelessWidget {
   final ConcertVolunteerApplication? ownApplication;
   final bool isAdmin;
   final bool isVolunteer;
+  final bool attendanceValidated;
   final ValueChanged<_MaraudeWorkspace> onOpen;
   final ValueChanged<MaraudeRole> onOpenMission;
 
@@ -624,11 +652,31 @@ class _NextActionCard extends StatelessWidget {
     }
     if (concert.maraudeStatus == MaraudeStatus.completed) {
       if (isAdmin) {
+        if (attendanceValidated) {
+          return (
+            'Maraude archivée',
+            'Présences validées, crédits attribués.',
+            _MaraudeWorkspace.report,
+            'Voir le bilan',
+            null,
+          );
+        }
         return (
           'Valider les présences et attribuer les crédits',
           'Les crédits ne sont créés qu’après votre validation.',
           _MaraudeWorkspace.attendance,
           'Vérifier',
+          null,
+        );
+      }
+      if (attendanceValidated) {
+        return (
+          'Maraude archivée',
+          ownApplication?.attendanceStatus == VolunteerAttendanceStatus.present
+              ? 'Votre présence a été validée, votre crédit a été attribué.'
+              : 'Votre présence a été validée.',
+          _MaraudeWorkspace.report,
+          'Voir le bilan',
           null,
         );
       }

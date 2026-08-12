@@ -1241,6 +1241,69 @@ void main() {
     );
   });
 
+  testWidgets(
+    'affiche l’action de validation tant que les crédits ne sont pas attribués',
+    (tester) async {
+      final repository = _FakeConcertVolunteerRepository(isAdmin: true);
+
+      await _pumpDetail(
+        tester,
+        repository,
+        maraudeStatus: MaraudeStatus.completed,
+        attendance: MaraudeAttendanceData([
+          MaraudeAttendanceMember(
+            applicationId: 'application-id',
+            userId: 'volunteer-id',
+            displayName: 'Camille Martin',
+            teamRole: MaraudeRole.teamLeader,
+            confirmationStatus: VolunteerConfirmationStatus.confirmed,
+            attendanceStatus: VolunteerAttendanceStatus.present,
+            lastModifiedAt: DateTime(2026, 8, 1),
+            canValidate: true,
+          ),
+        ]),
+      );
+
+      expect(
+        find.text('Valider les présences et attribuer les crédits'),
+        findsOneWidget,
+      );
+      expect(find.text('Maraude archivée'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'remplace l’action de validation par « Maraude archivée » une fois les crédits attribués',
+    (tester) async {
+      final repository = _FakeConcertVolunteerRepository(isAdmin: true);
+
+      await _pumpDetail(
+        tester,
+        repository,
+        maraudeStatus: MaraudeStatus.completed,
+        attendance: MaraudeAttendanceData([
+          MaraudeAttendanceMember(
+            applicationId: 'application-id',
+            userId: 'volunteer-id',
+            displayName: 'Camille Martin',
+            teamRole: MaraudeRole.teamLeader,
+            confirmationStatus: VolunteerConfirmationStatus.confirmed,
+            attendanceStatus: VolunteerAttendanceStatus.present,
+            attendanceValidatedAt: DateTime(2026, 8, 1),
+            lastModifiedAt: DateTime(2026, 8, 1),
+            canValidate: false,
+          ),
+        ]),
+      );
+
+      expect(find.text('Maraude archivée'), findsOneWidget);
+      expect(
+        find.text('Valider les présences et attribuer les crédits'),
+        findsNothing,
+      );
+    },
+  );
+
   testWidgets('refuse une équipe d’un bénévole sans chef', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1440, 900);
