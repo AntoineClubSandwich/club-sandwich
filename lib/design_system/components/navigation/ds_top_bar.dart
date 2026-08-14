@@ -1,6 +1,7 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
-import '../../tokens/ds_shadows.dart';
 import '../../tokens/ds_spacing.dart';
 import '../../tokens/ds_tokens.dart';
 import '../../tokens/ds_typography.dart';
@@ -29,30 +30,44 @@ class DsTopBar extends StatelessWidget implements PreferredSizeWidget {
     final tokens = Theme.of(context).extension<DsTokens>()!;
     final colors = tokens.colors;
 
-    return Container(
-      height: height,
-      padding: const EdgeInsets.symmetric(horizontal: DsSpacing.xl),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        boxShadow: DsShadows.ambient(colors.textPrimary),
-      ),
-      child: Row(
-        children: [
-          if (leading != null) ...[
-            leading!,
-            const SizedBox(width: DsSpacing.md),
-          ],
-          Expanded(
-            child: Text(
-              title,
-              style: DsTypography.h3.copyWith(color: colors.textPrimary),
+    // Glass surface: translucent + blurred rather than a solid fill with a
+    // drop shadow. The blur only has a visible effect once a screen scrolls
+    // content behind this bar (`extendBodyBehindAppBar`) — until then it's
+    // an inert-but-harmless no-op and this just reads as a softer, subtly
+    // transparent bar with a hairline border.
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          height: height,
+          padding: const EdgeInsets.symmetric(horizontal: DsSpacing.xl),
+          decoration: BoxDecoration(
+            color: colors.surface.withValues(alpha: 0.8),
+            border: Border(
+              bottom: BorderSide(
+                color: colors.textPrimary.withValues(alpha: 0.05),
+              ),
             ),
           ),
-          for (final action in actions) ...[
-            const SizedBox(width: DsSpacing.md),
-            action,
-          ],
-        ],
+          child: Row(
+            children: [
+              if (leading != null) ...[
+                leading!,
+                const SizedBox(width: DsSpacing.md),
+              ],
+              Expanded(
+                child: Text(
+                  title,
+                  style: DsTypography.h3.copyWith(color: colors.textPrimary),
+                ),
+              ),
+              for (final action in actions) ...[
+                const SizedBox(width: DsSpacing.md),
+                action,
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -123,6 +123,18 @@ abstract final class DsTheme {
         ),
       ),
       dividerTheme: DividerThemeData(color: colors.border, space: 24),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: colors.textPrimary.withValues(alpha: 0.92),
+          borderRadius: DsRadius.smRadius,
+        ),
+        textStyle: DsTypography.micro.copyWith(
+          color: colors.textOnColor,
+          fontWeight: FontWeight.w500,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        waitDuration: const Duration(milliseconds: 400),
+      ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: colors.primary,
         foregroundColor: colors.textOnColor,

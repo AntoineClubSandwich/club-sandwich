@@ -50,6 +50,11 @@ class DsCard extends StatelessWidget {
           duration: DsMotion.standard,
           curve: DsMotion.curve,
           padding: padding,
+          transform: Matrix4.translationValues(
+            0,
+            hovered && !pressed && onTap != null ? -2 : 0,
+            0,
+          ),
           decoration: BoxDecoration(
             color: colors.surface,
             borderRadius: borderRadius,

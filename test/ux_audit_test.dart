@@ -190,7 +190,7 @@ void main() {
 
     expect(find.textContaining('PRÉPRODUCTION'), findsOneWidget);
     expect(
-      find.textContaining('Les données peuvent être réinitialisées.'),
+      find.textContaining('Les données peuvent être réinitialisées'),
       findsOneWidget,
     );
     expect(find.text('Contenu'), findsOneWidget);

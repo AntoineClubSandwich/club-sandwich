@@ -475,7 +475,12 @@ class _DsSidebar extends StatelessWidget {
       decoration: BoxDecoration(
         color: dark ? colors.secondary : colors.canvas,
         border: Border(
-          right: BorderSide(color: colors.border, width: DsBorders.hairline),
+          right: BorderSide(
+            color: dark
+                ? Colors.white.withValues(alpha: 0.08)
+                : colors.border,
+            width: DsBorders.hairline,
+          ),
         ),
       ),
       child: Column(
@@ -577,7 +582,7 @@ class _DsNavItem extends StatelessWidget {
           background = selected
               ? colors.primary.withValues(alpha: 0.15)
               : (state.hovered
-                    ? Colors.white.withValues(alpha: 0.05)
+                    ? Colors.white.withValues(alpha: 0.08)
                     : Colors.transparent);
           foreground = selected ? Colors.white : _sidebarMutedText;
           weight = selected ? FontWeight.w600 : FontWeight.w500;
@@ -595,36 +600,54 @@ class _DsNavItem extends StatelessWidget {
           selected: selected,
           button: true,
           label: label,
-          child: AnimatedContainer(
-            duration: DsMotion.standard,
-            curve: DsMotion.curve,
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              horizontal: DsSpacing.md,
-              vertical: DsSpacing.sm + 2,
-            ),
-            decoration: BoxDecoration(
-              color: background,
-              borderRadius: DsRadius.mdRadius,
-              boxShadow: !dark && selected
-                  ? DsShadows.accent(colors.primary)
-                  : null,
-            ),
-            child: Row(
-              children: [
-                Icon(icon, size: 20, color: foreground),
-                const SizedBox(width: DsSpacing.md),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: DsTypography.body.copyWith(
-                      color: foreground,
-                      fontWeight: weight,
+          child: Stack(
+            children: [
+              AnimatedContainer(
+                duration: DsMotion.standard,
+                curve: DsMotion.curve,
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DsSpacing.md,
+                  vertical: DsSpacing.sm + 2,
+                ),
+                decoration: BoxDecoration(
+                  color: background,
+                  borderRadius: DsRadius.mdRadius,
+                  boxShadow: !dark && selected
+                      ? DsShadows.accent(colors.primary)
+                      : null,
+                ),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 20, color: foreground),
+                    const SizedBox(width: DsSpacing.md),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: DsTypography.body.copyWith(
+                          color: foreground,
+                          fontWeight: weight,
+                        ),
+                      ),
                     ),
+                  ],
+                ),
+              ),
+              Positioned(
+                left: 0,
+                top: 6,
+                bottom: 6,
+                child: AnimatedContainer(
+                  duration: DsMotion.standard,
+                  curve: DsMotion.curve,
+                  width: selected ? 3 : 0,
+                  decoration: BoxDecoration(
+                    color: colors.primary,
+                    borderRadius: DsRadius.pillRadius,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },

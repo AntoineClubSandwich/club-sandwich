@@ -2,6 +2,7 @@ import 'package:club_sandwich/design_system/components/buttons/ds_ghost_button.d
 import 'package:club_sandwich/design_system/components/buttons/ds_primary_button.dart';
 import 'package:club_sandwich/design_system/components/ds_hover_spotlight.dart';
 import 'package:club_sandwich/design_system/components/ds_reveal_on_scroll.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_skeleton.dart';
 import 'package:club_sandwich/design_system/components/indicators/ds_status_chip.dart';
 import 'package:club_sandwich/design_system/components/inputs/ds_dropdown.dart';
 import 'package:club_sandwich/design_system/components/inputs/ds_filter_chip.dart';
@@ -88,8 +89,7 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
             ),
             Expanded(
               child: asyncConcerts.when(
-                loading: () =>
-                    const AppLoadingState(label: 'Chargement des maraudes'),
+                loading: () => const _ConcertsSkeletonGrid(),
                 error: (error, stackTrace) => AppErrorState(
                   message: _errorMessage(error),
                   onRetry: () => ref.invalidate(concertsProvider),
@@ -496,6 +496,80 @@ class _ConcertFilters extends StatelessWidget {
   }
 }
 
+/// Loading placeholder for [_ConcertListSliver] — same grid shape and
+/// card silhouette so nothing jumps around once the real data lands.
+class _ConcertsSkeletonGrid extends StatelessWidget {
+  const _ConcertsSkeletonGrid();
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final columns = width >= 1024
+            ? 3
+            : width >= 768
+            ? 2
+            : 1;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: 20,
+              mainAxisSpacing: 20,
+              mainAxisExtent: 366,
+            ),
+            itemCount: columns * 2,
+            itemBuilder: (context, index) => const _ConcertCardSkeleton(),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ConcertCardSkeleton extends StatelessWidget {
+  const _ConcertCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return DsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const DsSkeleton(width: 180, height: 20),
+          const SizedBox(height: DsSpacing.md),
+          const DsSkeleton(
+            width: 96,
+            height: 22,
+            borderRadius: DsRadius.pillRadius,
+          ),
+          const SizedBox(height: DsSpacing.lg),
+          const DsSkeleton(width: 140, height: 14),
+          const SizedBox(height: DsSpacing.sm),
+          const DsSkeleton(width: 160, height: 14),
+          const SizedBox(height: DsSpacing.sm),
+          const DsSkeleton(width: 120, height: 14),
+          const Spacer(),
+          Divider(height: 1, color: colors.border),
+          const SizedBox(height: DsSpacing.md),
+          Row(
+            children: [
+              const DsSkeleton(width: 70, height: 12),
+              const SizedBox(width: 24),
+              const DsSkeleton(width: 70, height: 12),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ConcertListSliver extends StatelessWidget {
   const _ConcertListSliver({required this.concerts, required this.role});
 
@@ -509,12 +583,16 @@ class _ConcertListSliver extends StatelessWidget {
       sliver: SliverLayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.crossAxisExtent;
-          final columns = width >= 900 ? 2 : 1;
+          final columns = width >= 1024
+              ? 3
+              : width >= 768
+              ? 2
+              : 1;
           return SliverGrid(
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: columns,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
+              crossAxisSpacing: 20,
+              mainAxisSpacing: 20,
               mainAxisExtent: 366,
             ),
             delegate: SliverChildBuilderDelegate(
