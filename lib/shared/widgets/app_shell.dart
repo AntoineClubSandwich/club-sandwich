@@ -1,4 +1,6 @@
 import 'package:club_sandwich/design_system/components/ds_pressable.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_badge.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_semantic_variant.dart';
 import 'package:club_sandwich/design_system/components/navigation/ds_top_bar.dart';
 import 'package:club_sandwich/design_system/icons/ds_icons.dart';
 import 'package:club_sandwich/design_system/tokens/ds_borders.dart';
@@ -192,79 +194,46 @@ class AppShell extends ConsumerWidget {
 
 /// Bordered "CLUB SANDWICH" logo chip shown atop the mobile drawer and the
 /// desktop sidebar (both admin and non-admin variants).
+/// The brand mark shown atop both the mobile drawer and desktop sidebar —
+/// icon + wordmark sitting directly on the sidebar's own background,
+/// no colored block/shadow of its own (that read as a second CTA
+/// competing with the actual nav). [dark] controls text color to stay
+/// readable against the admin sidebar's near-black background.
 class _SidebarLogo extends StatelessWidget {
-  const _SidebarLogo();
+  const _SidebarLogo({this.dark = false});
+
+  final bool dark;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<DsTokens>()!;
     final colors = tokens.colors;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: DsSpacing.sm,
-        vertical: DsSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: colors.primary,
-        borderRadius: DsRadius.smRadius,
-        boxShadow: DsShadows.accent(colors.primary),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: DsRadius.smRadius,
-            ),
-            padding: const EdgeInsets.all(3),
-            child: const ClubSandwichMascot(size: 22, color: MascotColor.orange),
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: DsRadius.smRadius,
+            border: Border.all(color: colors.border, width: DsBorders.hairline),
           ),
-          const SizedBox(width: DsSpacing.sm),
-          Expanded(
-            child: Text(
-              'CLUB SANDWICH',
-              overflow: TextOverflow.ellipsis,
-              style: DsTypography.caption.copyWith(
-                color: colors.textOnColor,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Small "ADMIN" pill shown under the logo in the tinted admin sidebar —
-/// the non-color cue that reinforces the sidebar's purple tint, so the
-/// distinction doesn't rely on color alone.
-class _AdminBadge extends StatelessWidget {
-  const _AdminBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).extension<DsTokens>()!.colors;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: DsSpacing.sm,
-        vertical: 4,
-      ),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: DsRadius.pillRadius,
-        boxShadow: DsShadows.accent(colors.primary),
-      ),
-      child: Text(
-        'ADMIN',
-        style: DsTypography.caption.copyWith(
-          color: colors.primary,
-          fontWeight: FontWeight.w800,
+          padding: const EdgeInsets.all(4),
+          child: const ClubSandwichMascot(size: 24, color: MascotColor.orange),
         ),
-      ),
+        const SizedBox(width: DsSpacing.sm),
+        Expanded(
+          child: Text(
+            'Club Sandwich',
+            overflow: TextOverflow.ellipsis,
+            style: DsTypography.body.copyWith(
+              color: dark ? Colors.white : colors.textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -496,10 +465,13 @@ class _DsSidebar extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _SidebarLogo(),
+                _SidebarLogo(dark: dark),
                 if (dark) ...[
                   const SizedBox(height: DsSpacing.sm),
-                  const _AdminBadge(),
+                  const DsBadge(
+                    label: 'ADMIN',
+                    variant: DsSemanticVariant.primary,
+                  ),
                 ],
               ],
             ),

@@ -90,9 +90,11 @@ class _VenuesScreenState extends ConsumerState<VenuesScreen> {
                     Expanded(
                       child: selectedId == null
                           ? const SizedBox()
-                          : _VenueDetailsPane(
-                              key: ValueKey(selectedId),
-                              venueId: selectedId,
+                          : SingleChildScrollView(
+                              child: _VenueDetailsPane(
+                                key: ValueKey(selectedId),
+                                venueId: selectedId,
+                              ),
                             ),
                     ),
                   ],
@@ -350,21 +352,30 @@ class _VenueDetailsPaneState extends ConsumerState<_VenueDetailsPane> {
         children: [
           ClipRRect(
             borderRadius: DsRadius.xlRadius,
-            child: Container(
-              width: double.infinity,
-              height: 220,
-              color: colors.secondarySelectedBg,
-              child: venue.photoUrl == null
-                  ? Icon(DsIcons.building, size: 40, color: colors.textSecondary)
-                  : Image.network(
-                      venue.photoUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Icon(
+            child: AspectRatio(
+              // A fixed height regardless of the pane's width used to
+              // force very wide panes into an extreme, heavily-cropped
+              // banner shape — a fixed aspect ratio keeps the crop
+              // proportionate at any pane width instead.
+              aspectRatio: 16 / 9,
+              child: Container(
+                color: colors.secondarySelectedBg,
+                child: venue.photoUrl == null
+                    ? Icon(
                         DsIcons.building,
                         size: 40,
                         color: colors.textSecondary,
+                      )
+                    : Image.network(
+                        venue.photoUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Icon(
+                          DsIcons.building,
+                          size: 40,
+                          color: colors.textSecondary,
+                        ),
                       ),
-                    ),
+              ),
             ),
           ),
           const SizedBox(height: DsSpacing.md),
