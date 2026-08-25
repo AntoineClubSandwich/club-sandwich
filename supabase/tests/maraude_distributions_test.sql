@@ -321,9 +321,9 @@ select throws_ok(
       10
     )
   $$,
-  '42501',
-  'new row violates row-level security policy for table "maraude_distributions"',
-  'Un bénévole présent ne peut pas créer de distribution'
+  '23505',
+  'duplicate key value violates unique constraint "maraude_distributions_concert_id_key"',
+  'La saisie collaborative respecte l’unicité de la distribution'
 );
 
 select lives_ok(
@@ -332,7 +332,7 @@ select lives_ok(
     set distributed_meals = 99
     where id = 'b2000000-0000-0000-0000-000000000001'
   $$,
-  'La modification bénévole est filtrée par la RLS'
+  'Un bénévole affecté peut corriger la distribution'
 );
 
 select results_eq(
@@ -341,8 +341,8 @@ select results_eq(
     from public.maraude_distributions
     where id = 'b2000000-0000-0000-0000-000000000001'
   $$,
-  array['40'::text],
-  'Le bénévole n’a pas modifié la distribution'
+  array['99'::text],
+  'La correction collaborative est enregistrée'
 );
 
 select throws_ok(
@@ -420,7 +420,7 @@ select results_eq(
     select count(*)::bigint
     from public.maraude_distributions
     where id = 'b2000000-0000-0000-0000-000000000001'
-      and distributed_meals = 40
+      and distributed_meals = 99
   $$,
   array[1::bigint],
   'La distribution clôturée reste lisible et inchangée'

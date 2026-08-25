@@ -183,6 +183,7 @@ void main() {
     await pumpForRole(AppUserRole.admin);
     expect(creditReads, 0);
     expect(pendingDocumentReads, 1);
+    expect(find.text('Objectif du mois'), findsNothing);
   });
 
   testWidgets('le shell reste lisible sur mobile et desktop', (tester) async {

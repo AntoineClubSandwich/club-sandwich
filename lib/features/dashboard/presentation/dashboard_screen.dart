@@ -494,9 +494,6 @@ class _AdminDashboard extends ConsumerWidget {
           (item) => item.date.year == now.year && item.date.month == now.month,
         )
         .toList();
-    final monthCompleted = monthItems
-        .where((item) => item.maraudeStatus == MaraudeStatus.completed)
-        .length;
     final lastMonthDate = DateTime(now.year, now.month - 1, 1);
     final lastMonthItems = items
         .where(
@@ -567,13 +564,6 @@ class _AdminDashboard extends ConsumerWidget {
           ),
           const SizedBox(height: DsSpacing.xxl),
           _FadeIn(child: _ActivityTimeline(history: history)),
-          const SizedBox(height: DsSpacing.xxl),
-          _FadeIn(
-            child: _MonthlyGoalCard(
-              completed: monthCompleted,
-              total: monthItems.length,
-            ),
-          ),
           const SizedBox(height: DsSpacing.xxl),
           _PremiumMaraudeSection(
             title: 'Prochaines maraudes',
@@ -984,65 +974,6 @@ class _QuickActionsSection extends StatelessWidget {
   }
 }
 
-class _MonthlyGoalCard extends StatelessWidget {
-  const _MonthlyGoalCard({required this.completed, required this.total});
-
-  final int completed;
-  final int total;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<DsTokens>()!;
-    final colors = tokens.colors;
-    final progress = total == 0
-        ? 0.0
-        : (completed / total).clamp(0, 1).toDouble();
-    final monthLabel = _frenchMonth(DateTime.now());
-
-    return DsCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DsSectionHeader(
-            title: 'Objectif du mois',
-            subtitle: total == 0
-                ? 'Aucune maraude prévue en $monthLabel pour le moment.'
-                : '$completed maraude${completed > 1 ? 's' : ''} clôturée'
-                      '${completed > 1 ? 's' : ''} sur $total en $monthLabel.',
-          ),
-          const SizedBox(height: DsSpacing.lg),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: progress),
-              duration: DsMotion.standard,
-              curve: DsMotion.curve,
-              builder: (context, value, _) => Stack(
-                children: [
-                  Container(height: 10, color: colors.border),
-                  FractionallySizedBox(
-                    widthFactor: value,
-                    child: Container(height: 10, color: colors.primary),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: DsSpacing.sm),
-          Text(
-            '${(progress * 100).round()} %',
-            style: DsTypography.caption.copyWith(
-              color: colors.textSecondary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ActivityTimeline extends StatelessWidget {
   const _ActivityTimeline({required this.history});
 
@@ -1397,24 +1328,6 @@ class _PremiumMaraudeCard extends StatelessWidget {
       ),
     );
   }
-}
-
-String _frenchMonth(DateTime date) {
-  const months = [
-    'janvier',
-    'février',
-    'mars',
-    'avril',
-    'mai',
-    'juin',
-    'juillet',
-    'août',
-    'septembre',
-    'octobre',
-    'novembre',
-    'décembre',
-  ];
-  return months[date.month - 1];
 }
 
 String _hm(DateTime value) {

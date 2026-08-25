@@ -709,6 +709,18 @@ List<_AppDestination> _destinationsFor(AppUserRole role) {
         path: '/venues',
       ),
       _AppDestination(
+        label: 'Consommables',
+        icon: Icons.shopping_basket_outlined,
+        selectedIcon: Icons.shopping_basket,
+        path: '/consumables',
+      ),
+      _AppDestination(
+        label: 'Parc matériel',
+        icon: Icons.inventory_2_outlined,
+        selectedIcon: Icons.inventory_2,
+        path: '/equipment',
+      ),
+      _AppDestination(
         label: 'Bénévoles',
         icon: Icons.groups_outlined,
         selectedIcon: Icons.groups,

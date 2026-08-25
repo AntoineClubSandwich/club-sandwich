@@ -16,6 +16,7 @@ import 'package:club_sandwich/features/concerts/presentation/maraude_report_prov
 import 'package:club_sandwich/features/concerts/presentation/maraude_operational_report_card.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_role_mission_sheet.dart';
 import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dart';
+import 'package:club_sandwich/features/operations/presentation/maraude_resources_card.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_repository.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
@@ -276,6 +277,23 @@ class _ConcertDetailsState extends ConsumerState<_ConcertDetails> {
                             concert: concert,
                             canManage: canManageMaraude,
                             canComplete: canCompleteMaraude,
+                            canOperate: canManageMaraude || isSelectedVolunteer,
+                          ),
+                        ),
+                      if (selectedWorkspace == _MaraudeWorkspace.operations &&
+                          (canManageMaraude || isSelectedVolunteer))
+                        SizedBox(
+                          width: sectionWidth,
+                          child: MaraudeResourcesCard(
+                            concertId: concert.id,
+                            canManage: canManageMaraude,
+                            canEditPlan:
+                                concert.maraudeStatus !=
+                                    MaraudeStatus.inProgress &&
+                                concert.maraudeStatus !=
+                                    MaraudeStatus.completed &&
+                                concert.maraudeStatus !=
+                                    MaraudeStatus.cancelled,
                           ),
                         ),
                       if (selectedWorkspace == _MaraudeWorkspace.attendance &&
@@ -782,11 +800,13 @@ class _MaraudeSection extends ConsumerStatefulWidget {
     required this.concert,
     required this.canManage,
     required this.canComplete,
+    required this.canOperate,
   });
 
   final Concert concert;
   final bool canManage;
   final bool canComplete;
+  final bool canOperate;
 
   @override
   ConsumerState<_MaraudeSection> createState() => _MaraudeSectionState();
@@ -879,9 +899,7 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
             const SizedBox(height: 16),
             FilledButton.icon(
               key: const ValueKey('start-maraude-team-leader'),
-              onPressed: _isSubmitting
-                  ? null
-                  : () => _setStatus(MaraudeStatus.inProgress),
+              onPressed: _isSubmitting ? null : _startGuided,
               icon: const Icon(Icons.play_arrow),
               label: Text(
                 widget.canManage
@@ -890,18 +908,15 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
               ),
             ),
           ],
-          if ((widget.canManage || widget.canComplete) &&
+          if (widget.canOperate &&
               concert.maraudeStatus == MaraudeStatus.inProgress) ...[
             const SizedBox(height: 16),
             FilledButton.icon(
-              key: const ValueKey('complete-maraude-team-leader'),
-              onPressed: _isSubmitting ? null : _complete,
-              icon: const Icon(Icons.check_circle_outline),
-              label: Text(
-                widget.canManage
-                    ? 'Clôturer à la place du chef'
-                    : 'Terminer la maraude',
-              ),
+              key: const ValueKey('open-maraude-operation'),
+              onPressed: () =>
+                  context.go('/maraudes/${widget.concert.id}/operation'),
+              icon: const Icon(Icons.route_outlined),
+              label: const Text('Ouvrir le mode terrain'),
             ),
           ],
         ],
@@ -909,31 +924,11 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
     );
   }
 
-  Future<void> _complete() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Terminer la maraude ?'),
-        content: const Text(
-          'La maraude sera clôturée. Les présences devront ensuite être '
-          'validées par un administrateur avant l’attribution des crédits. '
-          'Si aucun compte rendu n’est enregistré, les quantités seront '
-          'marquées comme non renseignées.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Terminer'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    await _setStatus(MaraudeStatus.completed);
+  Future<void> _startGuided() async {
+    final changed = await _setStatus(MaraudeStatus.inProgress);
+    if (changed && mounted) {
+      context.go('/maraudes/${widget.concert.id}/operation');
+    }
   }
 
   Future<void> _correctTiming() async {
@@ -958,8 +953,8 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
     );
   }
 
-  Future<void> _setStatus(MaraudeStatus status) async {
-    await _changeStatus(
+  Future<bool> _setStatus(MaraudeStatus status) async {
+    return _changeStatus(
       action: () => ref
           .read(concertRepositoryProvider)
           .setMaraudeStatus(widget.concert.id, status),
@@ -968,7 +963,7 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
     );
   }
 
-  Future<void> _changeStatus({
+  Future<bool> _changeStatus({
     required Future<void> Function() action,
     required String successMessage,
     required String errorMessage,
@@ -978,15 +973,17 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
       await action();
       ref.invalidate(concertDetailsProvider(widget.concert.id));
       ref.invalidate(concertsProvider);
-      if (!mounted) return;
+      if (!mounted) return true;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(successMessage)));
+      return true;
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(describeError(error, errorMessage))),
       );
+      return false;
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

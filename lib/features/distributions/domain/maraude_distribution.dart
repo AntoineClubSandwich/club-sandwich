@@ -11,6 +11,10 @@ class MaraudeDistribution {
     this.distributionStartedAt,
     this.distributionCompletedAt,
     this.incidentComment,
+    this.collectedBoxes,
+    this.distributedBoxes,
+    this.remainingBoxes,
+    this.lastModifiedBy,
   });
 
   factory MaraudeDistribution.fromJson(Map<String, dynamic> json) {
@@ -27,6 +31,10 @@ class MaraudeDistribution {
         json['distribution_completed_at'],
       ),
       incidentComment: json['incident_comment'] as String?,
+      collectedBoxes: (json['collected_boxes'] as num?)?.toInt(),
+      distributedBoxes: (json['distributed_boxes'] as num?)?.toInt(),
+      remainingBoxes: (json['remaining_boxes'] as num?)?.toInt(),
+      lastModifiedBy: json['last_modified_by'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -41,6 +49,10 @@ class MaraudeDistribution {
   final DateTime? distributionStartedAt;
   final DateTime? distributionCompletedAt;
   final String? incidentComment;
+  final int? collectedBoxes;
+  final int? distributedBoxes;
+  final int? remainingBoxes;
+  final String? lastModifiedBy;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -54,6 +66,10 @@ class MaraudeDistribution {
     'distribution_started_at': distributionStartedAt?.toIso8601String(),
     'distribution_completed_at': distributionCompletedAt?.toIso8601String(),
     'incident_comment': incidentComment,
+    'collected_boxes': collectedBoxes,
+    'distributed_boxes': distributedBoxes,
+    'remaining_boxes': remainingBoxes,
+    'last_modified_by': lastModifiedBy,
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
   };
@@ -71,6 +87,10 @@ class MaraudeDistribution {
             distributionStartedAt == other.distributionStartedAt &&
             distributionCompletedAt == other.distributionCompletedAt &&
             incidentComment == other.incidentComment &&
+            collectedBoxes == other.collectedBoxes &&
+            distributedBoxes == other.distributedBoxes &&
+            remainingBoxes == other.remainingBoxes &&
+            lastModifiedBy == other.lastModifiedBy &&
             createdAt == other.createdAt &&
             updatedAt == other.updatedAt;
   }
@@ -86,6 +106,10 @@ class MaraudeDistribution {
     distributionStartedAt,
     distributionCompletedAt,
     incidentComment,
+    collectedBoxes,
+    distributedBoxes,
+    remainingBoxes,
+    lastModifiedBy,
     createdAt,
     updatedAt,
   );

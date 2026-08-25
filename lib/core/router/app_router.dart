@@ -10,8 +10,11 @@ import 'package:club_sandwich/features/auth/presentation/reset_password_screen.d
 import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
 import 'package:club_sandwich/features/dashboard/presentation/dashboard_screen.dart';
+import 'package:club_sandwich/features/consumables/presentation/consumables_screen.dart';
+import 'package:club_sandwich/features/equipment/presentation/equipment_screen.dart';
 import 'package:club_sandwich/features/invitations/presentation/invitations_screen.dart';
 import 'package:club_sandwich/features/organizations/presentation/organizations_screen.dart';
+import 'package:club_sandwich/features/operations/presentation/maraude_operation_screen.dart';
 import 'package:club_sandwich/features/profiles/presentation/profile_screen.dart';
 import 'package:club_sandwich/features/venues/presentation/venues_screen.dart';
 import 'package:club_sandwich/features/volunteers/presentation/volunteers_screen.dart';
@@ -30,6 +33,8 @@ abstract final class AppRoutes {
   static const invitations = '/invitations';
   static const organizations = '/organizations';
   static const venues = '/venues';
+  static const consumables = '/consumables';
+  static const equipment = '/equipment';
   static const volunteers = '/volunteers';
   static const administration = '/administration';
   static const profile = '/profile';
@@ -144,6 +149,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               }
               return dsFadeScalePage(key: state.pageKey, child: child);
             },
+            routes: [
+              GoRoute(
+                path: 'operation',
+                pageBuilder: (context, state) => dsFadeScalePage(
+                  key: state.pageKey,
+                  child: MaraudeOperationScreen(
+                    concertId: state.pathParameters['concertId']!,
+                  ),
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: AppRoutes.invitations,
@@ -156,6 +172,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutes.venues,
             builder: (context, state) => const VenuesScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.consumables,
+            builder: (context, state) => const ConsumablesScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.equipment,
+            builder: (context, state) => const EquipmentScreen(),
           ),
           GoRoute(
             path: AppRoutes.volunteers,
@@ -188,6 +212,8 @@ bool _isAllowed(AppUserRole role, String location) {
       AppRoutes.invitations,
       AppRoutes.organizations,
       AppRoutes.venues,
+      AppRoutes.consumables,
+      AppRoutes.equipment,
       AppRoutes.volunteers,
       AppRoutes.administration,
       AppRoutes.styleGuide,

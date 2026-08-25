@@ -391,7 +391,7 @@ select results_eq(
   'Un bénévole sélectionné peut lire la collecte de sa maraude'
 );
 
-select throws_ok(
+select lives_ok(
   $$
     insert into public.maraude_collections (
       concert_id,
@@ -406,9 +406,7 @@ select throws_ok(
       'box'
     )
   $$,
-  '42501',
-  'new row violates row-level security policy for table "maraude_collections"',
-  'Un bénévole ne peut pas créer de lot'
+  'Un bénévole affecté peut ajouter un lot pendant la maraude'
 );
 
 select lives_ok(
@@ -417,7 +415,7 @@ select lives_ok(
     set quantity = 99
     where id = 'a2000000-0000-0000-0000-000000000001'
   $$,
-  'La modification bénévole est filtrée par la RLS'
+  'Un bénévole affecté peut corriger un lot'
 );
 
 select results_eq(
@@ -426,8 +424,8 @@ select results_eq(
     from public.maraude_collections
     where id = 'a2000000-0000-0000-0000-000000000001'
   $$,
-  array['30'::text],
-  'Le bénévole n’a pas modifié le lot'
+  array['99'::text],
+  'La correction collaborative est enregistrée'
 );
 
 select lives_ok(
@@ -435,7 +433,7 @@ select lives_ok(
     delete from public.maraude_collections
     where id = 'a2000000-0000-0000-0000-000000000001'
   $$,
-  'Une suppression bénévole filtrée par RLS ne modifie aucune ligne'
+  'Un bénévole affecté peut retirer une ligne erronée'
 );
 
 select results_eq(
@@ -444,7 +442,7 @@ select results_eq(
     from public.maraude_collections
   $$,
   array[1::bigint],
-  'Le lot reste présent après une suppression bénévole'
+  'Le second lot reste présent après la suppression collaborative'
 );
 
 reset role;
