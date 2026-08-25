@@ -103,7 +103,8 @@ begin
     'de500002-0000-4000-8000-000000000002'::uuid,
     'de500003-0000-4000-8000-000000000003'::uuid,
     'de500004-0000-4000-8000-000000000004'::uuid,
-    'de500005-0000-4000-8000-000000000005'::uuid
+    'de500005-0000-4000-8000-000000000005'::uuid,
+    'de500006-0000-4000-8000-000000000006'::uuid
   );
   delete from public.consumables
   where id in (
@@ -111,7 +112,8 @@ begin
     'de500002-0000-4000-8000-000000000002'::uuid,
     'de500003-0000-4000-8000-000000000003'::uuid,
     'de500004-0000-4000-8000-000000000004'::uuid,
-    'de500005-0000-4000-8000-000000000005'::uuid
+    'de500005-0000-4000-8000-000000000005'::uuid,
+    'de500006-0000-4000-8000-000000000006'::uuid
   );
 
   delete from public.equipment_events
@@ -202,6 +204,11 @@ begin
       'de500005-0000-4000-8000-000000000005',
       '[DÉMO] Bouteilles d’eau', 'Équipe', 48,
       'bottle', 24, '[DÉMO] Cave'
+    ),
+    (
+      'de500006-0000-4000-8000-000000000006',
+      '[DÉMO] Boîtes alimentaires 500 ml', 'Conditionnement', 180,
+      'box', 60, '[DÉMO] Cave'
     );
 
   insert into public.consumable_movements (
@@ -230,6 +237,11 @@ begin
     (
       'de510005-0000-4000-8000-000000000005',
       'de500005-0000-4000-8000-000000000005', 0, 48, 'restock',
+      '[DÉMO] Stock initial', admin_id
+    ),
+    (
+      'de510006-0000-4000-8000-000000000006',
+      'de500006-0000-4000-8000-000000000006', 0, 180, 'restock',
       '[DÉMO] Stock initial', admin_id
     );
 
@@ -279,37 +291,42 @@ begin
   ) values
     (
       'de100001-0000-4000-8000-000000000001', club_id,
-      '[DÉMO] Aurore', current_date + 5, time '20:30', 'planned',
-      '[DÉMO] Maraude ouverte sans candidature : test du parcours bénévole.',
+      '[ÉTAPE 1 — OUVERTE] Visibilité sans candidature',
+      current_date + 5, time '20:30', 'planned',
+      'À tester : visibilité bénévole, candidature et invitation ouverte.',
       promoter_user_id, olympia_id, time '23:00', promoter_id,
       'Théo Tourneur', '+33610000001', 'open', null, null, null
     ),
     (
       'de100002-0000-4000-8000-000000000002', club_id,
-      '[DÉMO] Lumen', current_date + 12, time '21:00', 'planned',
-      '[DÉMO] Plusieurs candidatures avec des décisions différentes.',
+      '[ÉTAPE 2 — CANDIDATURES] Sélection et refus',
+      current_date + 12, time '21:00', 'planned',
+      'À tester : candidatures en attente, désistée et non sélectionnée.',
       admin_id, bataclan_id, time '22:45', promoter_id,
       'Camille Production', '+33610000002', 'open', null, null, null
     ),
     (
       'de100003-0000-4000-8000-000000000003', club_id,
-      '[DÉMO] Horizon', current_date + 2, time '20:00', 'confirmed',
-      '[DÉMO] Équipe constituée et confirmations reçues.',
+      '[ÉTAPE 3 — ÉQUIPE PRÊTE] Rôles et confirmations',
+      current_date + 2, time '20:00', 'confirmed',
+      'À tester : équipe complète, rôles et confirmations reçues.',
       promoter_user_id, cigale_id, time '23:15', promoter_id,
       'Théo Tourneur', '+33610000001', 'team_ready', null, null, null
     ),
     (
       'de100004-0000-4000-8000-000000000004', club_id,
-      '[DÉMO] Nocturne', current_date, time '20:00', 'confirmed',
-      '[DÉMO] Maraude en cours à l’étape de distribution.',
+      '[ÉTAPE 4 — DISTRIBUTION] Plusieurs types de boîtes',
+      current_date, time '20:00', 'confirmed',
+      'À tester : quantités écoulées et restantes par référence de boîte.',
       admin_id, point_ephemere_id, time '22:30', promoter_id,
       'Théo Tourneur', '+33610000001', 'in_progress',
       clock_timestamp() - interval '2 hours', null, null
     ),
     (
       'de100005-0000-4000-8000-000000000005', club_id,
-      '[DÉMO] Élodie', current_date - 7, time '20:30', 'completed',
-      '[DÉMO] Bilan complet avec collecte, distribution et rencontres.',
+      '[ÉTAPE 5 — BILAN] Parcours opérationnel complet',
+      current_date - 7, time '20:30', 'completed',
+      'À tester : bilan complet avec collecte, distribution et rencontres.',
       promoter_user_id, trianon_id, time '22:30', promoter_id,
       'Théo Tourneur', '+33610000001', 'in_progress',
       ((current_date - 7) + time '20:15') at time zone 'Europe/Paris',
@@ -317,8 +334,9 @@ begin
     ),
     (
       'de100006-0000-4000-8000-000000000006', club_id,
-      '[DÉMO] Maël & Anaïs', current_date - 21, time '21:00', 'completed',
-      '[DÉMO] Bilan avec une absence dans l’équipe.',
+      '[CAS — ABSENCE] Présence et bilan',
+      current_date - 21, time '21:00', 'completed',
+      'À tester : bilan avec une absence dans l’équipe.',
       admin_id, belle_villoise_id, time '23:00', promoter_id,
       'Camille Production', '+33610000002', 'in_progress',
       ((current_date - 21) + time '20:40') at time zone 'Europe/Paris',
@@ -326,8 +344,9 @@ begin
     ),
     (
       'de100007-0000-4000-8000-000000000007', club_id,
-      '[DÉMO] Point Éphémère', current_date - 45, time '20:00', 'completed',
-      '[DÉMO] Historique plus ancien pour les statistiques.',
+      '[CAS — HISTORIQUE] Statistiques et crédits',
+      current_date - 45, time '20:00', 'completed',
+      'À tester : historique bénévole, statistiques et crédit attribué.',
       promoter_user_id, accor_arena_id, time '22:15', promoter_id,
       'Théo Tourneur', '+33610000001', 'in_progress',
       ((current_date - 45) + time '19:50') at time zone 'Europe/Paris',
@@ -335,8 +354,9 @@ begin
     ),
     (
       'de100008-0000-4000-8000-000000000008', club_id,
-      '[DÉMO] Concert annulé', current_date + 20, time '20:00', 'cancelled',
-      '[DÉMO] Exemple d’annulation.',
+      '[CAS — ANNULÉE] Lecture seule',
+      current_date + 20, time '20:00', 'cancelled',
+      'À tester : annulation, motif et actions indisponibles.',
       admin_id, olympia_id, null, promoter_id,
       'Camille Production', '+33610000002', 'cancelled', null, null,
       'Annulation de la tournée'
@@ -456,6 +476,12 @@ begin
       'de800002-0000-4000-8000-000000000002',
       'de100004-0000-4000-8000-000000000004',
       'de500002-0000-4000-8000-000000000002', 8, 8,
+      volunteer_1, clock_timestamp() - interval '110 minutes'
+    ),
+    (
+      'de800003-0000-4000-8000-000000000003',
+      'de100004-0000-4000-8000-000000000004',
+      'de500006-0000-4000-8000-000000000006', 16, 15,
       volunteer_1, clock_timestamp() - interval '110 minutes'
     );
 
@@ -698,16 +724,16 @@ begin
     (
       'de400001-0000-4000-8000-000000000001', promoter_id,
       'de100001-0000-4000-8000-000000000001',
-      '[DÉMO] Places partenaires — Aurore',
-      'Invitation de démonstration ouverte aux bénévoles éligibles.', 6,
+      '[INVITATION OUVERTE] Test candidature et crédit',
+      'À tester : visibilité bénévole, candidature et consommation du crédit.', 6,
       clock_timestamp() + interval '3 days', 'open', promoter_user_id,
       olympia_id, current_date + 5
     ),
     (
       'de400002-0000-4000-8000-000000000002', promoter_id,
       'de100002-0000-4000-8000-000000000002',
-      '[DÉMO] Invitation en préparation — Lumen',
-      'Campagne brouillon visible côté tourneur et administration.', 4,
+      '[INVITATION BROUILLON] Test gestion tourneur',
+      'À tester : visibilité et modification côté tourneur et administration.', 4,
       clock_timestamp() + interval '8 days', 'draft', promoter_user_id,
       bataclan_id, current_date + 12
     );
@@ -721,24 +747,28 @@ begin
   alter table public.concert_volunteers
     enable trigger concert_volunteers_email_notifications;
 
-  raise notice 'Jeu de données [DÉMO] créé avec succès.';
+  raise notice 'Jeu de données de recette créé avec succès.';
 end;
 $seed$;
 
 commit;
 
 select
-  (select count(*) from public.concerts where artist like '[DÉMO]%')
+  (select count(*) from public.concerts
+    where artist like '[ÉTAPE %' or artist like '[CAS %')
     as maraudes,
   (select count(*) from public.concert_volunteers application
     join public.concerts concert on concert.id = application.concert_id
-    where concert.artist like '[DÉMO]%') as candidatures,
+    where concert.artist like '[ÉTAPE %' or concert.artist like '[CAS %')
+    as candidatures,
   (select count(*) from public.encounters encounter
     join public.concerts concert on concert.id = encounter.maraude_id
-    where concert.artist like '[DÉMO]%') as rencontres,
+    where concert.artist like '[ÉTAPE %' or concert.artist like '[CAS %')
+    as rencontres,
   (select count(*) from public.consumables where name like '[DÉMO]%')
     as consommables,
   (select count(*) from public.equipment_assets where name like '[DÉMO]%')
     as materiels,
-  (select count(*) from public.invitation_campaigns where title like '[DÉMO]%')
+  (select count(*) from public.invitation_campaigns
+    where title like '[INVITATION %')
     as invitations;
