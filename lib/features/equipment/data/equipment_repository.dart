@@ -91,8 +91,13 @@ class EquipmentRepository {
         .eq('id', id);
   }
 
-  Future<void> createLocation(String name) async {
-    await _client.from('equipment_locations').insert({'name': name.trim()});
+  Future<EquipmentLocation> createLocation(String name) async {
+    final row = await _client
+        .from('equipment_locations')
+        .insert({'name': name.trim()})
+        .select()
+        .single();
+    return EquipmentLocation.fromJson(row);
   }
 }
 

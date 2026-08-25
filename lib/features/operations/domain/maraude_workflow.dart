@@ -198,6 +198,7 @@ class MaraudeOperationBundle {
     required this.equipment,
     required this.collections,
     required this.history,
+    this.encounterCount = 0,
     this.operation,
     this.distribution,
   });
@@ -223,6 +224,7 @@ class MaraudeOperationBundle {
             : MaraudeDistribution.fromJson(
                 Map<String, dynamic>.from(json['distribution'] as Map),
               ),
+        encounterCount: (json['encounter_count'] as num?)?.toInt() ?? 0,
         history: _maps(
           json['history'],
         ).map(MaraudeStepEvent.fromJson).toList(growable: false),
@@ -233,6 +235,7 @@ class MaraudeOperationBundle {
   final List<MaraudeEquipmentAllocation> equipment;
   final List<MaraudeCollection> collections;
   final MaraudeDistribution? distribution;
+  final int encounterCount;
   final List<MaraudeStepEvent> history;
 
   int get totalCollectedBoxes => collections

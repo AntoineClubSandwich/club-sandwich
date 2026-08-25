@@ -10,6 +10,7 @@ import 'package:club_sandwich/features/auth/presentation/reset_password_screen.d
 import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
 import 'package:club_sandwich/features/dashboard/presentation/dashboard_screen.dart';
+import 'package:club_sandwich/features/encounters/presentation/encounter_map_screen.dart';
 import 'package:club_sandwich/features/invitations/presentation/invitations_screen.dart';
 import 'package:club_sandwich/features/organizations/presentation/organizations_screen.dart';
 import 'package:club_sandwich/features/operations/presentation/maraude_operation_screen.dart';
@@ -37,6 +38,7 @@ abstract final class AppRoutes {
   static const equipment = '/equipment';
   static const volunteers = '/volunteers';
   static const administration = '/administration';
+  static const encounterMap = '/encounters-map';
   static const profile = '/profile';
   static const account = '/account';
 
@@ -201,6 +203,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const AdministrationScreen(),
           ),
           GoRoute(
+            path: AppRoutes.encounterMap,
+            builder: (context, state) => const EncounterMapScreen(),
+          ),
+          GoRoute(
             path: AppRoutes.profile,
             builder: (context, state) => const ProfileScreen(),
           ),
@@ -228,6 +234,7 @@ bool _isAllowed(AppUserRole role, String location) {
       AppRoutes.equipment,
       AppRoutes.volunteers,
       AppRoutes.administration,
+      AppRoutes.encounterMap,
       AppRoutes.styleGuide,
     },
     AppUserRole.promoter => {

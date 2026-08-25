@@ -7,6 +7,9 @@ import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
 import 'package:club_sandwich/features/consumables/data/consumable_providers.dart';
 import 'package:club_sandwich/features/consumables/domain/consumable.dart';
+import 'package:club_sandwich/features/equipment/data/equipment_providers.dart';
+import 'package:club_sandwich/features/equipment/domain/equipment_asset.dart';
+import 'package:club_sandwich/features/stock/presentation/stock_location_dialog.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
 import 'package:flutter/material.dart';
@@ -298,9 +301,7 @@ class _ConsumableEditorState extends ConsumerState<_ConsumableEditor> {
   late final _threshold = TextEditingController(
     text: widget.item == null ? '0' : _number(widget.item!.alertThreshold),
   );
-  late final _location = TextEditingController(
-    text: widget.item?.storageLocation,
-  );
+  late String? _locationName = widget.item?.storageLocation;
   late var _unit = widget.item?.unit ?? InventoryUnit.unit;
   var _saving = false;
 
@@ -310,7 +311,6 @@ class _ConsumableEditorState extends ConsumerState<_ConsumableEditor> {
     _category.dispose();
     _quantity.dispose();
     _threshold.dispose();
-    _location.dispose();
     super.dispose();
   }
 
@@ -326,7 +326,7 @@ class _ConsumableEditorState extends ConsumerState<_ConsumableEditor> {
           unit: _unit,
           initialQuantity: _parse(_quantity.text)!,
           alertThreshold: _parse(_threshold.text)!,
-          storageLocation: _location.text,
+          storageLocation: _locationName,
         );
       } else {
         await repository.updateMetadata(
@@ -335,7 +335,7 @@ class _ConsumableEditorState extends ConsumerState<_ConsumableEditor> {
           category: _category.text,
           unit: _unit,
           alertThreshold: _parse(_threshold.text)!,
-          storageLocation: _location.text,
+          storageLocation: _locationName,
         );
       }
       if (mounted) Navigator.pop(context, true);
@@ -351,83 +351,143 @@ class _ConsumableEditorState extends ConsumerState<_ConsumableEditor> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(
-      widget.item == null ? 'Nouveau consommable' : 'Modifier le consommable',
-    ),
-    content: SizedBox(
-      width: 520,
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _name,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: 'Nom'),
-                validator: _required,
-              ),
-              const SizedBox(height: DsSpacing.md),
-              TextFormField(
-                controller: _category,
-                decoration: const InputDecoration(labelText: 'Catégorie'),
-                validator: _required,
-              ),
-              const SizedBox(height: DsSpacing.md),
-              DropdownButtonFormField<InventoryUnit>(
-                initialValue: _unit,
-                decoration: const InputDecoration(labelText: 'Unité'),
-                items: [
-                  for (final unit in InventoryUnit.values)
-                    DropdownMenuItem(value: unit, child: Text(unit.label)),
-                ],
-                onChanged: (value) => setState(() => _unit = value ?? _unit),
-              ),
-              const SizedBox(height: DsSpacing.md),
-              if (widget.item == null) ...[
+  Widget build(BuildContext context) {
+    final locationsState = ref.watch(equipmentLocationsProvider);
+    final locations = locationsState.value ?? const <EquipmentLocation>[];
+    final selectedLocation = _locationName?.trim();
+    final selectableLocations = [
+      if (selectedLocation != null && selectedLocation.isNotEmpty)
+        selectedLocation,
+      for (final location in locations)
+        if (selectedLocation == null ||
+            location.name.toLowerCase() != selectedLocation.toLowerCase())
+          location.name,
+    ];
+    return AlertDialog(
+      title: Text(
+        widget.item == null ? 'Nouveau consommable' : 'Modifier le consommable',
+      ),
+      content: SizedBox(
+        width: 520,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 TextFormField(
-                  controller: _quantity,
+                  controller: _name,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: 'Nom'),
+                  validator: _required,
+                ),
+                const SizedBox(height: DsSpacing.md),
+                TextFormField(
+                  controller: _category,
+                  decoration: const InputDecoration(labelText: 'Catégorie'),
+                  validator: _required,
+                ),
+                const SizedBox(height: DsSpacing.md),
+                DropdownButtonFormField<InventoryUnit>(
+                  initialValue: _unit,
+                  decoration: const InputDecoration(labelText: 'Unité'),
+                  items: [
+                    for (final unit in InventoryUnit.values)
+                      DropdownMenuItem(value: unit, child: Text(unit.label)),
+                  ],
+                  onChanged: (value) => setState(() => _unit = value ?? _unit),
+                ),
+                const SizedBox(height: DsSpacing.md),
+                if (widget.item == null) ...[
+                  TextFormField(
+                    controller: _quantity,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Quantité initiale',
+                    ),
+                    validator: _nonNegative,
+                  ),
+                  const SizedBox(height: DsSpacing.md),
+                ],
+                TextFormField(
+                  controller: _threshold,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
                   decoration: const InputDecoration(
-                    labelText: 'Quantité initiale',
+                    labelText: 'Seuil d’alerte',
                   ),
                   validator: _nonNegative,
                 ),
                 const SizedBox(height: DsSpacing.md),
-              ],
-              TextFormField(
-                controller: _threshold,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                DropdownButtonFormField<String?>(
+                  key: ValueKey(selectedLocation),
+                  initialValue: selectedLocation?.isEmpty ?? true
+                      ? null
+                      : selectedLocation,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Emplacement',
+                    suffixIcon: locationsState.isLoading
+                        ? const Padding(
+                            padding: EdgeInsets.all(14),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : null,
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('Non renseigné'),
+                    ),
+                    for (final location in selectableLocations)
+                      DropdownMenuItem(value: location, child: Text(location)),
+                  ],
+                  onChanged: locationsState.hasError
+                      ? null
+                      : (value) => setState(() => _locationName = value),
                 ),
-                decoration: const InputDecoration(labelText: 'Seuil d’alerte'),
-                validator: _nonNegative,
-              ),
-              const SizedBox(height: DsSpacing.md),
-              TextFormField(
-                controller: _location,
-                decoration: const InputDecoration(labelText: 'Emplacement'),
-              ),
-            ],
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _saving ? null : _createLocation,
+                    icon: const Icon(Icons.add_location_alt_outlined),
+                    label: const Text('Créer un emplacement'),
+                  ),
+                ),
+                if (locationsState.hasError)
+                  Text(
+                    'La liste des emplacements est indisponible.',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: _saving ? null : () => Navigator.pop(context),
-        child: const Text('Annuler'),
-      ),
-      FilledButton(
-        onPressed: _saving ? null : _save,
-        child: Text(_saving ? 'Enregistrement…' : 'Enregistrer'),
-      ),
-    ],
-  );
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: const Text('Annuler'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: Text(_saving ? 'Enregistrement…' : 'Enregistrer'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _createLocation() async {
+    final location = await showCreateStockLocationDialog(context, ref);
+    if (location != null && mounted) {
+      setState(() => _locationName = location.name);
+    }
+  }
 }
 
 class _StockMovementDialog extends ConsumerStatefulWidget {

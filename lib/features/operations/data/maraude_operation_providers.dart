@@ -35,6 +35,17 @@ final maraudeOperationBundleProvider = FutureProvider.autoDispose
           callback: (_) => ref.invalidateSelf(),
         );
       }
+      channel.onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'encounters',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'maraude_id',
+          value: concertId,
+        ),
+        callback: (_) => ref.invalidateSelf(),
+      );
       channel.subscribe();
       ref.onDispose(() => unawaited(repository.client.removeChannel(channel)));
       return repository.fetchBundle(concertId);

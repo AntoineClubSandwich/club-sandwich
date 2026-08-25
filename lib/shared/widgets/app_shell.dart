@@ -546,6 +546,7 @@ IconData _sidebarIcon(String path) => switch (path) {
   '/stock' => DsIcons.package,
   '/volunteers' => DsIcons.users2,
   '/administration' => DsIcons.settings,
+  '/encounters-map' => DsIcons.mapPin,
   '/profile' || '/account' => DsIcons.user,
   '/dashboard' => DsIcons.home,
   _ => DsIcons.layoutDashboard,
@@ -725,6 +726,12 @@ List<_AppDestination> _destinationsFor(AppUserRole role) {
         icon: Icons.groups_outlined,
         selectedIcon: Icons.groups,
         path: '/volunteers',
+      ),
+      _AppDestination(
+        label: 'Carte des rencontres',
+        icon: Icons.map_outlined,
+        selectedIcon: Icons.map,
+        path: '/encounters-map',
       ),
       _AppDestination(
         label: 'Administration',

@@ -233,6 +233,7 @@ void main() {
     expect(find.text('Consommables'), findsNothing);
     expect(find.text('Parc matériel'), findsNothing);
     expect(find.text('Bénévoles'), findsOneWidget);
+    expect(find.text('Carte des rencontres'), findsOneWidget);
     expect(find.text('Administration'), findsOneWidget);
     expect(find.text('Opérations'), findsNothing);
   });
@@ -248,6 +249,7 @@ void main() {
     expect(find.text('Organisations'), findsNothing);
     expect(find.text('Stock'), findsNothing);
     expect(find.text('Administration'), findsNothing);
+    expect(find.text('Carte des rencontres'), findsNothing);
   });
 
   testWidgets('affiche la navigation personnelle du Bénévole', (tester) async {
@@ -260,6 +262,7 @@ void main() {
     expect(find.text('Mon profil'), findsOneWidget);
     expect(find.text('Stock'), findsNothing);
     expect(find.text('Administration'), findsNothing);
+    expect(find.text('Carte des rencontres'), findsNothing);
   });
 
   testWidgets('valide le mot de passe et le profil à l’activation', (

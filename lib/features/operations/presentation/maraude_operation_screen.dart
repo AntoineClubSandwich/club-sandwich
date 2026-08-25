@@ -8,6 +8,8 @@ import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/collections/domain/maraude_collection.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
+import 'package:club_sandwich/features/encounters/data/encounter_location_service.dart';
+import 'package:club_sandwich/features/encounters/data/encounter_providers.dart';
 import 'package:club_sandwich/features/operations/data/maraude_operation_providers.dart';
 import 'package:club_sandwich/features/operations/data/maraude_operation_repository.dart';
 import 'package:club_sandwich/features/operations/domain/maraude_workflow.dart';
@@ -42,6 +44,7 @@ class _MaraudeOperationScreenState
   final _distributionComment = TextEditingController();
   var _distributionInitialized = false;
   var _saving = false;
+  var _recordingEncounter = false;
 
   @override
   void dispose() {
@@ -225,6 +228,7 @@ class _MaraudeOperationScreenState
       beneficiaries: _beneficiaries,
       comment: _distributionComment,
       saving: _saving,
+      recordingEncounter: _recordingEncounter,
       active: current == viewed,
       onDistributedChanged: () {
         final distributed = int.tryParse(_distributed.text);
@@ -232,6 +236,7 @@ class _MaraudeOperationScreenState
           _remaining.text = '${data.totalCollectedBoxes - distributed}';
         }
       },
+      onRecordEncounter: _recordEncounter,
       onSave: () => _saveDistribution(data, validate: current == viewed),
     ),
     MaraudeOperationalStep.equipmentReturn => _EquipmentReturnStep(
@@ -355,6 +360,56 @@ class _MaraudeOperationScreenState
             );
       }
     }, validate ? 'Distribution validée.' : 'Corrections enregistrées.');
+  }
+
+  Future<void> _recordEncounter() async {
+    if (_recordingEncounter) return;
+    setState(() => _recordingEncounter = true);
+    try {
+      final position = await ref
+          .read(encounterLocationServiceProvider)
+          .currentPosition();
+      await ref
+          .read(encounterRepositoryProvider)
+          .record(
+            maraudeId: widget.concertId,
+            latitude: position.latitude,
+            longitude: position.longitude,
+            accuracy: position.accuracy,
+          );
+      ref.invalidate(maraudeOperationBundleProvider(widget.concertId));
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Rencontre enregistrée ✓')));
+    } on EncounterLocationException catch (error) {
+      if (!mounted) return;
+      final message = switch (error.failure) {
+        EncounterLocationFailure.serviceDisabled =>
+          'La localisation est désactivée. Activez-la puis réessayez.',
+        EncounterLocationFailure.permissionDenied =>
+          'Autorisez la localisation dans votre navigateur puis réessayez.',
+        EncounterLocationFailure.unavailable =>
+          'Impossible d’obtenir une position suffisamment précise. Réessayez.',
+      };
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            describeError(
+              error,
+              'Impossible d’enregistrer la rencontre. Vérifiez votre connexion et réessayez.',
+            ),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _recordingEncounter = false);
+    }
   }
 
   Future<void> _saveReturns(
@@ -637,8 +692,10 @@ class _DistributionStep extends StatelessWidget {
     required this.beneficiaries,
     required this.comment,
     required this.saving,
+    required this.recordingEncounter,
     required this.active,
     required this.onDistributedChanged,
+    required this.onRecordEncounter,
     required this.onSave,
   });
   final MaraudeOperationBundle data;
@@ -647,8 +704,10 @@ class _DistributionStep extends StatelessWidget {
   final TextEditingController beneficiaries;
   final TextEditingController comment;
   final bool saving;
+  final bool recordingEncounter;
   final bool active;
   final VoidCallback onDistributedChanged;
+  final VoidCallback onRecordEncounter;
   final VoidCallback onSave;
 
   @override
@@ -678,6 +737,20 @@ class _DistributionStep extends StatelessWidget {
         decoration: const InputDecoration(
           labelText: 'Commentaire ou incident (optionnel)',
         ),
+      ),
+      const Divider(height: DsSpacing.xl),
+      Text('Rencontres', style: DsTypography.h3),
+      const SizedBox(height: DsSpacing.xs),
+      Text(
+        '${data.encounterCount} ${data.encounterCount == 1 ? 'rencontre enregistrée' : 'rencontres enregistrées'}',
+      ),
+      const SizedBox(height: DsSpacing.md),
+      DsPrimaryButton(
+        label: 'Enregistrer une rencontre',
+        icon: Icons.add_location_alt_outlined,
+        isLoading: recordingEncounter,
+        isFullWidth: true,
+        onPressed: active && !recordingEncounter ? onRecordEncounter : null,
       ),
       const SizedBox(height: DsSpacing.xl),
       DsPrimaryButton(
@@ -796,6 +869,7 @@ class _SummaryStep extends StatelessWidget {
           'Bénéficiaires',
           '${distribution?.estimatedBeneficiaries ?? 0}',
         ),
+        _InfoRow('Rencontres géolocalisées', '${data.encounterCount}'),
         _InfoRow('Incidents matériels', '$incidents'),
         const SizedBox(height: DsSpacing.xl),
         if (canClose)

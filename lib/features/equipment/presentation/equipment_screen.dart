@@ -7,6 +7,7 @@ import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
 import 'package:club_sandwich/features/equipment/data/equipment_providers.dart';
 import 'package:club_sandwich/features/equipment/domain/equipment_asset.dart';
+import 'package:club_sandwich/features/stock/presentation/stock_location_dialog.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
 import 'package:flutter/material.dart';
@@ -169,32 +170,7 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
   }
 
   Future<void> _openLocationEditor() async {
-    final controller = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Nouvel emplacement'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Nom'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Créer'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (name == null || name.isEmpty) return;
-    await ref.read(equipmentRepositoryProvider).createLocation(name);
-    ref.invalidate(equipmentLocationsProvider);
+    await showCreateStockLocationDialog(context, ref);
   }
 
   Future<void> _openHistory(EquipmentAsset asset) => showDialog<void>(

@@ -47,6 +47,9 @@ dependencies:
   file_saver: ^0.4.0
   lucide_icons_flutter: ^3.1.15
   flutter_svg: ^2.3.0
+  flutter_map: ^8.3.1
+  geolocator: ^14.0.2
+  latlong2: ^0.10.1
 
 dev_dependencies:
   flutter_test:

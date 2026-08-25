@@ -146,6 +146,7 @@ void main() {
         'created_at': '2026-08-25T11:00:00Z',
         'updated_at': '2026-08-25T11:00:00Z',
       },
+      'encounter_count': 13,
       'history': [
         {
           'id': 'event-1',
@@ -165,6 +166,7 @@ void main() {
       expect(bundle.consumables.single.actualQuantity, 1);
       expect(bundle.equipment.single.status, EquipmentStatus.inUse);
       expect(bundle.history.single.eventType, 'completed');
+      expect(bundle.encounterCount, 13);
     });
 
     test('calcule les totaux de collecte à partir des lignes', () {
