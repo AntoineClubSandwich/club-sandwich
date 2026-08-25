@@ -10,6 +10,8 @@ import 'package:club_sandwich/features/concerts/domain/maraude_message.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_form.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
+import 'package:club_sandwich/features/operations/data/maraude_operation_providers.dart';
+import 'package:club_sandwich/features/operations/domain/maraude_workflow.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
 import 'package:club_sandwich/features/volunteers/domain/volunteer_profile.dart';
@@ -609,6 +611,7 @@ void main() {
     tester,
   ) async {
     final repository = _FakeLifecycleConcertRepository();
+    var operationBundleReads = 0;
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -623,6 +626,15 @@ void main() {
               applications: [],
             ),
           ),
+          maraudeOperationBundleProvider.overrideWith((ref, concertId) async {
+            operationBundleReads++;
+            return const MaraudeOperationBundle(
+              consumables: [],
+              equipment: [],
+              collections: [],
+              history: [],
+            );
+          }),
         ],
         child: const MaterialApp(
           home: ConcertDetailScreen(concertId: 'concert-id'),
@@ -638,6 +650,19 @@ void main() {
     expect(find.text('Planifiée'), findsWidgets);
     expect(find.text('Planifié'), findsNothing);
 
+    final timingButton = find.byKey(const ValueKey('correct-maraude-timing'));
+    await tester.ensureVisible(timingButton);
+    await tester.tap(timingButton);
+    await tester.pumpAndSettle();
+    expect(find.text('AAAA-MM-JJ HH:MM'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('maraude-start-correction')));
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    Navigator.of(tester.element(find.byType(DatePickerDialog))).pop();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Annuler'));
+    await tester.pumpAndSettle();
+
     final selector = find.byKey(const ValueKey('maraude-status-selector'));
     await tester.ensureVisible(selector);
     await tester.tap(selector);
@@ -647,6 +672,7 @@ void main() {
 
     expect(find.text('En cours'), findsWidgets);
     expect(find.text('27 juillet 2026\n21:12'), findsOneWidget);
+    expect(operationBundleReads, greaterThanOrEqualTo(2));
 
     await tester.ensureVisible(selector);
     await tester.tap(selector);

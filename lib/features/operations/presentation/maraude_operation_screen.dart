@@ -40,6 +40,7 @@ class _MaraudeOperationScreenState
   final Map<String, TextEditingController> _distributionControllers = {};
   final Map<String, EquipmentIncidentType?> _incidents = {};
   final Map<String, TextEditingController> _incidentNotes = {};
+  final ScrollController _stepScrollController = ScrollController();
   final _beneficiaries = TextEditingController();
   final _distributionComment = TextEditingController();
   var _distributionInitialized = false;
@@ -58,6 +59,7 @@ class _MaraudeOperationScreenState
     ]) {
       controller.dispose();
     }
+    _stepScrollController.dispose();
     super.dispose();
   }
 
@@ -131,6 +133,7 @@ class _MaraudeOperationScreenState
                 ),
                 Expanded(
                   child: SingleChildScrollView(
+                    controller: _stepScrollController,
                     padding: const EdgeInsets.fromLTRB(
                       DsSpacing.lg,
                       DsSpacing.lg,
@@ -280,6 +283,7 @@ class _MaraudeOperationScreenState
           },
         ),
     'Préparation validée.',
+    nextStep: MaraudeOperationalStep.collection,
   );
 
   Future<void> _validateStep(MaraudeOperationalStep step) => _run(
@@ -287,6 +291,14 @@ class _MaraudeOperationScreenState
         .read(maraudeOperationRepositoryProvider)
         .validateStep(widget.concertId, step),
     '${step.label} validée.',
+    nextStep: switch (step) {
+      MaraudeOperationalStep.preparation => MaraudeOperationalStep.collection,
+      MaraudeOperationalStep.collection => MaraudeOperationalStep.distribution,
+      MaraudeOperationalStep.distribution =>
+        MaraudeOperationalStep.equipmentReturn,
+      MaraudeOperationalStep.equipmentReturn => MaraudeOperationalStep.summary,
+      MaraudeOperationalStep.summary => null,
+    },
   );
 
   Future<void> _editCollection(
@@ -364,24 +376,28 @@ class _MaraudeOperationScreenState
       }
       distributedByAllocation[item.id] = distributed;
     }
-    await _run(() async {
-      await ref
-          .read(maraudeOperationRepositoryProvider)
-          .saveDistribution(
-            concertId: widget.concertId,
-            distributedBoxesByAllocation: distributedByAllocation,
-            beneficiaries: _parseInt(_beneficiaries.text),
-            comment: _distributionComment.text,
-          );
-      if (validate) {
+    await _run(
+      () async {
         await ref
             .read(maraudeOperationRepositoryProvider)
-            .validateStep(
-              widget.concertId,
-              MaraudeOperationalStep.distribution,
+            .saveDistribution(
+              concertId: widget.concertId,
+              distributedBoxesByAllocation: distributedByAllocation,
+              beneficiaries: _parseInt(_beneficiaries.text),
+              comment: _distributionComment.text,
             );
-      }
-    }, validate ? 'Distribution validée.' : 'Corrections enregistrées.');
+        if (validate) {
+          await ref
+              .read(maraudeOperationRepositoryProvider)
+              .validateStep(
+                widget.concertId,
+                MaraudeOperationalStep.distribution,
+              );
+        }
+      },
+      validate ? 'Distribution validée.' : 'Corrections enregistrées.',
+      nextStep: validate ? MaraudeOperationalStep.equipmentReturn : null,
+    );
   }
 
   Future<void> _recordEncounter() async {
@@ -437,30 +453,36 @@ class _MaraudeOperationScreenState
   Future<void> _saveReturns(
     MaraudeOperationBundle data, {
     required bool validate,
-  }) => _run(() async {
-    await ref
-        .read(maraudeOperationRepositoryProvider)
-        .recordEquipmentReturn(
-          concertId: widget.concertId,
-          returns: [
-            for (final item in data.equipment)
-              EquipmentReturnDraft(
-                allocationId: item.id,
-                returnedQuantity: _parseInt(_returnControllers[item.id]!.text),
-                incidentType: _incidents[item.id],
-                incidentNote: _incidentNotes[item.id]!.text,
-              ),
-          ],
-        );
-    if (validate) {
+  }) => _run(
+    () async {
       await ref
           .read(maraudeOperationRepositoryProvider)
-          .validateStep(
-            widget.concertId,
-            MaraudeOperationalStep.equipmentReturn,
+          .recordEquipmentReturn(
+            concertId: widget.concertId,
+            returns: [
+              for (final item in data.equipment)
+                EquipmentReturnDraft(
+                  allocationId: item.id,
+                  returnedQuantity: _parseInt(
+                    _returnControllers[item.id]!.text,
+                  ),
+                  incidentType: _incidents[item.id],
+                  incidentNote: _incidentNotes[item.id]!.text,
+                ),
+            ],
           );
-    }
-  }, validate ? 'Retour matériel validé.' : 'Corrections enregistrées.');
+      if (validate) {
+        await ref
+            .read(maraudeOperationRepositoryProvider)
+            .validateStep(
+              widget.concertId,
+              MaraudeOperationalStep.equipmentReturn,
+            );
+      }
+    },
+    validate ? 'Retour matériel validé.' : 'Corrections enregistrées.',
+    nextStep: validate ? MaraudeOperationalStep.summary : null,
+  );
 
   Future<void> _complete() async {
     final confirmed = await showDialog<bool>(
@@ -493,13 +515,25 @@ class _MaraudeOperationScreenState
     if (mounted) context.go('/maraudes/${widget.concertId}');
   }
 
-  Future<void> _run(Future<void> Function() action, String success) async {
+  Future<void> _run(
+    Future<void> Function() action,
+    String success, {
+    MaraudeOperationalStep? nextStep,
+  }) async {
     if (_saving) return;
     setState(() => _saving = true);
     try {
       await action();
       ref.invalidate(maraudeOperationBundleProvider(widget.concertId));
       if (!mounted) return;
+      if (nextStep != null) {
+        setState(() => _viewedStep = nextStep);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_stepScrollController.hasClients) {
+            _stepScrollController.jumpTo(0);
+          }
+        });
+      }
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(success)));

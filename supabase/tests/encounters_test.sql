@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(18);
+select plan(19);
 
 select has_table(
   'public',
@@ -151,8 +151,8 @@ select results_eq(
     from public.encounters
     where maraude_id = '96000000-0000-0000-0000-000000000001'
   $$,
-  $$ values (48.857::numeric, 2.352::numeric, 18.46::numeric) $$,
-  'La base réduit la précision des coordonnées à environ 100 mètres'
+  $$ values (48.856614::double precision, 2.3522219::double precision, 18.46::numeric) $$,
+  'La base conserve les coordonnées GPS sans arrondi volontaire'
 );
 
 select results_eq(
@@ -181,7 +181,7 @@ select throws_ok(
       '96000000-0000-0000-0000-000000000001',
       48.8566,
       2.3522,
-      150
+      30
     )
   $$,
   '22023',
@@ -222,9 +222,13 @@ select set_config(
 );
 
 select is(
-  (select count(*) from public.encounters),
+  (
+    select count(*)
+    from public.encounters
+    where maraude_id = '96000000-0000-0000-0000-000000000001'
+  ),
   1::bigint,
-  'Un administrateur consulte toutes les rencontres'
+  'Un administrateur consulte la rencontre créée par le scénario'
 );
 
 select results_eq(
@@ -232,7 +236,8 @@ select results_eq(
     select artist, venue_name, created_by_name, cardinality(team_names)
     from public.get_admin_encounter_map(
       clock_timestamp() - interval '1 day',
-      clock_timestamp() + interval '1 day'
+      clock_timestamp() + interval '1 day',
+      '96000000-0000-0000-0000-000000000001'
     )
   $$,
   $$ values ('Rencontres test'::text, 'Salle carte rencontres'::text, 'Hugo Terrain'::text, 1) $$,
@@ -284,21 +289,29 @@ select throws_ok(
 );
 
 select results_eq(
-  $$ select count(*)::integer from public.encounters $$,
+  $$
+    select count(*)::integer
+    from public.encounters
+    where maraude_id = '96000000-0000-0000-0000-000000000001'
+  $$,
   array[1],
   'Le refus ne crée aucune rencontre supplémentaire'
 );
 
-select ok(
-  (
-    select count(*) = 2
-    from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'encounters'
-      and column_name in ('latitude', 'longitude')
-      and numeric_scale = 3
-  ),
-  'La précision historique reste limitée à trois décimales'
+select col_type_is(
+  'public',
+  'encounters',
+  'latitude',
+  'double precision',
+  'La latitude conserve toute la précision transmise'
+);
+
+select col_type_is(
+  'public',
+  'encounters',
+  'longitude',
+  'double precision',
+  'La longitude conserve toute la précision transmise'
 );
 
 select * from finish();

@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:club_sandwich/core/config/auth_redirect.dart';
 import 'package:club_sandwich/core/router/app_router.dart';
 import 'package:club_sandwich/design_system/icons/ds_icons.dart';
 import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/data/auth_repository.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
+import 'package:club_sandwich/features/auth/presentation/activation_screen.dart';
 import 'package:club_sandwich/features/auth/presentation/forgot_password_screen.dart';
 import 'package:club_sandwich/features/auth/presentation/reset_password_screen.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
@@ -20,6 +22,62 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
+  test('le callback Auth ignore le chemin, la requête et le fragment Web', () {
+    expect(
+      authRedirectUrl(
+        Uri.parse(
+          'https://club-sandwich-preprod.netlify.app/administration'
+          '?source=test#/administration',
+        ),
+      ),
+      'https://club-sandwich-preprod.netlify.app/',
+    );
+  });
+
+  testWidgets(
+    'un compte invité authentifié est dirigé vers la création du compte',
+    (tester) async {
+      final authRepository = _AuthenticatedAuthRepository();
+      addTearDown(authRepository.dispose);
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(authRepository),
+          authStateProvider.overrideWithValue(
+            AsyncData(
+              AuthState(AuthChangeEvent.signedIn, authRepository.session),
+            ),
+          ),
+          currentUserContextProvider.overrideWith(
+            (ref) async => const CurrentUserContext(
+              profileId: 'profile-id',
+              role: AppUserRole.volunteer,
+              status: UserAccountStatus.invited,
+            ),
+          ),
+        ],
+      );
+      addTearDown(() async {
+        container.read(appRouterProvider).dispose();
+        container.dispose();
+      });
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            theme: DsTheme.light,
+            routerConfig: container.read(appRouterProvider),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ActivationScreen), findsOneWidget);
+      expect(find.text('Activer mon compte'), findsOneWidget);
+      expect(find.text('Se connecter'), findsNothing);
+    },
+  );
+
   testWidgets('les routes Concerts ouvrent les écrans attendus', (
     tester,
   ) async {

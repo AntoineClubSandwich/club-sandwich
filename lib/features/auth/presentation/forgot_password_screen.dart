@@ -1,3 +1,4 @@
+import 'package:club_sandwich/core/config/auth_redirect.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/presentation/widgets/auth_card_layout.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
@@ -37,7 +38,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           .read(authRepositoryProvider)
           .sendPasswordResetEmail(
             _emailController.text.trim(),
-            redirectTo: Uri.base.resolve('/reset-password').toString(),
+            redirectTo: authRedirectUrl(),
           );
       if (mounted) setState(() => _linkSent = true);
     } catch (error) {

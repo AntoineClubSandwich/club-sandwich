@@ -10,6 +10,7 @@ import 'package:club_sandwich/features/encounters/domain/encounter_cluster.dart'
 import 'package:club_sandwich/features/encounters/domain/maraude_encounter.dart';
 import 'package:club_sandwich/features/encounters/presentation/encounter_map_screen.dart';
 import 'package:club_sandwich/features/operations/data/maraude_operation_providers.dart';
+import 'package:club_sandwich/features/operations/data/maraude_operation_repository.dart';
 import 'package:club_sandwich/features/operations/domain/maraude_workflow.dart';
 import 'package:club_sandwich/features/operations/presentation/maraude_operation_screen.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
@@ -25,8 +26,8 @@ void main() {
       final encounter = MaraudeEncounter.fromJson({
         'id': 'encounter-1',
         'maraude_id': 'maraude-1',
-        'latitude': 48.857,
-        'longitude': 2.352,
+        'latitude': 48.856614,
+        'longitude': 2.3522219,
         'accuracy': 18.46,
         'created_at': '2026-08-25T22:14:00Z',
         'maraude_date': '2026-08-25',
@@ -38,7 +39,8 @@ void main() {
         'team_names': ['Hugo Martin', 'Inès Dupont'],
       });
 
-      expect(encounter.latitude, 48.857);
+      expect(encounter.latitude, 48.856614);
+      expect(encounter.longitude, 2.3522219);
       expect(encounter.artist, 'Beyoncé');
       expect(encounter.teamNames, ['Hugo Martin', 'Inès Dupont']);
     });
@@ -199,6 +201,51 @@ void main() {
         expect(find.text('7 boîtes restantes'), findsOneWidget);
       },
     );
+
+    testWidgets('une validation ouvre automatiquement l’étape suivante', (
+      tester,
+    ) async {
+      final repository = _FakeOperationRepository();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserContextProvider.overrideWith(
+              (ref) async => const CurrentUserContext(
+                profileId: 'admin-1',
+                role: AppUserRole.admin,
+                status: UserAccountStatus.active,
+              ),
+            ),
+            concertDetailsProvider(
+              'maraude-1',
+            ).overrideWith((ref) async => _concert),
+            concertVolunteerSectionProvider('maraude-1').overrideWith(
+              (ref) async => const ConcertVolunteerSectionData(
+                counts: ConcertVolunteerCounts.empty(),
+                isAdmin: true,
+                applications: [],
+              ),
+            ),
+            maraudeOperationRepositoryProvider.overrideWithValue(repository),
+            maraudeOperationBundleProvider(
+              'maraude-1',
+            ).overrideWith((ref) async => _preparationBundle),
+          ],
+          child: const MaterialApp(
+            home: MaraudeOperationScreen(concertId: 'maraude-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('1. Préparation'), findsOneWidget);
+      await tester.tap(find.text('Valider et continuer'));
+      await tester.pumpAndSettle();
+
+      expect(repository.preparationValidationCount, 1);
+      expect(find.text('2. Collecte catering'), findsOneWidget);
+      expect(find.text('Préparation validée.'), findsOneWidget);
+    });
   });
 }
 
@@ -264,6 +311,19 @@ final _bundle = MaraudeOperationBundle(
   encounterCount: 2,
 );
 
+final _preparationBundle = MaraudeOperationBundle(
+  operation: MaraudeOperation(
+    concertId: 'maraude-1',
+    currentStep: MaraudeOperationalStep.preparation,
+    createdAt: DateTime(2026, 8, 25),
+    updatedAt: DateTime(2026, 8, 25),
+  ),
+  consumables: const [],
+  equipment: const [],
+  collections: const [],
+  history: const [],
+);
+
 class _FakeLocationService extends EncounterLocationService {
   const _FakeLocationService();
 
@@ -306,5 +366,27 @@ class _FakeEncounterRepository extends EncounterRepository {
       createdAt: DateTime.utc(2026, 8, 25),
       createdBy: 'user-1',
     );
+  }
+}
+
+class _FakeOperationRepository extends MaraudeOperationRepository {
+  _FakeOperationRepository()
+    : super(
+        SupabaseClient(
+          'https://example.supabase.co',
+          'test-key',
+          authOptions: const AuthClientOptions(autoRefreshToken: false),
+        ),
+      );
+
+  int preparationValidationCount = 0;
+
+  @override
+  Future<void> validatePreparation({
+    required String concertId,
+    required Map<String, double> consumableQuantities,
+    required Map<String, int> equipmentQuantities,
+  }) async {
+    preparationValidationCount++;
   }
 }

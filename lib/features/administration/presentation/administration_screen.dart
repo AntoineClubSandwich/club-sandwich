@@ -1,3 +1,4 @@
+import 'package:club_sandwich/core/config/auth_redirect.dart';
 import 'package:club_sandwich/design_system/components/buttons/ds_secondary_button.dart';
 import 'package:club_sandwich/design_system/components/indicators/ds_avatar.dart';
 import 'package:club_sandwich/design_system/components/indicators/ds_badge.dart';
@@ -107,10 +108,7 @@ class AdministrationScreen extends ConsumerWidget {
     try {
       final delivery = await ref
           .read(userAccountRepositoryProvider)
-          .inviteUser(
-            draft,
-            redirectTo: Uri.base.resolve('/activate').toString(),
-          );
+          .inviteUser(draft, redirectTo: authRedirectUrl());
       ref.invalidate(managedUsersProvider);
       if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
       if (context.mounted) {
@@ -507,7 +505,7 @@ class _UserActionsState extends ConsumerState<_UserActions> {
         case 'resend':
           await repository.resendInvitation(
             widget.user.profileId,
-            redirectTo: Uri.base.resolve('/activate').toString(),
+            redirectTo: authRedirectUrl(),
           );
         case 'disable':
           await repository.setDisabled(widget.user.profileId, disabled: true);

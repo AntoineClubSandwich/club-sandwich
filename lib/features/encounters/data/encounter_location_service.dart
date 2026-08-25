@@ -25,6 +25,8 @@ class EncounterLocationException implements Exception {
 class EncounterLocationService {
   const EncounterLocationService();
 
+  static const maximumAcceptedAccuracyMeters = 25.0;
+
   Future<EncounterPosition> currentPosition() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw const EncounterLocationException(
@@ -46,11 +48,11 @@ class EncounterLocationService {
     try {
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
+          accuracy: LocationAccuracy.best,
           timeLimit: Duration(seconds: 15),
         ),
       );
-      if (position.accuracy > 100) {
+      if (position.accuracy > maximumAcceptedAccuracyMeters) {
         throw const EncounterLocationException(
           EncounterLocationFailure.unavailable,
         );

@@ -28,7 +28,7 @@ class EncounterMapScreen extends ConsumerStatefulWidget {
 
 class _EncounterMapScreenState extends ConsumerState<EncounterMapScreen> {
   final _mapController = MapController();
-  var _mode = EncounterMapMode.clusters;
+  var _mode = EncounterMapMode.points;
   var _preset = _PeriodPreset.thirtyDays;
   late DateTimeRange _customRange;
   String? _maraudeId;
@@ -356,7 +356,8 @@ class _EncounterMapScreenState extends ConsumerState<EncounterMapScreen> {
                 ),
                 const SizedBox(height: DsSpacing.sm),
                 Text(
-                  'La position affichée est volontairement approximative.',
+                  'Coordonnées enregistrées sans arrondi · précision GPS '
+                  'annoncée par l’appareil : ±${encounter.accuracy.round()} m.',
                   style: DsTypography.caption,
                 ),
               ],

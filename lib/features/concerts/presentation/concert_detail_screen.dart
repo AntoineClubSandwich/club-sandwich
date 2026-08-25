@@ -16,6 +16,7 @@ import 'package:club_sandwich/features/concerts/presentation/maraude_report_prov
 import 'package:club_sandwich/features/concerts/presentation/maraude_operational_report_card.dart';
 import 'package:club_sandwich/features/concerts/presentation/maraude_role_mission_sheet.dart';
 import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dart';
+import 'package:club_sandwich/features/operations/data/maraude_operation_providers.dart';
 import 'package:club_sandwich/features/operations/presentation/maraude_resources_card.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_repository.dart';
@@ -973,6 +974,7 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
       await action();
       ref.invalidate(concertDetailsProvider(widget.concert.id));
       ref.invalidate(concertsProvider);
+      ref.invalidate(maraudeOperationBundleProvider(widget.concert.id));
       if (!mounted) return true;
       ScaffoldMessenger.of(
         context,
@@ -1253,104 +1255,161 @@ class _MaraudeTimingDialog extends StatefulWidget {
 }
 
 class _MaraudeTimingDialogState extends State<_MaraudeTimingDialog> {
-  final _key = GlobalKey<FormState>();
-  late final TextEditingController _start;
-  late final TextEditingController _end;
+  DateTime? _startAt;
+  DateTime? _endAt;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _start = TextEditingController(text: _timingValue(widget.startAt));
-    _end = TextEditingController(text: _timingValue(widget.endAt));
+    _startAt = widget.startAt?.toLocal();
+    _endAt = widget.endAt?.toLocal();
   }
 
-  @override
-  void dispose() {
-    _start.dispose();
-    _end.dispose();
-    super.dispose();
+  Future<void> _pick({required bool isStart}) async {
+    final otherValue = isStart ? _endAt : _startAt;
+    final initial =
+        (isStart ? _startAt : _endAt) ?? otherValue ?? DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+      initialEntryMode: TimePickerEntryMode.dial,
+    );
+    if (time == null || !mounted) return;
+    setState(() {
+      final value = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
+      if (isStart) {
+        _startAt = value;
+      } else {
+        _endAt = value;
+      }
+      _error = null;
+    });
   }
 
-  DateTime? _parse(String value) {
-    final normalized = value.trim();
-    if (normalized.isEmpty) return null;
-    return DateTime.tryParse(normalized.replaceFirst(' ', 'T'));
-  }
-
-  String? _validate(String? value) {
-    if (value == null || value.trim().isEmpty) return null;
-    return _parse(value) == null ? 'Format attendu : AAAA-MM-JJ HH:MM' : null;
+  void _save() {
+    if (_endAt != null && _startAt == null) {
+      setState(() => _error = 'Renseignez le début avant la fin.');
+      return;
+    }
+    if (_startAt != null && _endAt != null && _endAt!.isBefore(_startAt!)) {
+      setState(() => _error = 'La fin doit être postérieure au début.');
+      return;
+    }
+    Navigator.pop(
+      context,
+      _MaraudeTimingCorrection(startAt: _startAt, endAt: _endAt),
+    );
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: const Text('Corriger les horaires'),
-    content: Form(
-      key: _key,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextFormField(
-            key: const ValueKey('maraude-start-correction'),
-            controller: _start,
-            decoration: const InputDecoration(
-              labelText: 'Début',
-              hintText: 'AAAA-MM-JJ HH:MM',
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _MaraudeTimingField(
+          key: const ValueKey('maraude-start-correction'),
+          label: 'Début',
+          value: _startAt,
+          onPick: () => _pick(isStart: true),
+          onClear: () => setState(() {
+            _startAt = null;
+            _error = null;
+          }),
+        ),
+        const SizedBox(height: 12),
+        _MaraudeTimingField(
+          key: const ValueKey('maraude-end-correction'),
+          label: 'Fin',
+          value: _endAt,
+          onPick: () => _pick(isStart: false),
+          onClear: () => setState(() {
+            _endAt = null;
+            _error = null;
+          }),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
-            validator: _validate,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            key: const ValueKey('maraude-end-correction'),
-            controller: _end,
-            decoration: const InputDecoration(
-              labelText: 'Fin',
-              hintText: 'AAAA-MM-JJ HH:MM',
-            ),
-            validator: (value) {
-              final formatError = _validate(value);
-              if (formatError != null) return formatError;
-              final start = _parse(_start.text);
-              final end = _parse(value ?? '');
-              if (start != null && end != null && end.isBefore(start)) {
-                return 'La fin doit être postérieure au début.';
-              }
-              return null;
-            },
           ),
         ],
-      ),
+      ],
     ),
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
         child: const Text('Annuler'),
       ),
-      FilledButton(
-        onPressed: () {
-          if (!(_key.currentState?.validate() ?? false)) return;
-          Navigator.pop(
-            context,
-            _MaraudeTimingCorrection(
-              startAt: _parse(_start.text),
-              endAt: _parse(_end.text),
-            ),
-          );
-        },
-        child: const Text('Enregistrer'),
-      ),
+      FilledButton(onPressed: _save, child: const Text('Enregistrer')),
     ],
   );
 }
 
-String _timingValue(DateTime? value) {
-  if (value == null) return '';
-  final local = value.toLocal();
-  return '${local.year.toString().padLeft(4, '0')}-'
-      '${local.month.toString().padLeft(2, '0')}-'
-      '${local.day.toString().padLeft(2, '0')} '
-      '${local.hour.toString().padLeft(2, '0')}:'
-      '${local.minute.toString().padLeft(2, '0')}';
+class _MaraudeTimingField extends StatelessWidget {
+  const _MaraudeTimingField({
+    required this.label,
+    required this.value,
+    required this.onPick,
+    required this.onClear,
+    super.key,
+  });
+
+  final String label;
+  final DateTime? value;
+  final VoidCallback onPick;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = MaterialLocalizations.of(context);
+    final selected = value;
+    final valueLabel = selected == null
+        ? 'Choisir une date et une heure'
+        : '${localizations.formatMediumDate(selected)} · '
+              '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(selected))}';
+    return Semantics(
+      button: true,
+      label: '$label, $valueLabel',
+      child: InkWell(
+        onTap: onPick,
+        borderRadius: BorderRadius.circular(4),
+        child: InputDecorator(
+          isEmpty: selected == null,
+          decoration: InputDecoration(
+            labelText: label,
+            prefixIcon: const Icon(Icons.schedule_outlined),
+            suffixIcon: selected == null
+                ? const Icon(Icons.arrow_drop_down)
+                : IconButton(
+                    tooltip: 'Effacer $label',
+                    onPressed: onClear,
+                    icon: const Icon(Icons.clear),
+                  ),
+          ),
+          child: Text(valueLabel),
+        ),
+      ),
+    );
+  }
 }
 
 class _MaraudeStatusChip extends StatelessWidget {
