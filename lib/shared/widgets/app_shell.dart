@@ -1,3 +1,4 @@
+import 'package:club_sandwich/core/config/environment.dart';
 import 'package:club_sandwich/design_system/components/ds_pressable.dart';
 import 'package:club_sandwich/design_system/components/indicators/ds_badge.dart';
 import 'package:club_sandwich/design_system/components/indicators/ds_semantic_variant.dart';
@@ -23,6 +24,7 @@ import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
 import 'package:club_sandwich/features/profiles/domain/profile.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
+import 'package:club_sandwich/shared/widgets/environment_indicator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -117,14 +119,25 @@ class AppShell extends ConsumerWidget {
                   child: SafeArea(
                     child: Column(
                       children: [
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.fromLTRB(
                             DsSpacing.lg,
                             DsSpacing.lg,
                             DsSpacing.lg,
                             DsSpacing.sm,
                           ),
-                          child: _SidebarLogo(),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _SidebarLogo(),
+                              if (Environment.isPreproduction) ...[
+                                const SizedBox(height: DsSpacing.sm),
+                                const AppEnvironmentBadge(
+                                  environment: AppEnvironment.preprod,
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                         Expanded(
                           child: SingleChildScrollView(
@@ -468,11 +481,22 @@ class _DsSidebar extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (dark) ...[
+                if (dark || Environment.isPreproduction) ...[
                   const SizedBox(height: DsSpacing.sm),
-                  const DsBadge(
-                    label: 'ADMIN',
-                    variant: DsSemanticVariant.primary,
+                  Wrap(
+                    spacing: DsSpacing.sm,
+                    runSpacing: DsSpacing.xs,
+                    children: [
+                      if (dark)
+                        const DsBadge(
+                          label: 'ADMIN',
+                          variant: DsSemanticVariant.primary,
+                        ),
+                      if (Environment.isPreproduction)
+                        const AppEnvironmentBadge(
+                          environment: AppEnvironment.preprod,
+                        ),
+                    ],
                   ),
                 ],
               ],

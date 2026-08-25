@@ -21,7 +21,7 @@ import 'package:club_sandwich/features/volunteers/data/volunteer_document_provid
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
 import 'package:club_sandwich/shared/widgets/app_shell.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
-import 'package:club_sandwich/shared/widgets/environment_banner.dart';
+import 'package:club_sandwich/shared/widgets/environment_indicator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -249,38 +249,30 @@ void main() {
     );
   });
 
-  testWidgets('la bannière apparaît uniquement en préproduction', (
+  testWidgets('le badge compact apparaît uniquement en préproduction', (
     tester,
   ) async {
     await _setViewport(tester, const Size(320, 640));
     await tester.pumpWidget(
       const MaterialApp(
-        home: AppEnvironmentBanner(
-          environment: AppEnvironment.production,
-          child: Scaffold(body: Text('Contenu')),
-        ),
+        key: ValueKey('production-environment'),
+        home: AppEnvironmentBadge(environment: AppEnvironment.production),
       ),
     );
 
     expect(find.text('PRÉPRODUCTION'), findsNothing);
-    expect(find.text('Contenu'), findsOneWidget);
 
     await tester.pumpWidget(
       MaterialApp(
+        key: const ValueKey('preprod-environment'),
         theme: DsTheme.light,
-        home: const AppEnvironmentBanner(
-          environment: AppEnvironment.preprod,
-          child: Scaffold(body: Text('Contenu')),
+        home: const Scaffold(
+          body: AppEnvironmentBadge(environment: AppEnvironment.preprod),
         ),
       ),
     );
 
-    expect(find.textContaining('PRÉPRODUCTION'), findsOneWidget);
-    expect(
-      find.textContaining('Les données peuvent être réinitialisées'),
-      findsOneWidget,
-    );
-    expect(find.text('Contenu'), findsOneWidget);
+    expect(find.text('PRÉPRODUCTION'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
