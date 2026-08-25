@@ -13,7 +13,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class EquipmentScreen extends ConsumerStatefulWidget {
-  const EquipmentScreen({super.key});
+  const EquipmentScreen({this.embedded = false, super.key});
+
+  final bool embedded;
 
   @override
   ConsumerState<EquipmentScreen> createState() => _EquipmentScreenState();
@@ -26,135 +28,135 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
   @override
   Widget build(BuildContext context) {
     final asyncAssets = ref.watch(equipmentAssetsProvider);
+    final content = asyncAssets.when(
+      loading: () => const AppLoadingState(label: 'Chargement du matériel'),
+      error: (error, _) => AppErrorState(
+        message: describeError(error, 'Impossible de charger le matériel.'),
+        onRetry: () => ref.invalidate(equipmentAssetsProvider),
+      ),
+      data: (assets) {
+        final query = _query.trim().toLowerCase();
+        final filtered = assets
+            .where((asset) {
+              if (_status != null && asset.status != _status) return false;
+              return query.isEmpty ||
+                  asset.name.toLowerCase().contains(query) ||
+                  asset.category.toLowerCase().contains(query) ||
+                  (asset.internalCode?.toLowerCase().contains(query) ?? false);
+            })
+            .toList(growable: false);
+        return ListView(
+          padding: const EdgeInsets.all(DsSpacing.xl),
+          children: [
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: DsSpacing.lg,
+              runSpacing: DsSpacing.md,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Parc matériel', style: DsTypography.h1),
+                    Text(
+                      '${assets.length} équipement${assets.length > 1 ? 's' : ''} · ${assets.where((asset) => asset.status == EquipmentStatus.available).length} disponible${assets.length > 1 ? 's' : ''}',
+                    ),
+                  ],
+                ),
+                Wrap(
+                  spacing: DsSpacing.sm,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _openLocationEditor,
+                      icon: const Icon(Icons.place_outlined),
+                      label: const Text('Nouvel emplacement'),
+                    ),
+                    DsPrimaryButton(
+                      label: 'Nouveau matériel',
+                      icon: Icons.add,
+                      onPressed: () => _openEditor(),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: DsSpacing.lg),
+            Wrap(
+              spacing: DsSpacing.md,
+              runSpacing: DsSpacing.md,
+              children: [
+                SizedBox(
+                  width: 320,
+                  child: TextField(
+                    onChanged: (value) => setState(() => _query = value),
+                    decoration: const InputDecoration(
+                      hintText: 'Rechercher du matériel',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 240,
+                  child: DropdownButtonFormField<EquipmentStatus?>(
+                    isExpanded: true,
+                    initialValue: _status,
+                    decoration: const InputDecoration(labelText: 'Statut'),
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Tous les statuts'),
+                      ),
+                      for (final status in EquipmentStatus.values)
+                        DropdownMenuItem(
+                          value: status,
+                          child: Text(status.label),
+                        ),
+                    ],
+                    onChanged: (value) => setState(() => _status = value),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: DsSpacing.lg),
+            if (filtered.isEmpty)
+              const AppEmptyState(
+                title: 'Aucun matériel',
+                message: 'Ajoutez du matériel ou modifiez les filtres.',
+                icon: Icons.inventory_2_outlined,
+              )
+            else
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth >= 1100
+                      ? (constraints.maxWidth - DsSpacing.lg) / 2
+                      : constraints.maxWidth;
+                  return Wrap(
+                    spacing: DsSpacing.lg,
+                    runSpacing: DsSpacing.lg,
+                    children: [
+                      for (final asset in filtered)
+                        SizedBox(
+                          width: width,
+                          child: _EquipmentCard(
+                            asset: asset,
+                            onEdit: () => _openEditor(asset),
+                            onHistory: () => _openHistory(asset),
+                            onArchive: () => _archive(asset),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+          ],
+        );
+      },
+    );
     return Theme(
       data: DsTheme.light,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: asyncAssets.when(
-          loading: () => const AppLoadingState(label: 'Chargement du matériel'),
-          error: (error, _) => AppErrorState(
-            message: describeError(error, 'Impossible de charger le matériel.'),
-            onRetry: () => ref.invalidate(equipmentAssetsProvider),
-          ),
-          data: (assets) {
-            final query = _query.trim().toLowerCase();
-            final filtered = assets
-                .where((asset) {
-                  if (_status != null && asset.status != _status) return false;
-                  return query.isEmpty ||
-                      asset.name.toLowerCase().contains(query) ||
-                      asset.category.toLowerCase().contains(query) ||
-                      (asset.internalCode?.toLowerCase().contains(query) ??
-                          false);
-                })
-                .toList(growable: false);
-            return ListView(
-              padding: const EdgeInsets.all(DsSpacing.xl),
-              children: [
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: DsSpacing.lg,
-                  runSpacing: DsSpacing.md,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Parc matériel', style: DsTypography.h1),
-                        Text(
-                          '${assets.length} équipement${assets.length > 1 ? 's' : ''} · ${assets.where((asset) => asset.status == EquipmentStatus.available).length} disponible${assets.length > 1 ? 's' : ''}',
-                        ),
-                      ],
-                    ),
-                    Wrap(
-                      spacing: DsSpacing.sm,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: _openLocationEditor,
-                          icon: const Icon(Icons.place_outlined),
-                          label: const Text('Nouvel emplacement'),
-                        ),
-                        DsPrimaryButton(
-                          label: 'Nouveau matériel',
-                          icon: Icons.add,
-                          onPressed: () => _openEditor(),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: DsSpacing.lg),
-                Wrap(
-                  spacing: DsSpacing.md,
-                  runSpacing: DsSpacing.md,
-                  children: [
-                    SizedBox(
-                      width: 320,
-                      child: TextField(
-                        onChanged: (value) => setState(() => _query = value),
-                        decoration: const InputDecoration(
-                          hintText: 'Rechercher du matériel',
-                          prefixIcon: Icon(Icons.search),
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 240,
-                      child: DropdownButtonFormField<EquipmentStatus?>(
-                        initialValue: _status,
-                        decoration: const InputDecoration(labelText: 'Statut'),
-                        items: [
-                          const DropdownMenuItem(
-                            value: null,
-                            child: Text('Tous les statuts'),
-                          ),
-                          for (final status in EquipmentStatus.values)
-                            DropdownMenuItem(
-                              value: status,
-                              child: Text(status.label),
-                            ),
-                        ],
-                        onChanged: (value) => setState(() => _status = value),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: DsSpacing.lg),
-                if (filtered.isEmpty)
-                  const AppEmptyState(
-                    title: 'Aucun matériel',
-                    message: 'Ajoutez du matériel ou modifiez les filtres.',
-                    icon: Icons.inventory_2_outlined,
-                  )
-                else
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final width = constraints.maxWidth >= 1100
-                          ? (constraints.maxWidth - DsSpacing.lg) / 2
-                          : constraints.maxWidth;
-                      return Wrap(
-                        spacing: DsSpacing.lg,
-                        runSpacing: DsSpacing.lg,
-                        children: [
-                          for (final asset in filtered)
-                            SizedBox(
-                              width: width,
-                              child: _EquipmentCard(
-                                asset: asset,
-                                onEdit: () => _openEditor(asset),
-                                onHistory: () => _openHistory(asset),
-                                onArchive: () => _archive(asset),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-              ],
-            );
-          },
-        ),
-      ),
+      child: widget.embedded
+          ? content
+          : Scaffold(backgroundColor: Colors.transparent, body: content),
     );
   }
 

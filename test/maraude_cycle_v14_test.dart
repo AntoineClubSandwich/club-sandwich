@@ -462,6 +462,12 @@ void main() {
   testWidgets('le dashboard bénévole masque les actions administratives', (
     tester,
   ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 1600);
+    addTearDown(() {
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+    });
     final items = [
       _overview(
         id: 'open',

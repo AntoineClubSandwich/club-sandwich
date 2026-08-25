@@ -225,11 +225,13 @@ void main() {
     await _pumpShell(tester, AppUserRole.admin);
 
     expect(find.text('Tableau de bord'), findsWidgets);
+    expect(find.text('ADMIN'), findsOneWidget);
     expect(find.text('Maraudes'), findsOneWidget);
     expect(find.text('Invitations'), findsOneWidget);
     expect(find.text('Organisations'), findsOneWidget);
-    expect(find.text('Consommables'), findsOneWidget);
-    expect(find.text('Parc matériel'), findsOneWidget);
+    expect(find.text('Stock'), findsOneWidget);
+    expect(find.text('Consommables'), findsNothing);
+    expect(find.text('Parc matériel'), findsNothing);
     expect(find.text('Bénévoles'), findsOneWidget);
     expect(find.text('Administration'), findsOneWidget);
     expect(find.text('Opérations'), findsNothing);
@@ -239,12 +241,12 @@ void main() {
     await _pumpShell(tester, AppUserRole.promoter);
 
     expect(find.text('Tableau de bord'), findsWidgets);
+    expect(find.text('TOURNEUR'), findsOneWidget);
     expect(find.text('Mes maraudes'), findsOneWidget);
     expect(find.text('Mes invitations'), findsOneWidget);
     expect(find.text('Mon compte'), findsOneWidget);
     expect(find.text('Organisations'), findsNothing);
-    expect(find.text('Consommables'), findsNothing);
-    expect(find.text('Parc matériel'), findsNothing);
+    expect(find.text('Stock'), findsNothing);
     expect(find.text('Administration'), findsNothing);
   });
 
@@ -252,11 +254,11 @@ void main() {
     await _pumpShell(tester, AppUserRole.volunteer);
 
     expect(find.text('Accueil'), findsWidgets);
+    expect(find.text('BÉNÉVOLE'), findsOneWidget);
     expect(find.text('Mes maraudes'), findsOneWidget);
     expect(find.text('Invitations'), findsOneWidget);
     expect(find.text('Mon profil'), findsOneWidget);
-    expect(find.text('Consommables'), findsNothing);
-    expect(find.text('Parc matériel'), findsNothing);
+    expect(find.text('Stock'), findsNothing);
     expect(find.text('Administration'), findsNothing);
   });
 

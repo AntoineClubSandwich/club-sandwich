@@ -61,6 +61,7 @@ void main() {
   testWidgets(
     'le dashboard signale une indisponibilité partielle sans masquer le reste',
     (tester) async {
+      await _setViewport(tester, const Size(1280, 1200));
       await tester.pumpWidget(
         ProviderScope(
           overrides: [

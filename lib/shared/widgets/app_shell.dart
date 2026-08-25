@@ -59,9 +59,8 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 840;
     final userContext = ref.watch(currentUserContextProvider).value;
-    final destinations = _destinationsFor(
-      userContext?.role ?? AppUserRole.volunteer,
-    );
+    final role = userContext?.role ?? AppUserRole.volunteer;
+    final destinations = _destinationsFor(role);
     final selectedIndex = _selectedIndex(destinations);
     void onSignedOut() {
       ref.invalidate(currentProfileProvider);
@@ -78,8 +77,11 @@ class AppShell extends ConsumerWidget {
     }
 
     final accountPanel = _UserAccountPanel(onSignedOut: onSignedOut);
-    final isAdmin =
-        (userContext?.role ?? AppUserRole.volunteer) == AppUserRole.admin;
+    final roleLabel = switch (role) {
+      AppUserRole.admin => 'ADMIN',
+      AppUserRole.promoter => 'TOURNEUR',
+      AppUserRole.volunteer => 'BÉNÉVOLE',
+    };
 
     // Wrapped in a local DsTheme.light regardless of the ambient theme:
     // AppShell is exercised directly (without ClubSandwichApp's app-wide
@@ -108,10 +110,10 @@ class AppShell extends ConsumerWidget {
                 final colors = tokens.colors;
                 return Container(
                   decoration: BoxDecoration(
-                    color: colors.canvas,
+                    color: colors.secondary,
                     border: Border(
                       right: BorderSide(
-                        color: colors.border,
+                        color: Colors.white.withValues(alpha: 0.08),
                         width: DsBorders.hairline,
                       ),
                     ),
@@ -129,13 +131,22 @@ class AppShell extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const _SidebarLogo(),
-                              if (Environment.isPreproduction) ...[
-                                const SizedBox(height: DsSpacing.sm),
-                                const AppEnvironmentBadge(
-                                  environment: AppEnvironment.preprod,
-                                ),
-                              ],
+                              const _SidebarLogo(dark: true),
+                              const SizedBox(height: DsSpacing.sm),
+                              Wrap(
+                                spacing: DsSpacing.sm,
+                                runSpacing: DsSpacing.xs,
+                                children: [
+                                  DsBadge(
+                                    label: roleLabel,
+                                    variant: DsSemanticVariant.primary,
+                                  ),
+                                  if (Environment.isPreproduction)
+                                    const AppEnvironmentBadge(
+                                      environment: AppEnvironment.preprod,
+                                    ),
+                                ],
+                              ),
                             ],
                           ),
                         ),
@@ -158,6 +169,7 @@ class AppShell extends ConsumerWidget {
                                     label: destinations[i].label,
                                     icon: _sidebarIcon(destinations[i].path),
                                     selected: i == selectedIndex,
+                                    dark: true,
                                     onTap: () {
                                       Navigator.of(context).pop();
                                       _navigate(context, destinations, i);
@@ -187,7 +199,7 @@ class AppShell extends ConsumerWidget {
         body: Row(
           children: [
             _DsSidebar(
-              dark: isAdmin,
+              roleLabel: roleLabel,
               destinations: destinations,
               selectedIndex: selectedIndex,
               onSelected: (index) => _navigate(context, destinations, index),
@@ -422,21 +434,19 @@ String _accountInitial(String label) {
   return normalizedLabel.isEmpty ? '?' : normalizedLabel[0].toUpperCase();
 }
 
-/// Desktop sidebar. [dark] switches between the admin-only treatment
-/// (deep indigo [DsColorTokens.secondary] background, muted nav-item
-/// text, mascot widget + "ADMIN" badge) and the plain canvas treatment
-/// used by every other role — same [_AppDestination] route list and
-/// navigation behavior either way, only the visuals differ.
+/// Desktop sidebar shared by every role. Permissions still determine the
+/// destinations, while the same dark visual identity keeps the application
+/// coherent for administrators, tour managers and volunteers.
 class _DsSidebar extends StatelessWidget {
   const _DsSidebar({
-    required this.dark,
+    required this.roleLabel,
     required this.destinations,
     required this.selectedIndex,
     required this.onSelected,
     required this.accountPanel,
   });
 
-  final bool dark;
+  final String roleLabel;
   final List<_AppDestination> destinations;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
@@ -451,10 +461,10 @@ class _DsSidebar extends StatelessWidget {
       key: AppShell.desktopSidebarKey,
       width: 280,
       decoration: BoxDecoration(
-        color: dark ? colors.secondary : colors.canvas,
+        color: colors.secondary,
         border: Border(
           right: BorderSide(
-            color: dark ? Colors.white.withValues(alpha: 0.08) : colors.border,
+            color: Colors.white.withValues(alpha: 0.08),
             width: DsBorders.hairline,
           ),
         ),
@@ -474,31 +484,26 @@ class _DsSidebar extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Expanded(child: _SidebarLogo(dark: dark)),
+                    const Expanded(child: _SidebarLogo(dark: true)),
                     const SizedBox(width: DsSpacing.sm),
-                    WorkflowNotificationsButton(
-                      foregroundColor: dark ? Colors.white : colors.textPrimary,
-                    ),
+                    WorkflowNotificationsButton(foregroundColor: Colors.white),
                   ],
                 ),
-                if (dark || Environment.isPreproduction) ...[
-                  const SizedBox(height: DsSpacing.sm),
-                  Wrap(
-                    spacing: DsSpacing.sm,
-                    runSpacing: DsSpacing.xs,
-                    children: [
-                      if (dark)
-                        const DsBadge(
-                          label: 'ADMIN',
-                          variant: DsSemanticVariant.primary,
-                        ),
-                      if (Environment.isPreproduction)
-                        const AppEnvironmentBadge(
-                          environment: AppEnvironment.preprod,
-                        ),
-                    ],
-                  ),
-                ],
+                const SizedBox(height: DsSpacing.sm),
+                Wrap(
+                  spacing: DsSpacing.sm,
+                  runSpacing: DsSpacing.xs,
+                  children: [
+                    DsBadge(
+                      label: roleLabel,
+                      variant: DsSemanticVariant.primary,
+                    ),
+                    if (Environment.isPreproduction)
+                      const AppEnvironmentBadge(
+                        environment: AppEnvironment.preprod,
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -516,7 +521,7 @@ class _DsSidebar extends StatelessWidget {
                       label: destinations[i].label,
                       icon: _sidebarIcon(destinations[i].path),
                       selected: i == selectedIndex,
-                      dark: dark,
+                      dark: true,
                       onTap: () => onSelected(i),
                     ),
                   ],
@@ -538,6 +543,7 @@ IconData _sidebarIcon(String path) => switch (path) {
   '/invitations' => DsIcons.mail,
   '/organizations' => DsIcons.building2,
   '/venues' => DsIcons.building,
+  '/stock' => DsIcons.package,
   '/volunteers' => DsIcons.users2,
   '/administration' => DsIcons.settings,
   '/profile' || '/account' => DsIcons.user,
@@ -709,16 +715,10 @@ List<_AppDestination> _destinationsFor(AppUserRole role) {
         path: '/venues',
       ),
       _AppDestination(
-        label: 'Consommables',
-        icon: Icons.shopping_basket_outlined,
-        selectedIcon: Icons.shopping_basket,
-        path: '/consumables',
-      ),
-      _AppDestination(
-        label: 'Parc matériel',
+        label: 'Stock',
         icon: Icons.inventory_2_outlined,
         selectedIcon: Icons.inventory_2,
-        path: '/equipment',
+        path: '/stock',
       ),
       _AppDestination(
         label: 'Bénévoles',

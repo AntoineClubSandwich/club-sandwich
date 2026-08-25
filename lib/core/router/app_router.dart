@@ -10,12 +10,11 @@ import 'package:club_sandwich/features/auth/presentation/reset_password_screen.d
 import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
 import 'package:club_sandwich/features/dashboard/presentation/dashboard_screen.dart';
-import 'package:club_sandwich/features/consumables/presentation/consumables_screen.dart';
-import 'package:club_sandwich/features/equipment/presentation/equipment_screen.dart';
 import 'package:club_sandwich/features/invitations/presentation/invitations_screen.dart';
 import 'package:club_sandwich/features/organizations/presentation/organizations_screen.dart';
 import 'package:club_sandwich/features/operations/presentation/maraude_operation_screen.dart';
 import 'package:club_sandwich/features/profiles/presentation/profile_screen.dart';
+import 'package:club_sandwich/features/stock/presentation/stock_screen.dart';
 import 'package:club_sandwich/features/venues/presentation/venues_screen.dart';
 import 'package:club_sandwich/features/volunteers/presentation/volunteers_screen.dart';
 import 'package:club_sandwich/shared/widgets/app_shell.dart';
@@ -33,6 +32,7 @@ abstract final class AppRoutes {
   static const invitations = '/invitations';
   static const organizations = '/organizations';
   static const venues = '/venues';
+  static const stock = '/stock';
   static const consumables = '/consumables';
   static const equipment = '/equipment';
   static const volunteers = '/volunteers';
@@ -174,12 +174,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const VenuesScreen(),
           ),
           GoRoute(
+            path: AppRoutes.stock,
+            builder: (context, state) => StockScreen(
+              initialSection:
+                  state.uri.queryParameters['section'] == 'equipment'
+                  ? StockSection.equipment
+                  : StockSection.consumables,
+            ),
+          ),
+          GoRoute(
             path: AppRoutes.consumables,
-            builder: (context, state) => const ConsumablesScreen(),
+            redirect: (context, state) =>
+                '${AppRoutes.stock}?section=consumables',
           ),
           GoRoute(
             path: AppRoutes.equipment,
-            builder: (context, state) => const EquipmentScreen(),
+            redirect: (context, state) =>
+                '${AppRoutes.stock}?section=equipment',
           ),
           GoRoute(
             path: AppRoutes.volunteers,
@@ -212,6 +223,7 @@ bool _isAllowed(AppUserRole role, String location) {
       AppRoutes.invitations,
       AppRoutes.organizations,
       AppRoutes.venues,
+      AppRoutes.stock,
       AppRoutes.consumables,
       AppRoutes.equipment,
       AppRoutes.volunteers,

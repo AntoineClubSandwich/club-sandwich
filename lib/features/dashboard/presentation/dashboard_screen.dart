@@ -1,5 +1,7 @@
 import 'package:club_sandwich/design_system/components/ds_pressable.dart';
 import 'package:club_sandwich/design_system/components/feedback/ds_empty_state.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_badge.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_semantic_variant.dart';
 import 'package:club_sandwich/design_system/components/indicators/ds_status_chip.dart';
 import 'package:club_sandwich/design_system/components/navigation/ds_section_header.dart';
 import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
@@ -44,6 +46,7 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = ref.watch(maraudeOverviewProvider);
     final contextRole = ref.watch(currentUserContextProvider).value?.role;
+    final firstName = ref.watch(currentProfileProvider).value?.firstName;
     final invitationCampaigns = ref.watch(invitationCampaignsProvider);
     final invitations =
         invitationCampaigns.value ?? const <InvitationCampaign>[];
@@ -53,27 +56,32 @@ class DashboardScreen extends ConsumerWidget {
     final hasPendingDocuments = contextRole == AppUserRole.admin
         ? ref.watch(pendingVolunteerDocumentsProvider).value?.isNotEmpty == true
         : false;
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: overview.when(
-        loading: () =>
-            const AppLoadingState(label: 'Chargement du tableau de bord'),
-        error: (_, _) => AppErrorState(
-          message: 'Impossible de charger le tableau de bord.',
-          onRetry: () => ref.invalidate(maraudeOverviewProvider),
-        ),
-        data: (items) => _DashboardContent(
-          items: items,
-          role:
-              contextRole ??
-              (items.any((item) => item.isAdmin)
-                  ? AppUserRole.admin
-                  : AppUserRole.volunteer),
-          invitations: invitations,
-          invitationsUnavailable: invitationCampaigns.hasError,
-          onRetryInvitations: () => ref.invalidate(invitationCampaignsProvider),
-          creditSummary: creditSummary,
-          hasPendingDocuments: hasPendingDocuments,
+    return Theme(
+      data: DsTheme.light,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: overview.when(
+          loading: () =>
+              const AppLoadingState(label: 'Chargement du tableau de bord'),
+          error: (_, _) => AppErrorState(
+            message: 'Impossible de charger le tableau de bord.',
+            onRetry: () => ref.invalidate(maraudeOverviewProvider),
+          ),
+          data: (items) => _DashboardContent(
+            items: items,
+            role:
+                contextRole ??
+                (items.any((item) => item.isAdmin)
+                    ? AppUserRole.admin
+                    : AppUserRole.volunteer),
+            firstName: firstName,
+            invitations: invitations,
+            invitationsUnavailable: invitationCampaigns.hasError,
+            onRetryInvitations: () =>
+                ref.invalidate(invitationCampaignsProvider),
+            creditSummary: creditSummary,
+            hasPendingDocuments: hasPendingDocuments,
+          ),
         ),
       ),
     );
@@ -84,6 +92,7 @@ class _DashboardContent extends StatelessWidget {
   const _DashboardContent({
     required this.items,
     required this.role,
+    required this.firstName,
     required this.invitations,
     required this.invitationsUnavailable,
     required this.onRetryInvitations,
@@ -93,6 +102,7 @@ class _DashboardContent extends StatelessWidget {
 
   final List<MaraudeOverview> items;
   final AppUserRole role;
+  final String? firstName;
   final List<InvitationCampaign> invitations;
   final bool invitationsUnavailable;
   final VoidCallback onRetryInvitations;
@@ -105,21 +115,24 @@ class _DashboardContent extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 48),
       children: [
         if (role != AppUserRole.admin) ...[
-          Text('Accueil', style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 6),
-          const Text('Votre impact et vos prochaines actions.'),
-          const SizedBox(height: 24),
-          _AchievementSummary(
-            role: role,
-            items: items,
-            invitations: invitations,
-            creditSummary: creditSummary,
+          _FadeIn(
+            child: _RoleDashboardHero(
+              role: role,
+              firstName: firstName,
+              items: items,
+            ),
           ),
-          const SizedBox(height: 28),
-          Text(
-            'À faire maintenant',
-            style: Theme.of(context).textTheme.titleLarge,
+          const SizedBox(height: DsSpacing.xxl),
+          _FadeIn(
+            child: _AchievementSummary(
+              role: role,
+              items: items,
+              invitations: invitations,
+              creditSummary: creditSummary,
+            ),
           ),
+          const SizedBox(height: DsSpacing.xxl),
+          const DsSectionHeader(title: 'À faire maintenant'),
         ],
         if (invitationsUnavailable) ...[
           const SizedBox(height: 16),
@@ -137,6 +150,120 @@ class _DashboardContent extends StatelessWidget {
         else
           _VolunteerDashboard(items: items, invitations: invitations),
       ],
+    );
+  }
+}
+
+class _RoleDashboardHero extends StatelessWidget {
+  const _RoleDashboardHero({
+    required this.role,
+    required this.firstName,
+    required this.items,
+  });
+
+  final AppUserRole role;
+  final String? firstName;
+  final List<MaraudeOverview> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<DsTokens>()!;
+    final colors = tokens.colors;
+    final name = firstName?.trim();
+    final greeting = name == null || name.isEmpty ? 'Bonjour' : 'Bonjour $name';
+    final today = _day(DateTime.now());
+    final upcoming = items.where(
+      (item) =>
+          !item.date.isBefore(today) &&
+          item.maraudeStatus != MaraudeStatus.completed &&
+          item.maraudeStatus != MaraudeStatus.cancelled,
+    );
+    final openCount = items.where((item) => item.isOpenForApplication).length;
+    final isVolunteer = role == AppUserRole.volunteer;
+    final subtitle = isVolunteer
+        ? openCount == 0
+              ? 'Retrouvez ici vos missions et votre impact.'
+              : '$openCount maraude${openCount > 1 ? 's' : ''} ouverte${openCount > 1 ? 's' : ''} aux candidatures.'
+        : upcoming.isEmpty
+        ? 'Aucune maraude à venir pour le moment.'
+        : '${upcoming.length} maraude${upcoming.length > 1 ? 's' : ''} à venir.';
+    final roleLabel = isVolunteer ? 'BÉNÉVOLE' : 'TOURNEUR';
+
+    return Container(
+      padding: const EdgeInsets.all(DsSpacing.xl),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: DsRadius.xlRadius,
+        border: Border.all(color: colors.border),
+        boxShadow: DsShadows.ambient(colors.textPrimary),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 560;
+          final identity = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colors.primarySelectedBg,
+                  borderRadius: DsRadius.lgRadius,
+                ),
+                child: Icon(
+                  isVolunteer ? DsIcons.heart : DsIcons.building2,
+                  color: colors.primary,
+                ),
+              ),
+              const SizedBox(width: DsSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      greeting.toUpperCase(),
+                      style: DsTypography.h1.copyWith(
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: DsSpacing.xs),
+                    Text(
+                      subtitle,
+                      style: DsTypography.body.copyWith(
+                        color: colors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+          final badge = DsBadge(
+            label: roleLabel,
+            variant: DsSemanticVariant.primary,
+          );
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Align(alignment: Alignment.topRight, child: badge),
+                const SizedBox(height: DsSpacing.lg),
+                identity,
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: identity),
+              const SizedBox(width: DsSpacing.xl),
+              badge,
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -165,60 +292,66 @@ class _AchievementSummary extends StatelessWidget {
     );
     final metrics = role == AppUserRole.volunteer
         ? [
-            ('Maraudes réalisées', '${completed.length}'),
-            ('Impact collectif', '${_dashboardNumber(totalWeight)} kg'),
+            (DsIcons.circleCheck, 'Maraudes réalisées', '${completed.length}'),
             (
+              DsIcons.scale,
+              'Impact collectif',
+              '${_dashboardNumber(totalWeight)} kg',
+            ),
+            (
+              DsIcons.mail,
               'Invitations obtenues',
               '${invitations.where((campaign) => campaign.ownApplication?.status == InvitationApplicationStatus.selected).length}',
             ),
-            ('Crédits disponibles', '${creditSummary?.available ?? '—'}'),
+            (
+              DsIcons.award,
+              'Crédits disponibles',
+              '${creditSummary?.available ?? '—'}',
+            ),
           ]
         : [
-            ('Maraudes réalisées', '${completed.length}'),
-            ('Collecte accompagnée', '${_dashboardNumber(totalWeight)} kg'),
-            ('Campagnes d’invitations', '${invitations.length}'),
+            (DsIcons.circleCheck, 'Maraudes réalisées', '${completed.length}'),
+            (
+              DsIcons.scale,
+              'Collecte accompagnée',
+              '${_dashboardNumber(totalWeight)} kg',
+            ),
+            (DsIcons.mail, 'Campagnes d’invitations', '${invitations.length}'),
           ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          role == AppUserRole.volunteer
+        DsSectionHeader(
+          title: role == AppUserRole.volunteer
               ? 'Votre engagement'
               : 'Votre contribution',
-          style: Theme.of(context).textTheme.titleLarge,
         ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 136,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: metrics.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final metric = metrics[index];
-              return SizedBox(
-                width: 200,
-                child: Card(
-                  margin: EdgeInsets.zero,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          metric.$2,
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(metric.$1),
-                      ],
+        const SizedBox(height: DsSpacing.lg),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 900
+                ? metrics.length
+                : constraints.maxWidth >= 520
+                ? 2
+                : 1;
+            final width =
+                (constraints.maxWidth - DsSpacing.lg * (columns - 1)) / columns;
+            return Wrap(
+              spacing: DsSpacing.lg,
+              runSpacing: DsSpacing.lg,
+              children: [
+                for (final metric in metrics)
+                  SizedBox(
+                    width: width,
+                    child: DsMetricCard(
+                      icon: metric.$1,
+                      label: metric.$2,
+                      value: metric.$3,
                     ),
                   ),
-                ),
-              );
-            },
-          ),
+              ],
+            );
+          },
         ),
         if (role == AppUserRole.volunteer && creditSummary != null) ...[
           const SizedBox(height: 16),
@@ -239,37 +372,37 @@ class _CreditProgress extends StatelessWidget {
   Widget build(BuildContext context) {
     final eligible = summary.available >= _threshold;
     final progress = (summary.available / _threshold).clamp(0, 1).toDouble();
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              eligible
-                  ? 'Vous êtes éligible aux invitations'
-                  : 'Progression vers les invitations',
-              style: Theme.of(context).textTheme.titleSmall,
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    return DsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            eligible
+                ? 'Vous êtes éligible aux invitations'
+                : 'Progression vers les invitations',
+            style: DsTypography.body.copyWith(
+              color: colors.textPrimary,
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 8,
-                color: eligible ? Colors.green : null,
-              ),
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              color: eligible ? Colors.green : null,
             ),
-            const SizedBox(height: 8),
-            Text(
-              eligible
-                  ? '${summary.available} crédits disponibles — vous pouvez candidater aux invitations.'
-                  : '${summary.available}/$_threshold crédits pour pouvoir candidater aux invitations.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            eligible
+                ? '${summary.available} crédits disponibles — vous pouvez candidater aux invitations.'
+                : '${summary.available}/$_threshold crédits pour pouvoir candidater aux invitations.',
+            style: DsTypography.caption.copyWith(color: colors.textSecondary),
+          ),
+        ],
       ),
     );
   }
@@ -336,30 +469,12 @@ class _PromoterDashboard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            FilledButton.icon(
-              onPressed: () => context.go('/maraudes'),
-              icon: const Icon(Icons.add),
-              label: const Text('Ouvrir une maraude'),
-            ),
-            FilledButton.tonalIcon(
-              onPressed: () => context.go('/invitations'),
-              icon: const Icon(Icons.confirmation_number_outlined),
-              label: const Text('Nouvelle campagne'),
-            ),
-            OutlinedButton.icon(
-              key: const ValueKey('open-export-dialog-button'),
-              onPressed: () =>
-                  showMaraudeExportDialog(context, AppUserRole.promoter),
-              icon: const Icon(Icons.file_download_outlined),
-              label: const Text('Exporter les indicateurs'),
-            ),
-          ],
+        _RoleQuickActionsSection(
+          role: AppUserRole.promoter,
+          onExport: () =>
+              showMaraudeExportDialog(context, AppUserRole.promoter),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: DsSpacing.xxl),
         MaraudeListSection(
           title: 'Prochaines maraudes',
           items: upcoming.take(5).toList(),
@@ -383,6 +498,84 @@ class _PromoterDashboard extends StatelessWidget {
             MaraudeOverviewCard(maraude: item),
         ],
       ],
+    );
+  }
+}
+
+class _RoleQuickActionsSection extends StatelessWidget {
+  const _RoleQuickActionsSection({required this.role, this.onExport});
+
+  final AppUserRole role;
+  final VoidCallback? onExport;
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = role == AppUserRole.promoter
+        ? <(IconData, String, VoidCallback, bool)>[
+            (
+              DsIcons.plus,
+              'Ouvrir une maraude',
+              () => context.go('/maraudes'),
+              true,
+            ),
+            (
+              DsIcons.mail,
+              'Nouvelle campagne',
+              () => context.go('/invitations'),
+              false,
+            ),
+            (
+              DsIcons.download,
+              'Exporter les indicateurs',
+              onExport ?? () {},
+              false,
+            ),
+          ]
+        : <(IconData, String, VoidCallback, bool)>[
+            (
+              DsIcons.truck,
+              'Voir les maraudes',
+              () => context.go('/maraudes'),
+              true,
+            ),
+            (
+              DsIcons.mail,
+              'Voir les invitations',
+              () => context.go('/invitations'),
+              false,
+            ),
+            (
+              DsIcons.user,
+              'Mettre à jour mon profil',
+              () => context.go('/profile'),
+              false,
+            ),
+          ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 760 ? 3 : 1;
+        final width =
+            (constraints.maxWidth - DsSpacing.lg * (columns - 1)) / columns;
+        return Wrap(
+          spacing: DsSpacing.lg,
+          runSpacing: DsSpacing.lg,
+          children: [
+            for (final action in actions)
+              SizedBox(
+                width: width,
+                child: _QuickActionTile(
+                  key: action.$2 == 'Exporter les indicateurs'
+                      ? const ValueKey('open-export-dialog-button')
+                      : null,
+                  icon: action.$1,
+                  label: action.$2,
+                  onTap: action.$3,
+                  isPrimary: action.$4,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -1538,7 +1731,10 @@ class _VolunteerDashboard extends StatelessWidget {
         .toList();
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const _RoleQuickActionsSection(role: AppUserRole.volunteer),
+        const SizedBox(height: DsSpacing.xxl),
         MaraudeListSection(
           title: 'Maraudes ouvertes',
           items: open,

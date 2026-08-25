@@ -13,7 +13,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ConsumablesScreen extends ConsumerStatefulWidget {
-  const ConsumablesScreen({super.key});
+  const ConsumablesScreen({this.embedded = false, super.key});
+
+  final bool embedded;
 
   @override
   ConsumerState<ConsumablesScreen> createState() => _ConsumablesScreenState();
@@ -26,99 +28,98 @@ class _ConsumablesScreenState extends ConsumerState<ConsumablesScreen> {
   @override
   Widget build(BuildContext context) {
     final asyncItems = ref.watch(consumablesProvider);
+    final content = asyncItems.when(
+      loading: () =>
+          const AppLoadingState(label: 'Chargement des consommables'),
+      error: (error, _) => AppErrorState(
+        message: describeError(
+          error,
+          'Impossible de charger les consommables.',
+        ),
+        onRetry: () => ref.invalidate(consumablesProvider),
+      ),
+      data: (items) {
+        final normalized = _query.trim().toLowerCase();
+        final filtered = items
+            .where((item) {
+              if (_purchaseOnly && !item.shouldBuy) return false;
+              return normalized.isEmpty ||
+                  item.name.toLowerCase().contains(normalized) ||
+                  item.category.toLowerCase().contains(normalized);
+            })
+            .toList(growable: false);
+        return ListView(
+          padding: const EdgeInsets.all(DsSpacing.xl),
+          children: [
+            _Header(
+              count: items.length,
+              purchaseCount: items.where((item) => item.shouldBuy).length,
+              onCreate: () => _openEditor(),
+            ),
+            const SizedBox(height: DsSpacing.lg),
+            Wrap(
+              spacing: DsSpacing.md,
+              runSpacing: DsSpacing.md,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: 320,
+                  child: TextField(
+                    onChanged: (value) => setState(() => _query = value),
+                    decoration: const InputDecoration(
+                      hintText: 'Rechercher un consommable',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                  ),
+                ),
+                FilterChip(
+                  label: const Text('À acheter'),
+                  selected: _purchaseOnly,
+                  onSelected: (value) => setState(() => _purchaseOnly = value),
+                ),
+              ],
+            ),
+            const SizedBox(height: DsSpacing.lg),
+            if (filtered.isEmpty)
+              const AppEmptyState(
+                title: 'Aucun consommable',
+                message: 'Ajoutez un consommable ou modifiez les filtres.',
+                icon: Icons.shopping_basket_outlined,
+              )
+            else
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth >= 1100
+                      ? (constraints.maxWidth - DsSpacing.lg) / 2
+                      : constraints.maxWidth;
+                  return Wrap(
+                    spacing: DsSpacing.lg,
+                    runSpacing: DsSpacing.lg,
+                    children: [
+                      for (final item in filtered)
+                        SizedBox(
+                          width: width,
+                          child: _ConsumableCard(
+                            item: item,
+                            onMove: () => _openMovement(item),
+                            onEdit: () => _openEditor(item),
+                            onHistory: () => _openHistory(item),
+                            onArchive: () => _archive(item),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+          ],
+        );
+      },
+    );
     return Theme(
       data: DsTheme.light,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: asyncItems.when(
-          loading: () =>
-              const AppLoadingState(label: 'Chargement des consommables'),
-          error: (error, _) => AppErrorState(
-            message: describeError(
-              error,
-              'Impossible de charger les consommables.',
-            ),
-            onRetry: () => ref.invalidate(consumablesProvider),
-          ),
-          data: (items) {
-            final normalized = _query.trim().toLowerCase();
-            final filtered = items
-                .where((item) {
-                  if (_purchaseOnly && !item.shouldBuy) return false;
-                  return normalized.isEmpty ||
-                      item.name.toLowerCase().contains(normalized) ||
-                      item.category.toLowerCase().contains(normalized);
-                })
-                .toList(growable: false);
-            return ListView(
-              padding: const EdgeInsets.all(DsSpacing.xl),
-              children: [
-                _Header(
-                  count: items.length,
-                  purchaseCount: items.where((item) => item.shouldBuy).length,
-                  onCreate: () => _openEditor(),
-                ),
-                const SizedBox(height: DsSpacing.lg),
-                Wrap(
-                  spacing: DsSpacing.md,
-                  runSpacing: DsSpacing.md,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 320,
-                      child: TextField(
-                        onChanged: (value) => setState(() => _query = value),
-                        decoration: const InputDecoration(
-                          hintText: 'Rechercher un consommable',
-                          prefixIcon: Icon(Icons.search),
-                        ),
-                      ),
-                    ),
-                    FilterChip(
-                      label: const Text('À acheter'),
-                      selected: _purchaseOnly,
-                      onSelected: (value) =>
-                          setState(() => _purchaseOnly = value),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: DsSpacing.lg),
-                if (filtered.isEmpty)
-                  const AppEmptyState(
-                    title: 'Aucun consommable',
-                    message: 'Ajoutez un consommable ou modifiez les filtres.',
-                    icon: Icons.shopping_basket_outlined,
-                  )
-                else
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final width = constraints.maxWidth >= 1100
-                          ? (constraints.maxWidth - DsSpacing.lg) / 2
-                          : constraints.maxWidth;
-                      return Wrap(
-                        spacing: DsSpacing.lg,
-                        runSpacing: DsSpacing.lg,
-                        children: [
-                          for (final item in filtered)
-                            SizedBox(
-                              width: width,
-                              child: _ConsumableCard(
-                                item: item,
-                                onMove: () => _openMovement(item),
-                                onEdit: () => _openEditor(item),
-                                onHistory: () => _openHistory(item),
-                                onArchive: () => _archive(item),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-              ],
-            );
-          },
-        ),
-      ),
+      child: widget.embedded
+          ? content
+          : Scaffold(backgroundColor: Colors.transparent, body: content),
     );
   }
 

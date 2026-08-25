@@ -57,6 +57,7 @@ abstract final class DsIcons {
   static const IconData scale = LucideIcons.scale;
   static const IconData route = LucideIcons.route;
   static const IconData truck = LucideIcons.truck;
+  static const IconData package = LucideIcons.package;
   static const IconData utensils = LucideIcons.utensils;
   static const IconData heart = LucideIcons.heart;
   static const IconData footprints = LucideIcons.footprints;
