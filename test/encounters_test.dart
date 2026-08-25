@@ -2,6 +2,7 @@ import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
+import 'package:club_sandwich/features/consumables/domain/consumable.dart';
 import 'package:club_sandwich/features/encounters/data/encounter_location_service.dart';
 import 'package:club_sandwich/features/encounters/data/encounter_providers.dart';
 import 'package:club_sandwich/features/encounters/data/encounter_repository.dart';
@@ -143,6 +144,65 @@ void main() {
       expect(repository.lastMaraudeId, 'maraude-1');
       expect(find.text('Rencontre enregistrée ✓'), findsOneWidget);
     });
+
+    testWidgets(
+      'Distribution calcule les boîtes restantes depuis le stock emporté',
+      (tester) async {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              currentUserContextProvider.overrideWith(
+                (ref) async => const CurrentUserContext(
+                  profileId: 'user-1',
+                  role: AppUserRole.volunteer,
+                  status: UserAccountStatus.active,
+                ),
+              ),
+              concertDetailsProvider(
+                'maraude-1',
+              ).overrideWith((ref) async => _concert),
+              concertVolunteerSectionProvider('maraude-1').overrideWith(
+                (ref) async => const ConcertVolunteerSectionData(
+                  counts: ConcertVolunteerCounts.empty(),
+                  isAdmin: false,
+                  applications: [],
+                ),
+              ),
+              maraudeOperationBundleProvider(
+                'maraude-1',
+              ).overrideWith((ref) async => _bundle),
+            ],
+            child: const MaterialApp(
+              home: MaraudeOperationScreen(concertId: 'maraude-1'),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('38 boîtes emportées depuis le stock'),
+          findsOneWidget,
+        );
+        final distributed = find.byWidgetPredicate(
+          (widget) =>
+              widget is TextField &&
+              widget.decoration?.labelText == 'Boîtes distribuées',
+        );
+        final remaining = find.byWidgetPredicate(
+          (widget) =>
+              widget is TextField &&
+              widget.decoration?.labelText == 'Boîtes restantes',
+        );
+
+        expect(tester.widget<TextField>(remaining).readOnly, isTrue);
+        expect(tester.widget<TextField>(remaining).controller?.text, '38');
+
+        await tester.enterText(distributed, '25');
+        await tester.pump();
+
+        expect(tester.widget<TextField>(remaining).controller?.text, '13');
+      },
+    );
   });
 }
 
@@ -180,7 +240,18 @@ final _bundle = MaraudeOperationBundle(
     createdAt: DateTime(2026, 8, 25),
     updatedAt: DateTime(2026, 8, 25),
   ),
-  consumables: const [],
+  consumables: const [
+    MaraudeConsumableAllocation(
+      id: 'allocation-1',
+      concertId: 'maraude-1',
+      consumableId: 'consumable-1',
+      name: 'Boîtes alimentaires',
+      unit: InventoryUnit.box,
+      plannedQuantity: 40,
+      actualQuantity: 38,
+      availableQuantity: 262,
+    ),
+  ],
   equipment: const [],
   collections: const [],
   history: const [],

@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('affiche la variante bleue sans exception', (tester) async {
+  testWidgets('affiche le logo officiel bleu sans exception', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(home: Center(child: ClubSandwichMascot(size: 96))),
     );
@@ -18,17 +18,17 @@ void main() {
     expect(size, 96);
   });
 
-  testWidgets('affiche la variante orange sans exception', (tester) async {
+  testWidgets('respecte la taille demandée', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Center(
-          child: ClubSandwichMascot(size: 48, color: MascotColor.orange),
-        ),
-      ),
+      const MaterialApp(home: Center(child: ClubSandwichMascot(size: 48))),
     );
     await tester.pumpAndSettle();
 
     expect(find.byType(SvgPicture), findsOneWidget);
     expect(tester.takeException(), isNull);
+
+    final svgWidget = tester.widget<SvgPicture>(find.byType(SvgPicture));
+    expect(svgWidget.width, 48);
+    expect(svgWidget.height, 48);
   });
 }

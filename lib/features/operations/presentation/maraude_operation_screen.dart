@@ -189,9 +189,10 @@ class _MaraudeOperationScreenState
       _incidents.putIfAbsent(item.id, () => item.incidentType);
     }
     if (!_distributionInitialized) {
-      _distributed.text = '${data.distribution?.distributedBoxes ?? 0}';
-      _remaining.text =
-          '${data.distribution?.remainingBoxes ?? data.totalCollectedBoxes}';
+      final distributed = data.distribution?.distributedBoxes ?? 0;
+      final remaining = data.totalPreparedBoxes - distributed;
+      _distributed.text = '$distributed';
+      _remaining.text = '${remaining < 0 ? 0 : remaining}';
       _beneficiaries.text = '${data.distribution?.estimatedBeneficiaries ?? 0}';
       _distributionComment.text = data.distribution?.incidentComment ?? '';
       _distributionInitialized = true;
@@ -232,8 +233,10 @@ class _MaraudeOperationScreenState
       active: current == viewed,
       onDistributedChanged: () {
         final distributed = int.tryParse(_distributed.text);
-        if (distributed != null && distributed <= data.totalCollectedBoxes) {
-          _remaining.text = '${data.totalCollectedBoxes - distributed}';
+        if (distributed != null && distributed <= data.totalPreparedBoxes) {
+          _remaining.text = '${data.totalPreparedBoxes - distributed}';
+        } else {
+          _remaining.text = '0';
         }
       },
       onRecordEncounter: _recordEncounter,
@@ -340,14 +343,24 @@ class _MaraudeOperationScreenState
     MaraudeOperationBundle data, {
     required bool validate,
   }) async {
+    final distributedBoxes = _parseInt(_distributed.text);
+    if (distributedBoxes > data.totalPreparedBoxes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Le nombre de boîtes distribuées ne peut pas dépasser les '
+            '${data.totalPreparedBoxes} boîtes emportées.',
+          ),
+        ),
+      );
+      return;
+    }
     await _run(() async {
       await ref
           .read(maraudeOperationRepositoryProvider)
           .saveDistribution(
             concertId: widget.concertId,
-            collectedBoxes: data.totalCollectedBoxes,
-            distributedBoxes: _parseInt(_distributed.text),
-            remainingBoxes: _parseInt(_remaining.text),
+            distributedBoxes: distributedBoxes,
             beneficiaries: _parseInt(_beneficiaries.text),
             comment: _distributionComment.text,
           );
@@ -713,7 +726,7 @@ class _DistributionStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _StepCard(
     title: '3. Distribution',
-    subtitle: '${data.totalCollectedBoxes} boîtes collectées',
+    subtitle: '${data.totalPreparedBoxes} boîtes emportées depuis le stock',
     children: [
       _QuantityRow(
         label: 'Boîtes distribuées',
@@ -730,6 +743,7 @@ class _DistributionStep extends StatelessWidget {
         label: 'Boîtes restantes',
         controller: remaining,
         integer: true,
+        readOnly: true,
       ),
       TextField(
         controller: comment,
@@ -859,7 +873,7 @@ class _SummaryStep extends StatelessWidget {
       children: [
         _InfoRow('Durée', duration),
         _InfoRow('Poids collecté', '${_number(data.totalCollectedWeight)} kg'),
-        _InfoRow('Boîtes collectées', '${data.totalCollectedBoxes}'),
+        _InfoRow('Boîtes emportées', '${data.totalPreparedBoxes}'),
         _InfoRow(
           'Boîtes distribuées',
           '${distribution?.distributedBoxes ?? 0}',
@@ -919,12 +933,14 @@ class _QuantityRow extends StatelessWidget {
     required this.label,
     required this.controller,
     this.enabled = true,
+    this.readOnly = false,
     this.integer = false,
     this.onChanged,
   });
   final String label;
   final TextEditingController controller;
   final bool enabled;
+  final bool readOnly;
   final bool integer;
   final ValueChanged<String>? onChanged;
 
@@ -934,6 +950,7 @@ class _QuantityRow extends StatelessWidget {
     child: TextField(
       controller: controller,
       enabled: enabled,
+      readOnly: readOnly,
       keyboardType: TextInputType.numberWithOptions(decimal: !integer),
       onChanged: onChanged,
       decoration: InputDecoration(labelText: label),

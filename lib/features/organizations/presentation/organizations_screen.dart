@@ -297,7 +297,7 @@ class _EmptyOrganizations extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const ClubSandwichMascot(size: 96, color: MascotColor.orange),
+            const ClubSandwichMascot(size: 96),
             const SizedBox(height: DsSpacing.lg),
             Text(
               'Aucune organisation',

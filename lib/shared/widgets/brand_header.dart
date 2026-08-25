@@ -8,7 +8,7 @@ class BrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const ClubSandwichMascot(size: 64, color: MascotColor.blue),
+        const ClubSandwichMascot(size: 64),
         const SizedBox(height: 12),
         Text(
           'Club Sandwich',

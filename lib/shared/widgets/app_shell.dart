@@ -241,7 +241,7 @@ class _SidebarLogo extends StatelessWidget {
             border: Border.all(color: colors.border, width: DsBorders.hairline),
           ),
           padding: const EdgeInsets.all(4),
-          child: const ClubSandwichMascot(size: 24, color: MascotColor.orange),
+          child: const ClubSandwichMascot(size: 24),
         ),
         const SizedBox(width: DsSpacing.sm),
         Expanded(

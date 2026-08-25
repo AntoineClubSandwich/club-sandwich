@@ -175,6 +175,11 @@ void main() {
       expect(bundle.totalCollectedWeight, closeTo(9.3, 0.0001));
     });
 
+    test('calcule les boîtes emportées depuis les consommables validés', () {
+      final bundle = MaraudeOperationBundle.fromJson(bundleJson);
+      expect(bundle.totalPreparedBoxes, 1);
+    });
+
     test(
       'parse les boîtes de distribution sans les confondre avec les repas',
       () {

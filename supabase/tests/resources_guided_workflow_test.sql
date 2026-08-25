@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(36);
+select plan(40);
 
 select has_table('public', 'consumables', 'La table des consommables existe');
 select has_table('public', 'consumable_movements', 'L’historique de stock existe');
@@ -28,6 +28,7 @@ select enum_has_labels(
 select has_function('public', 'validate_maraude_preparation', array['uuid', 'jsonb', 'jsonb'], 'La validation de préparation est transactionnelle');
 select has_function('public', 'validate_maraude_step', array['uuid', 'maraude_operational_step'], 'La progression est transactionnelle');
 select has_function('public', 'complete_guided_maraude', array['uuid'], 'La clôture guidée est transactionnelle');
+select has_function('public', 'save_maraude_distribution_v3', array['uuid', 'integer', 'integer', 'text'], 'La distribution calcule les boîtes depuis le stock préparé');
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -176,8 +177,24 @@ select lives_ok(
   'La collecte complète est validée'
 );
 select lives_ok(
-  $$ select public.save_maraude_distribution_v2('b1000000-0000-0000-0000-000000000001', 8, 7, 1, 6, null) $$,
+  $$ select public.save_maraude_distribution_v3('b1000000-0000-0000-0000-000000000001', 1, 6, null) $$,
   'Un membre enregistre la distribution'
+);
+select results_eq(
+  $$ select collected_boxes from public.maraude_distributions where concert_id = 'b1000000-0000-0000-0000-000000000001' $$,
+  array[2],
+  'Les boîtes disponibles proviennent des consommables réellement emportés'
+);
+select results_eq(
+  $$ select remaining_boxes from public.maraude_distributions where concert_id = 'b1000000-0000-0000-0000-000000000001' $$,
+  array[1],
+  'Les boîtes restantes sont calculées automatiquement'
+);
+select throws_ok(
+  $$ select public.save_maraude_distribution_v3('b1000000-0000-0000-0000-000000000001', 3, 6, null) $$,
+  '22023',
+  'Le nombre de boîtes distribuées dépasse les boîtes emportées',
+  'La distribution ne peut pas dépasser le stock emporté'
 );
 select lives_ok(
   $$ select public.validate_maraude_step('b1000000-0000-0000-0000-000000000001', 'distribution') $$,

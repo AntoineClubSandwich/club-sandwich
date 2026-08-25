@@ -1,6 +1,6 @@
 # Mascotte Club Sandwich
 
-Assets vectoriels officiels de la mascotte Club Sandwich (le personnage
+Asset vectoriel officiel de la mascotte Club Sandwich (le personnage
 note-de-musique/livre). Vectorisés fidèlement à partir de
 `assets_source/club_sandwich_reference.png` par traçage bitmap déterministe
 (`potrace`) — aucune génération ni réinterprétation graphique. Correspondance
@@ -12,15 +12,12 @@ raster, pas une forme modifiée.
 
 | Fichier | Description |
 |---|---|
-| `club_sandwich_mascot_blue.svg` | Mascotte, accent (note) en bleu marque |
-| `club_sandwich_mascot_orange.svg` | Mascotte, accent (note) en orange marque |
+| `club_sandwich_mascot_blue.svg` | Mascotte officielle, note en bleu marque |
 
-Les deux fichiers partagent exactement la même géométrie (silhouette,
-proportions, expression) — seule la couleur de la note change. `viewBox="0 0
-548 665"`, deux groupes nommés par fichier :
+Le fichier utilise un `viewBox="0 0 548 665"` et deux groupes nommés :
 
 - `#mascot-outline` — traits/silhouette noirs (`#000000`)
-- `#mascot-note-accent` — la note de musique (couleur de la variante)
+- `#mascot-note-accent` — la note de musique bleue
 
 Aucun bitmap intégré ; compatible `flutter_svg`.
 
@@ -28,14 +25,12 @@ Aucun bitmap intégré ; compatible `flutter_svg`.
 
 | Rôle | Hex | Origine |
 |---|---|---|
-| Silhouette (les deux variantes) | `#000000` | échantillonné sur la référence |
-| Accent — variante bleue | `#293283` | échantillonné sur la référence ; identique à `AppColors.primary` (`lib/core/theme/app_theme.dart`) et `DsColors.secondary` (`lib/design_system/tokens/ds_colors.dart`) |
-| Accent — variante orange | `#EA5133` | couleur de marque déjà établie ; identique à `AppColors.accent` et `DsColors.primary` |
+| Silhouette | `#000000` | échantillonné sur la référence |
+| Note bleue | `#293283` | échantillonnée sur la référence ; identique à `AppColors.primary` (`lib/core/theme/app_theme.dart`) et `DsColors.secondary` (`lib/design_system/tokens/ds_colors.dart`) |
 
 ## Règles d'utilisation
 
-- **Ne jamais redessiner, recolorier au-delà des deux variantes fournies, ou
-  déformer la mascotte.** Toute nouvelle variante de couleur doit être
+- **Ne jamais redessiner, recolorier ou déformer la mascotte.** Toute nouvelle variante de couleur doit être
   produite par le même processus de traçage à partir de la référence, jamais
   dessinée à la main ni générée.
 - Utiliser le widget `ClubSandwichMascot`
@@ -44,9 +39,7 @@ Aucun bitmap intégré ; compatible `flutter_svg`.
   toute l'app.
 - Respecter la zone de respiration native du dessin (le `viewBox` inclut déjà
   une marge) — ne pas recadrer davantage ni superposer d'éléments dessus.
-- Choisir la variante de couleur selon le fond : `blue` sur fond clair/neutre
-  (usage par défaut), `orange` pour les accents/CTA ou sur fond où le bleu
-  manquerait de contraste.
+- La note reste toujours bleue (`#293283`), conformément au logo associatif.
 - Ne pas utiliser la mascotte comme icône fonctionnelle (bouton, statut) —
   c'est un élément de marque/illustration, pas une icône UI (utiliser
   `lib/design_system/icons/ds_icons.dart` pour ça).

@@ -242,6 +242,10 @@ class MaraudeOperationBundle {
       .where((line) => line.unit == CollectionUnit.box)
       .fold(0, (total, line) => total + line.quantity.round());
 
+  int get totalPreparedBoxes => consumables
+      .where((item) => item.unit == InventoryUnit.box)
+      .fold(0, (total, item) => total + (item.actualQuantity ?? 0).round());
+
   double get totalCollectedWeight =>
       collections.fold(0, (total, line) => total + (line.weightKg ?? 0));
 }
