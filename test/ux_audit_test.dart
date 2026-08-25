@@ -1,4 +1,5 @@
 import 'package:club_sandwich/core/config/environment.dart';
+import 'package:club_sandwich/design_system/components/navigation/ds_top_bar.dart';
 import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
@@ -13,6 +14,7 @@ import 'package:club_sandwich/features/concerts/presentation/concert_form.dart';
 import 'package:club_sandwich/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:club_sandwich/features/distributions/presentation/maraude_distribution_form_dialog.dart';
 import 'package:club_sandwich/features/invitations/data/invitation_providers.dart';
+import 'package:club_sandwich/features/notifications/presentation/workflow_notifications_button.dart';
 import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
 import 'package:club_sandwich/features/volunteers/data/volunteer_document_providers.dart';
@@ -205,6 +207,7 @@ void main() {
 
     expect(find.text('Accueil'), findsWidgets);
     expect(find.byKey(AppShell.desktopSidebarKey), findsNothing);
+    expect(find.byType(DsTopBar), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await _setViewport(tester, const Size(1280, 800));
@@ -212,6 +215,8 @@ void main() {
 
     expect(find.byKey(AppShell.desktopSidebarKey), findsOneWidget);
     expect(find.text('Accueil'), findsWidgets);
+    expect(find.byType(DsTopBar), findsNothing);
+    expect(find.byType(WorkflowNotificationsButton), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

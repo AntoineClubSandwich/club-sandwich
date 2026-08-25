@@ -171,10 +171,6 @@ class AppShell extends ConsumerWidget {
     return Theme(
       data: DsTheme.light,
       child: Scaffold(
-        appBar: DsTopBar(
-          title: destinations[selectedIndex].label,
-          actions: const [WorkflowNotificationsButton()],
-        ),
         body: Row(
           children: [
             _DsSidebar(
@@ -463,7 +459,15 @@ class _DsSidebar extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _SidebarLogo(dark: dark),
+                Row(
+                  children: [
+                    Expanded(child: _SidebarLogo(dark: dark)),
+                    const SizedBox(width: DsSpacing.sm),
+                    WorkflowNotificationsButton(
+                      foregroundColor: dark ? Colors.white : colors.textPrimary,
+                    ),
+                  ],
+                ),
                 if (dark) ...[
                   const SizedBox(height: DsSpacing.sm),
                   const DsBadge(

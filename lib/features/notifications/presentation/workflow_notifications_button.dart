@@ -16,7 +16,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 class WorkflowNotificationsButton extends ConsumerWidget {
-  const WorkflowNotificationsButton({super.key});
+  const WorkflowNotificationsButton({this.foregroundColor, super.key});
+
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -30,7 +32,7 @@ class WorkflowNotificationsButton extends ConsumerWidget {
       count: unreadCount ?? 0,
       child: IconButton(
         tooltip: 'Notifications',
-        icon: Icon(DsIcons.bell, color: colors.textPrimary),
+        icon: Icon(DsIcons.bell, color: foregroundColor ?? colors.textPrimary),
         onPressed: () => showDialog<void>(
           context: context,
           builder: (context) => const _WorkflowNotificationsDialog(),
