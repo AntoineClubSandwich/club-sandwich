@@ -8,6 +8,7 @@ import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/collections/domain/maraude_collection.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
+import 'package:club_sandwich/features/consumables/domain/consumable.dart';
 import 'package:club_sandwich/features/encounters/data/encounter_location_service.dart';
 import 'package:club_sandwich/features/encounters/data/encounter_providers.dart';
 import 'package:club_sandwich/features/operations/data/maraude_operation_providers.dart';
@@ -36,10 +37,9 @@ class _MaraudeOperationScreenState
   MaraudeOperationalStep? _viewedStep;
   final Map<String, TextEditingController> _preparationControllers = {};
   final Map<String, TextEditingController> _returnControllers = {};
+  final Map<String, TextEditingController> _distributionControllers = {};
   final Map<String, EquipmentIncidentType?> _incidents = {};
   final Map<String, TextEditingController> _incidentNotes = {};
-  final _distributed = TextEditingController();
-  final _remaining = TextEditingController();
   final _beneficiaries = TextEditingController();
   final _distributionComment = TextEditingController();
   var _distributionInitialized = false;
@@ -51,9 +51,8 @@ class _MaraudeOperationScreenState
     for (final controller in [
       ..._preparationControllers.values,
       ..._returnControllers.values,
+      ..._distributionControllers.values,
       ..._incidentNotes.values,
-      _distributed,
-      _remaining,
       _beneficiaries,
       _distributionComment,
     ]) {
@@ -189,10 +188,21 @@ class _MaraudeOperationScreenState
       _incidents.putIfAbsent(item.id, () => item.incidentType);
     }
     if (!_distributionInitialized) {
-      final distributed = data.distribution?.distributedBoxes ?? 0;
-      final remaining = data.totalPreparedBoxes - distributed;
-      _distributed.text = '$distributed';
-      _remaining.text = '${remaining < 0 ? 0 : remaining}';
+      final boxAllocations = data.consumables
+          .where((item) => item.unit == InventoryUnit.box)
+          .toList(growable: false);
+      for (final item in boxAllocations) {
+        var distributed = item.distributedBoxes;
+        if (item.distributedQuantity == null && boxAllocations.length == 1) {
+          final legacyTotal = data.distribution?.distributedBoxes ?? 0;
+          distributed = legacyTotal > item.preparedBoxes
+              ? item.preparedBoxes
+              : legacyTotal;
+        }
+        _distributionControllers[item.id] = TextEditingController(
+          text: '$distributed',
+        );
+      }
       _beneficiaries.text = '${data.distribution?.estimatedBeneficiaries ?? 0}';
       _distributionComment.text = data.distribution?.incidentComment ?? '';
       _distributionInitialized = true;
@@ -224,21 +234,13 @@ class _MaraudeOperationScreenState
     ),
     MaraudeOperationalStep.distribution => _DistributionStep(
       data: data,
-      distributed: _distributed,
-      remaining: _remaining,
+      controllers: _distributionControllers,
       beneficiaries: _beneficiaries,
       comment: _distributionComment,
       saving: _saving,
       recordingEncounter: _recordingEncounter,
       active: current == viewed,
-      onDistributedChanged: () {
-        final distributed = int.tryParse(_distributed.text);
-        if (distributed != null && distributed <= data.totalPreparedBoxes) {
-          _remaining.text = '${data.totalPreparedBoxes - distributed}';
-        } else {
-          _remaining.text = '0';
-        }
-      },
+      onDistributedChanged: () => setState(() {}),
       onRecordEncounter: _recordEncounter,
       onSave: () => _saveDistribution(data, validate: current == viewed),
     ),
@@ -343,24 +345,31 @@ class _MaraudeOperationScreenState
     MaraudeOperationBundle data, {
     required bool validate,
   }) async {
-    final distributedBoxes = _parseInt(_distributed.text);
-    if (distributedBoxes > data.totalPreparedBoxes) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Le nombre de boîtes distribuées ne peut pas dépasser les '
-            '${data.totalPreparedBoxes} boîtes emportées.',
+    final boxAllocations = data.consumables.where(
+      (item) => item.unit == InventoryUnit.box,
+    );
+    final distributedByAllocation = <String, int>{};
+    for (final item in boxAllocations) {
+      final distributed = _parseInt(_distributionControllers[item.id]!.text);
+      if (distributed > item.preparedBoxes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${item.name} : la quantité écoulée ne peut pas dépasser les '
+              '${item.preparedBoxes} emportées.',
+            ),
           ),
-        ),
-      );
-      return;
+        );
+        return;
+      }
+      distributedByAllocation[item.id] = distributed;
     }
     await _run(() async {
       await ref
           .read(maraudeOperationRepositoryProvider)
           .saveDistribution(
             concertId: widget.concertId,
-            distributedBoxes: distributedBoxes,
+            distributedBoxesByAllocation: distributedByAllocation,
             beneficiaries: _parseInt(_beneficiaries.text),
             comment: _distributionComment.text,
           );
@@ -700,8 +709,7 @@ class _CollectionStep extends StatelessWidget {
 class _DistributionStep extends StatelessWidget {
   const _DistributionStep({
     required this.data,
-    required this.distributed,
-    required this.remaining,
+    required this.controllers,
     required this.beneficiaries,
     required this.comment,
     required this.saving,
@@ -712,8 +720,7 @@ class _DistributionStep extends StatelessWidget {
     required this.onSave,
   });
   final MaraudeOperationBundle data;
-  final TextEditingController distributed;
-  final TextEditingController remaining;
+  final Map<String, TextEditingController> controllers;
   final TextEditingController beneficiaries;
   final TextEditingController comment;
   final bool saving;
@@ -724,60 +731,125 @@ class _DistributionStep extends StatelessWidget {
   final VoidCallback onSave;
 
   @override
-  Widget build(BuildContext context) => _StepCard(
-    title: '3. Distribution',
-    subtitle: '${data.totalPreparedBoxes} boîtes emportées depuis le stock',
-    children: [
-      _QuantityRow(
-        label: 'Boîtes distribuées',
-        controller: distributed,
-        integer: true,
-        onChanged: (_) => onDistributedChanged(),
-      ),
-      _QuantityRow(
-        label: 'Bénéficiaires',
-        controller: beneficiaries,
-        integer: true,
-      ),
-      _QuantityRow(
-        label: 'Boîtes restantes',
-        controller: remaining,
-        integer: true,
-        readOnly: true,
-      ),
-      TextField(
-        controller: comment,
-        maxLines: 3,
-        decoration: const InputDecoration(
-          labelText: 'Commentaire ou incident (optionnel)',
+  Widget build(BuildContext context) {
+    final boxAllocations = data.consumables
+        .where((item) => item.unit == InventoryUnit.box)
+        .toList(growable: false);
+    return _StepCard(
+      title: '3. Distribution',
+      subtitle:
+          '${data.totalPreparedBoxes} boîtes emportées · '
+          '${boxAllocations.length} ${boxAllocations.length == 1 ? 'référence' : 'références'}',
+      children: [
+        Text('Boîtes écoulées par référence', style: DsTypography.h3),
+        const SizedBox(height: DsSpacing.sm),
+        if (boxAllocations.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(bottom: DsSpacing.md),
+            child: Text(
+              'Aucune boîte n’a été emportée pendant la préparation.',
+            ),
+          ),
+        for (final item in boxAllocations)
+          _ConsumableDistributionRow(
+            item: item,
+            controller: controllers[item.id]!,
+            onChanged: onDistributedChanged,
+          ),
+        const Divider(height: DsSpacing.xl),
+        _QuantityRow(
+          label: 'Bénéficiaires',
+          controller: beneficiaries,
+          integer: true,
+        ),
+        TextField(
+          controller: comment,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Commentaire ou incident (optionnel)',
+          ),
+        ),
+        const Divider(height: DsSpacing.xl),
+        Text('Rencontres', style: DsTypography.h3),
+        const SizedBox(height: DsSpacing.xs),
+        Text(
+          '${data.encounterCount} ${data.encounterCount == 1 ? 'rencontre enregistrée' : 'rencontres enregistrées'}',
+        ),
+        const SizedBox(height: DsSpacing.md),
+        DsPrimaryButton(
+          label: 'Enregistrer une rencontre',
+          icon: Icons.add_location_alt_outlined,
+          isLoading: recordingEncounter,
+          isFullWidth: true,
+          onPressed: active && !recordingEncounter ? onRecordEncounter : null,
+        ),
+        const SizedBox(height: DsSpacing.xl),
+        DsPrimaryButton(
+          label: active
+              ? 'Terminer la distribution'
+              : 'Enregistrer les corrections',
+          icon: active ? Icons.arrow_forward : Icons.save_outlined,
+          isLoading: saving,
+          isFullWidth: true,
+          onPressed: onSave,
+        ),
+      ],
+    );
+  }
+}
+
+class _ConsumableDistributionRow extends StatelessWidget {
+  const _ConsumableDistributionRow({
+    required this.item,
+    required this.controller,
+    required this.onChanged,
+  });
+
+  final MaraudeConsumableAllocation item;
+  final TextEditingController controller;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final distributed = int.tryParse(controller.text) ?? 0;
+    final remaining = item.preparedBoxes - distributed;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: DsSpacing.md),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(DsSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(item.name, style: DsTypography.h3),
+              const SizedBox(height: DsSpacing.xs),
+              Text(
+                '${item.preparedBoxes} ${item.preparedBoxes == 1 ? 'boîte emportée' : 'boîtes emportées'}',
+              ),
+              const SizedBox(height: DsSpacing.md),
+              _QuantityRow(
+                key: ValueKey('distributed-${item.id}'),
+                label: 'Quantité écoulée',
+                controller: controller,
+                integer: true,
+                onChanged: (_) => onChanged(),
+              ),
+              Text(
+                '${remaining < 0 ? 0 : remaining} '
+                '${remaining == 1 ? 'boîte restante' : 'boîtes restantes'}',
+              ),
+            ],
+          ),
         ),
       ),
-      const Divider(height: DsSpacing.xl),
-      Text('Rencontres', style: DsTypography.h3),
-      const SizedBox(height: DsSpacing.xs),
-      Text(
-        '${data.encounterCount} ${data.encounterCount == 1 ? 'rencontre enregistrée' : 'rencontres enregistrées'}',
-      ),
-      const SizedBox(height: DsSpacing.md),
-      DsPrimaryButton(
-        label: 'Enregistrer une rencontre',
-        icon: Icons.add_location_alt_outlined,
-        isLoading: recordingEncounter,
-        isFullWidth: true,
-        onPressed: active && !recordingEncounter ? onRecordEncounter : null,
-      ),
-      const SizedBox(height: DsSpacing.xl),
-      DsPrimaryButton(
-        label: active
-            ? 'Terminer la distribution'
-            : 'Enregistrer les corrections',
-        icon: active ? Icons.arrow_forward : Icons.save_outlined,
-        isLoading: saving,
-        isFullWidth: true,
-        onPressed: onSave,
-      ),
-    ],
-  );
+    );
+  }
 }
 
 class _EquipmentReturnStep extends StatelessWidget {
@@ -930,17 +1002,16 @@ class _StepCard extends StatelessWidget {
 
 class _QuantityRow extends StatelessWidget {
   const _QuantityRow({
+    super.key,
     required this.label,
     required this.controller,
     this.enabled = true,
-    this.readOnly = false,
     this.integer = false,
     this.onChanged,
   });
   final String label;
   final TextEditingController controller;
   final bool enabled;
-  final bool readOnly;
   final bool integer;
   final ValueChanged<String>? onChanged;
 
@@ -950,7 +1021,6 @@ class _QuantityRow extends StatelessWidget {
     child: TextField(
       controller: controller,
       enabled: enabled,
-      readOnly: readOnly,
       keyboardType: TextInputType.numberWithOptions(decimal: !integer),
       onChanged: onChanged,
       decoration: InputDecoration(labelText: label),

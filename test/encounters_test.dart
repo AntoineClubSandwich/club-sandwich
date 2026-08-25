@@ -179,28 +179,24 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(
-          find.text('38 boîtes emportées depuis le stock'),
-          findsOneWidget,
-        );
-        final distributed = find.byWidgetPredicate(
-          (widget) =>
-              widget is TextField &&
-              widget.decoration?.labelText == 'Boîtes distribuées',
-        );
-        final remaining = find.byWidgetPredicate(
-          (widget) =>
-              widget is TextField &&
-              widget.decoration?.labelText == 'Boîtes restantes',
-        );
+        expect(find.text('50 boîtes emportées · 2 références'), findsOneWidget);
+        expect(find.text('Boîtes alimentaires'), findsOneWidget);
+        expect(find.text('Petites barquettes'), findsOneWidget);
+        expect(find.text('38 boîtes restantes'), findsOneWidget);
+        expect(find.text('12 boîtes restantes'), findsOneWidget);
 
-        expect(tester.widget<TextField>(remaining).readOnly, isTrue);
-        expect(tester.widget<TextField>(remaining).controller?.text, '38');
-
-        await tester.enterText(distributed, '25');
+        await tester.enterText(
+          find.byKey(const ValueKey('distributed-allocation-1')),
+          '25',
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('distributed-allocation-2')),
+          '5',
+        );
         await tester.pump();
 
-        expect(tester.widget<TextField>(remaining).controller?.text, '13');
+        expect(find.text('13 boîtes restantes'), findsOneWidget);
+        expect(find.text('7 boîtes restantes'), findsOneWidget);
       },
     );
   });
@@ -250,6 +246,16 @@ final _bundle = MaraudeOperationBundle(
       plannedQuantity: 40,
       actualQuantity: 38,
       availableQuantity: 262,
+    ),
+    MaraudeConsumableAllocation(
+      id: 'allocation-2',
+      concertId: 'maraude-1',
+      consumableId: 'consumable-2',
+      name: 'Petites barquettes',
+      unit: InventoryUnit.box,
+      plannedQuantity: 12,
+      actualQuantity: 12,
+      availableQuantity: 88,
     ),
   ],
   equipment: const [],

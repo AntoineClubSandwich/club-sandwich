@@ -92,6 +92,7 @@ class MaraudeConsumableAllocation {
     required this.plannedQuantity,
     required this.availableQuantity,
     this.actualQuantity,
+    this.distributedQuantity,
     this.validatedAt,
   });
 
@@ -104,6 +105,7 @@ class MaraudeConsumableAllocation {
         unit: InventoryUnit.fromJson(json['unit'] as String),
         plannedQuantity: (json['planned_quantity'] as num).toDouble(),
         actualQuantity: (json['actual_quantity'] as num?)?.toDouble(),
+        distributedQuantity: (json['distributed_quantity'] as num?)?.toDouble(),
         availableQuantity: (json['available_quantity'] as num).toDouble(),
         validatedAt: _date(json['validated_at']),
       );
@@ -115,8 +117,13 @@ class MaraudeConsumableAllocation {
   final InventoryUnit unit;
   final double plannedQuantity;
   final double? actualQuantity;
+  final double? distributedQuantity;
   final double availableQuantity;
   final DateTime? validatedAt;
+
+  int get preparedBoxes => (actualQuantity ?? 0).round();
+  int get distributedBoxes => (distributedQuantity ?? 0).round();
+  int get remainingBoxes => preparedBoxes - distributedBoxes;
 }
 
 class MaraudeEquipmentAllocation {
@@ -244,7 +251,11 @@ class MaraudeOperationBundle {
 
   int get totalPreparedBoxes => consumables
       .where((item) => item.unit == InventoryUnit.box)
-      .fold(0, (total, item) => total + (item.actualQuantity ?? 0).round());
+      .fold(0, (total, item) => total + item.preparedBoxes);
+
+  int get totalDistributedConsumableBoxes => consumables
+      .where((item) => item.unit == InventoryUnit.box)
+      .fold(0, (total, item) => total + item.distributedBoxes);
 
   double get totalCollectedWeight =>
       collections.fold(0, (total, line) => total + (line.weightKg ?? 0));

@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(40);
+select plan(42);
 
 select has_table('public', 'consumables', 'La table des consommables existe');
 select has_table('public', 'consumable_movements', 'L’historique de stock existe');
@@ -28,7 +28,7 @@ select enum_has_labels(
 select has_function('public', 'validate_maraude_preparation', array['uuid', 'jsonb', 'jsonb'], 'La validation de préparation est transactionnelle');
 select has_function('public', 'validate_maraude_step', array['uuid', 'maraude_operational_step'], 'La progression est transactionnelle');
 select has_function('public', 'complete_guided_maraude', array['uuid'], 'La clôture guidée est transactionnelle');
-select has_function('public', 'save_maraude_distribution_v3', array['uuid', 'integer', 'integer', 'text'], 'La distribution calcule les boîtes depuis le stock préparé');
+select has_function('public', 'save_maraude_distribution_v4', array['uuid', 'jsonb', 'integer', 'text'], 'La distribution ventile les boîtes par référence');
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -85,6 +85,10 @@ select lives_ok(
   $$ select public.create_consumable('Gants test', 'Hygiène', 'box', 10, 2, 'Local') $$,
   'Un admin crée un consommable avec son stock initial'
 );
+select lives_ok(
+  $$ select public.create_consumable('Barquettes test', 'Conditionnement', 'box', 12, 2, 'Local') $$,
+  'Un admin crée une seconde référence de boîtes'
+);
 
 insert into public.equipment_locations (id, name)
 values ('b2000000-0000-0000-0000-000000000001', 'Local test');
@@ -103,10 +107,11 @@ select lives_ok(
   format(
     $$ select public.plan_maraude_resources(
       'b1000000-0000-0000-0000-000000000001',
-      '[{"consumable_id":"%s","planned_quantity":2}]'::jsonb,
+      '[{"consumable_id":"%s","planned_quantity":2},{"consumable_id":"%s","planned_quantity":3}]'::jsonb,
       '[{"equipment_id":"b3000000-0000-0000-0000-000000000001","planned_quantity":1}]'::jsonb
     ) $$,
-    (select id from public.consumables where name = 'Gants test')
+    (select id from public.consumables where name = 'Gants test'),
+    (select id from public.consumables where name = 'Barquettes test')
   ),
   'Un admin planifie toutes les ressources en une transaction'
 );
@@ -142,10 +147,11 @@ select lives_ok(
   format(
     $$ select public.validate_maraude_preparation(
       'b1000000-0000-0000-0000-000000000001',
-      '[{"allocation_id":"%s","actual_quantity":2}]'::jsonb,
+      '[{"allocation_id":"%s","actual_quantity":2},{"allocation_id":"%s","actual_quantity":3}]'::jsonb,
       '[{"allocation_id":"%s","taken_quantity":1}]'::jsonb
     ) $$,
-    (select id from public.maraude_consumable_allocations where concert_id = 'b1000000-0000-0000-0000-000000000001'),
+    (select allocation.id from public.maraude_consumable_allocations allocation where allocation.concert_id = 'b1000000-0000-0000-0000-000000000001' and allocation.planned_quantity = 2),
+    (select allocation.id from public.maraude_consumable_allocations allocation where allocation.concert_id = 'b1000000-0000-0000-0000-000000000001' and allocation.planned_quantity = 3),
     (select id from public.maraude_equipment_allocations where concert_id = 'b1000000-0000-0000-0000-000000000001')
   ),
   'Un membre confirmé valide la préparation'
@@ -158,7 +164,7 @@ select results_eq(
 );
 select results_eq(
   $$ select count(*)::integer from public.consumable_movements where reason = 'maraude' $$,
-  array[1],
+  array[2],
   'La sortie liée à la maraude est historisée'
 );
 select results_eq(
@@ -177,24 +183,47 @@ select lives_ok(
   'La collecte complète est validée'
 );
 select lives_ok(
-  $$ select public.save_maraude_distribution_v3('b1000000-0000-0000-0000-000000000001', 1, 6, null) $$,
+  format(
+    $$ select public.save_maraude_distribution_v4(
+      'b1000000-0000-0000-0000-000000000001',
+      '[{"allocation_id":"%s","distributed_quantity":1},{"allocation_id":"%s","distributed_quantity":2}]'::jsonb,
+      6,
+      null
+    ) $$,
+    (select allocation.id from public.maraude_consumable_allocations allocation where allocation.concert_id = 'b1000000-0000-0000-0000-000000000001' and allocation.planned_quantity = 2),
+    (select allocation.id from public.maraude_consumable_allocations allocation where allocation.concert_id = 'b1000000-0000-0000-0000-000000000001' and allocation.planned_quantity = 3)
+  ),
   'Un membre enregistre la distribution'
 );
 select results_eq(
   $$ select collected_boxes from public.maraude_distributions where concert_id = 'b1000000-0000-0000-0000-000000000001' $$,
-  array[2],
+  array[5],
   'Les boîtes disponibles proviennent des consommables réellement emportés'
 );
 select results_eq(
   $$ select remaining_boxes from public.maraude_distributions where concert_id = 'b1000000-0000-0000-0000-000000000001' $$,
-  array[1],
+  array[2],
   'Les boîtes restantes sont calculées automatiquement'
 );
+select results_eq(
+  $$ select allocation.distributed_quantity::integer from public.maraude_consumable_allocations allocation where allocation.concert_id = 'b1000000-0000-0000-0000-000000000001' and allocation.planned_quantity = 3 $$,
+  array[2],
+  'La quantité écoulée est conservée sur la référence concernée'
+);
 select throws_ok(
-  $$ select public.save_maraude_distribution_v3('b1000000-0000-0000-0000-000000000001', 3, 6, null) $$,
+  format(
+    $$ select public.save_maraude_distribution_v4(
+      'b1000000-0000-0000-0000-000000000001',
+      '[{"allocation_id":"%s","distributed_quantity":3},{"allocation_id":"%s","distributed_quantity":2}]'::jsonb,
+      6,
+      null
+    ) $$,
+    (select allocation.id from public.maraude_consumable_allocations allocation where allocation.concert_id = 'b1000000-0000-0000-0000-000000000001' and allocation.planned_quantity = 2),
+    (select allocation.id from public.maraude_consumable_allocations allocation where allocation.concert_id = 'b1000000-0000-0000-0000-000000000001' and allocation.planned_quantity = 3)
+  ),
   '22023',
-  'Le nombre de boîtes distribuées dépasse les boîtes emportées',
-  'La distribution ne peut pas dépasser le stock emporté'
+  'Quantité écoulée invalide pour une référence de boîtes',
+  'Une référence ne peut pas dépasser sa quantité emportée'
 );
 select lives_ok(
   $$ select public.validate_maraude_step('b1000000-0000-0000-0000-000000000001', 'distribution') $$,

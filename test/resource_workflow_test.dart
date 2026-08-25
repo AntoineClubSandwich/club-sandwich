@@ -94,6 +94,7 @@ void main() {
           'unit': 'box',
           'planned_quantity': 2,
           'actual_quantity': 1,
+          'distributed_quantity': 1,
           'available_quantity': 8,
         },
       ],
@@ -164,6 +165,7 @@ void main() {
         MaraudeOperationalStep.distribution,
       );
       expect(bundle.consumables.single.actualQuantity, 1);
+      expect(bundle.consumables.single.distributedQuantity, 1);
       expect(bundle.equipment.single.status, EquipmentStatus.inUse);
       expect(bundle.history.single.eventType, 'completed');
       expect(bundle.encounterCount, 13);
@@ -178,6 +180,7 @@ void main() {
     test('calcule les boîtes emportées depuis les consommables validés', () {
       final bundle = MaraudeOperationBundle.fromJson(bundleJson);
       expect(bundle.totalPreparedBoxes, 1);
+      expect(bundle.totalDistributedConsumableBoxes, 1);
     });
 
     test(

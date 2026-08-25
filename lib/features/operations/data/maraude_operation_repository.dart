@@ -89,16 +89,22 @@ class MaraudeOperationRepository {
 
   Future<MaraudeDistribution> saveDistribution({
     required String concertId,
-    required int distributedBoxes,
+    required Map<String, int> distributedBoxesByAllocation,
     required int beneficiaries,
     String? comment,
   }) async {
     final row = await client
         .rpc(
-          'save_maraude_distribution_v3',
+          'save_maraude_distribution_v4',
           params: {
             'requested_concert_id': concertId,
-            'requested_distributed_boxes': distributedBoxes,
+            'requested_box_distributions': [
+              for (final entry in distributedBoxesByAllocation.entries)
+                {
+                  'allocation_id': entry.key,
+                  'distributed_quantity': entry.value,
+                },
+            ],
             'requested_beneficiaries': beneficiaries,
             'requested_comment': comment,
           },
