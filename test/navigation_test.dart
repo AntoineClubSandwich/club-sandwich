@@ -214,6 +214,29 @@ void main() {
     },
   );
 
+  testWidgets('un deep link public initial est conservé', (tester) async {
+    tester.platformDispatcher.defaultRouteNameTestValue = '/forgot-password';
+    addTearDown(tester.platformDispatcher.clearDefaultRouteNameTestValue);
+    final authRepository = _AuthenticatedAuthRepository();
+    addTearDown(authRepository.dispose);
+    await authRepository.signOut();
+    final container = ProviderContainer(
+      overrides: [authRepositoryProvider.overrideWithValue(authRepository)],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const _RouterTestApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ForgotPasswordScreen), findsOneWidget);
+    expect(find.text('Mot de passe oublié'), findsOneWidget);
+  });
+
   testWidgets(
     'le drawer mobile affiche l’e-mail lorsque le profil est indisponible',
     (tester) async {

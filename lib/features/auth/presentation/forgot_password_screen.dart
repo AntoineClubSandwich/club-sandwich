@@ -1,4 +1,5 @@
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
+import 'package:club_sandwich/features/auth/presentation/widgets/auth_card_layout.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -56,106 +57,93 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Icon(
-                      Icons.lock_reset_outlined,
-                      size: 52,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Mot de passe oublié',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 24),
-                    if (_linkSent) ...[
-                      const Text(
-                        'Si un compte existe avec cette adresse, un lien de '
-                        'réinitialisation vient de lui être envoyé. '
-                        'Vérifiez votre boîte de réception.',
-                      ),
-                      const SizedBox(height: 20),
-                      TextButton(
-                        onPressed: () => context.go('/login'),
-                        child: const Text('Retour à la connexion'),
-                      ),
-                    ] else ...[
-                      const Text(
-                        'Saisissez votre adresse e-mail : nous vous '
-                        'enverrons un lien pour choisir un nouveau mot de '
-                        'passe.',
-                      ),
-                      const SizedBox(height: 20),
-                      Form(
-                        key: _formKey,
-                        child: TextFormField(
-                          key: const ValueKey('forgot-password-email'),
-                          controller: _emailController,
-                          autofocus: true,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.done,
-                          autocorrect: false,
-                          decoration: const InputDecoration(
-                            labelText: 'Adresse e-mail',
-                            prefixIcon: Icon(Icons.email_outlined),
-                          ),
-                          validator: _validateEmail,
-                          onFieldSubmitted: (_) {
-                            if (!_isLoading) _submit();
-                          },
-                        ),
-                      ),
-                      if (_errorMessage != null) ...[
-                        const SizedBox(height: 16),
-                        Semantics(
-                          liveRegion: true,
-                          child: Text(
-                            _errorMessage!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        key: const ValueKey('forgot-password-submit'),
-                        onPressed: _isLoading ? null : _submit,
-                        child: _isLoading
-                            ? const SizedBox.square(
-                                dimension: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('Envoyer le lien'),
-                      ),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () => context.go('/login'),
-                        child: const Text('Retour à la connexion'),
-                      ),
-                    ],
-                  ],
+      body: AuthCardLayout(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Icon(
+              Icons.lock_reset_outlined,
+              size: 52,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Mot de passe oublié',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 24),
+            if (_linkSent) ...[
+              const Text(
+                'Si un compte existe avec cette adresse, un lien de '
+                'réinitialisation vient de lui être envoyé. '
+                'Vérifiez votre boîte de réception.',
+              ),
+              const SizedBox(height: 20),
+              TextButton(
+                onPressed: () => context.go('/login'),
+                child: const Text('Retour à la connexion'),
+              ),
+            ] else ...[
+              const Text(
+                'Saisissez votre adresse e-mail : nous vous '
+                'enverrons un lien pour choisir un nouveau mot de '
+                'passe.',
+              ),
+              const SizedBox(height: 20),
+              Form(
+                key: _formKey,
+                child: TextFormField(
+                  key: const ValueKey('forgot-password-email'),
+                  controller: _emailController,
+                  autofocus: true,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.done,
+                  autocorrect: false,
+                  decoration: const InputDecoration(
+                    labelText: 'Adresse e-mail',
+                    prefixIcon: Icon(Icons.email_outlined),
+                  ),
+                  validator: _validateEmail,
+                  onFieldSubmitted: (_) {
+                    if (!_isLoading) _submit();
+                  },
                 ),
               ),
-            ),
-          ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    _errorMessage!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
+              ElevatedButton(
+                key: const ValueKey('forgot-password-submit'),
+                onPressed: _isLoading ? null : _submit,
+                child: _isLoading
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Envoyer le lien'),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: _isLoading ? null : () => context.go('/login'),
+                child: const Text('Retour à la connexion'),
+              ),
+            ],
+          ],
         ),
       ),
     );

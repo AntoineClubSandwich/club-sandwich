@@ -1,4 +1,5 @@
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
+import 'package:club_sandwich/features/auth/presentation/widgets/auth_card_layout.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
@@ -85,82 +86,70 @@ class _ActivationScreenState extends ConsumerState<ActivationScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _key,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Bienvenue sur Club Sandwich',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Définissez votre mot de passe et complétez votre profil.',
-                    ),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      key: const ValueKey('activation-password'),
-                      controller: _password,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Mot de passe',
-                      ),
-                      validator: (value) => value == null || value.length < 8
-                          ? 'Utilisez au moins 8 caractères.'
-                          : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _confirmation,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Confirmer le mot de passe',
-                      ),
-                      validator: (value) => value != _password.text
-                          ? 'Les mots de passe ne correspondent pas.'
-                          : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _firstName,
-                      decoration: const InputDecoration(labelText: 'Prénom'),
-                      validator: _required,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _lastName,
-                      decoration: const InputDecoration(labelText: 'Nom'),
-                      validator: _required,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _phone,
-                      keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'Téléphone (optionnel)',
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    FilledButton(
-                      onPressed: _saving ? null : _activate,
-                      child: Text(
-                        _saving ? 'Activation…' : 'Activer mon compte',
-                      ),
-                    ),
-                  ],
-                ),
+    body: AuthCardLayout(
+      maxWidth: 520,
+      pagePadding: const EdgeInsets.all(20),
+      cardPadding: const EdgeInsets.all(24),
+      child: Form(
+        key: _key,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Bienvenue sur Club Sandwich',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Définissez votre mot de passe et complétez votre profil.',
+            ),
+            const SizedBox(height: 20),
+            TextFormField(
+              key: const ValueKey('activation-password'),
+              controller: _password,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Mot de passe'),
+              validator: (value) => value == null || value.length < 8
+                  ? 'Utilisez au moins 8 caractères.'
+                  : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _confirmation,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Confirmer le mot de passe',
+              ),
+              validator: (value) => value != _password.text
+                  ? 'Les mots de passe ne correspondent pas.'
+                  : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _firstName,
+              decoration: const InputDecoration(labelText: 'Prénom'),
+              validator: _required,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _lastName,
+              decoration: const InputDecoration(labelText: 'Nom'),
+              validator: _required,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Téléphone (optionnel)',
               ),
             ),
-          ),
+            const SizedBox(height: 18),
+            FilledButton(
+              onPressed: _saving ? null : _activate,
+              child: Text(_saving ? 'Activation…' : 'Activer mon compte'),
+            ),
+          ],
         ),
       ),
     ),

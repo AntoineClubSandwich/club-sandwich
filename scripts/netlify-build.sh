@@ -73,3 +73,20 @@ flutter build web --release \
   --dart-define=APP_ENV="${APP_ENV}" \
   --dart-define=SUPABASE_URL="${SUPABASE_URL}" \
   --dart-define=SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY}"
+
+resolved_app_env="production"
+if [[ "${APP_ENV}" == "preprod" ]]; then
+  resolved_app_env="preprod"
+fi
+
+build_commit_ref="${COMMIT_REF:-local}"
+if [[ ! "${build_commit_ref}" =~ ^[a-fA-F0-9]{7,64}$ ]]; then
+  build_commit_ref="local"
+fi
+printf '{"commit_ref":"%s","app_env":"%s"}\n' \
+  "${build_commit_ref}" "${resolved_app_env}" >build/web/build-info.json
+
+if [[ "${resolved_app_env}" == "preprod" ]]; then
+  printf 'User-agent: *\nDisallow: /\n' >build/web/robots.txt
+  printf '/*\n  X-Robots-Tag: noindex, nofollow\n' >build/web/_headers
+fi

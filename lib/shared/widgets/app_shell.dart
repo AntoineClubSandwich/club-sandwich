@@ -445,9 +445,7 @@ class _DsSidebar extends StatelessWidget {
         color: dark ? colors.secondary : colors.canvas,
         border: Border(
           right: BorderSide(
-            color: dark
-                ? Colors.white.withValues(alpha: 0.08)
-                : colors.border,
+            color: dark ? Colors.white.withValues(alpha: 0.08) : colors.border,
             width: DsBorders.hairline,
           ),
         ),

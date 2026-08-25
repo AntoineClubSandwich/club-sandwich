@@ -2227,8 +2227,8 @@ class _VenueSection extends StatelessWidget {
               _DetailRow(
                 label: 'Entrée artiste',
                 value: artistEntrance,
-                showDivider: accessInstructions != null &&
-                    accessInstructions.isNotEmpty,
+                showDivider:
+                    accessInstructions != null && accessInstructions.isNotEmpty,
               ),
             if (accessInstructions != null && accessInstructions.isNotEmpty)
               _DetailRow(

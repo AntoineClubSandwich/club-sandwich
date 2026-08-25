@@ -9,7 +9,7 @@ SHA Git et à l'identifiant du deploy Netlify.
 - [ ] Le site Netlify de préproduction est distinct de la production.
 - [ ] Le projet Supabase de préproduction est distinct de
       `hmfamvfrronbnznywtdk`.
-- [ ] Les 18 migrations sont appliquées dans l'ordre.
+- [ ] Toutes les migrations locales sont appliquées dans l'ordre.
 - [ ] Les deux variables Supabase du build ciblent la préproduction.
 - [ ] Le build contient exactement `APP_ENV=preprod`.
 - [ ] La bannière `PRÉPRODUCTION` est visible dès la page de connexion.
@@ -171,8 +171,8 @@ principal avant la fin de la recette.
 ## 4. Authentification et navigation
 
 - [ ] Un utilisateur non connecté arrive sur `/login`.
-- [ ] Un deep link `/concerts` non connecté redirige vers `/login`.
-- [ ] Un deep link `/concerts/<id>` non connecté redirige vers `/login`.
+- [ ] Un deep link `/maraudes` non connecté redirige vers `/login`.
+- [ ] Un deep link `/maraudes/<id>` non connecté redirige vers `/login`.
 - [ ] Un e-mail invalide affiche une validation en français.
 - [ ] Un mot de passe vide affiche une validation en français.
 - [ ] Des identifiants invalides affichent un message non technique.
@@ -180,13 +180,14 @@ principal avant la fin de la recette.
 - [ ] Une connexion valide ouvre le tableau de bord.
 - [ ] La bannière de préproduction reste visible après connexion.
 - [ ] Un rafraîchissement conserve la session.
-- [ ] Un rafraîchissement sur `/concerts/<id>` recharge la bonne fiche.
+- [ ] Un rafraîchissement sur `/maraudes/<id>` recharge la bonne fiche.
 - [ ] Les boutons précédent/suivant du navigateur restent cohérents.
 - [ ] Une URL de concert inexistante affiche l'état introuvable.
 - [ ] Aucune route `/reset-password` n'est annoncée dans les e-mails.
 
-Pour changer de compte, utiliser des profils de navigateur distincts. La
-déconnexion n'est pas disponible dans la V1 actuelle.
+Pour changer de compte, utiliser l'action de déconnexion du panneau de compte.
+Des profils de navigateur distincts restent utiles pour une recette simultanée
+de plusieurs rôles.
 
 ## 5. Concerts
 
@@ -373,7 +374,7 @@ Mesurer avec les DevTools du navigateur, cache désactivé puis activé :
 
 - [ ] temps jusqu'au premier rendu de `/login` ;
 - [ ] poids transféré au premier chargement ;
-- [ ] nombre d'appels lors de l'ouverture de `/concerts` ;
+- [ ] nombre d'appels lors de l'ouverture de `/maraudes` ;
 - [ ] nombre d'appels lors de l'ouverture d'un concert détaillé ;
 - [ ] durée du chargement de la liste et du détail ;
 - [ ] durée de génération du PDF ;

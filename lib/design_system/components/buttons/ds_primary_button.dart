@@ -55,7 +55,7 @@ class DsPrimaryButton extends StatelessWidget {
             curve: DsMotion.curve,
             width: isFullWidth ? double.infinity : null,
             padding: const EdgeInsets.symmetric(horizontal: DsSpacing.lg),
-            height: 44,
+            height: 48,
             alignment: isFullWidth ? Alignment.center : null,
             decoration: BoxDecoration(
               color: background,

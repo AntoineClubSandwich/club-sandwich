@@ -1,4 +1,5 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../tokens/ds_motion.dart';
 
@@ -14,20 +15,29 @@ class DsPressScale extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => AnimatedScale(
-    scale: pressed ? 0.98 : 1,
-    duration: DsMotion.standard,
-    curve: DsMotion.curve,
-    child: child,
-  );
+  Widget build(BuildContext context) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    return AnimatedScale(
+      scale: pressed && !reduceMotion ? 0.98 : 1,
+      duration: reduceMotion ? Duration.zero : DsMotion.standard,
+      curve: DsMotion.curve,
+      child: child,
+    );
+  }
 }
 
 /// Hover/press state passed to a [DsPressable] builder.
 class DsInteractionState {
-  const DsInteractionState({this.hovered = false, this.pressed = false});
+  const DsInteractionState({
+    this.hovered = false,
+    this.pressed = false,
+    this.focused = false,
+  });
 
   final bool hovered;
   final bool pressed;
+  final bool focused;
 }
 
 typedef DsInteractiveBuilder =
@@ -59,31 +69,60 @@ class DsPressable extends StatefulWidget {
 class _DsPressableState extends State<DsPressable> {
   bool _hovered = false;
   bool _pressed = false;
+  bool _focused = false;
 
   bool get _interactive => widget.enabled && widget.onTap != null;
 
   @override
   Widget build(BuildContext context) {
     final state = DsInteractionState(
-      hovered: _hovered && _interactive,
+      // Keyboard focus receives the same visible treatment as pointer hover.
+      hovered: (_hovered || _focused) && _interactive,
       pressed: _pressed && _interactive,
+      focused: _focused && _interactive,
     );
-    return MouseRegion(
-      cursor: _interactive ? SystemMouseCursors.click : MouseCursor.defer,
-      onEnter: (_) {
-        if (_interactive) setState(() => _hovered = true);
+    return FocusableActionDetector(
+      enabled: _interactive,
+      mouseCursor: _interactive ? SystemMouseCursors.click : MouseCursor.defer,
+      onShowHoverHighlight: (value) {
+        if (_hovered != value) setState(() => _hovered = value);
       },
-      onExit: (_) {
-        if (_hovered) setState(() => _hovered = false);
+      onShowFocusHighlight: (value) {
+        if (_focused != value) setState(() => _focused = value);
       },
-      child: GestureDetector(
-        onTap: widget.enabled ? widget.onTap : null,
-        onTapDown: _interactive ? (_) => setState(() => _pressed = true) : null,
-        onTapUp: _interactive ? (_) => setState(() => _pressed = false) : null,
-        onTapCancel: _interactive
-            ? () => setState(() => _pressed = false)
-            : null,
-        child: widget.builder(context, state),
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+      },
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap?.call();
+            return null;
+          },
+        ),
+      },
+      child: Semantics(
+        button: true,
+        enabled: _interactive,
+        onTap: _interactive ? widget.onTap : null,
+        child: GestureDetector(
+          excludeFromSemantics: true,
+          onTap: _interactive ? widget.onTap : null,
+          onTapDown: _interactive
+              ? (_) => setState(() => _pressed = true)
+              : null,
+          onTapUp: _interactive
+              ? (_) => setState(() => _pressed = false)
+              : null,
+          onTapCancel: _interactive
+              ? () => setState(() => _pressed = false)
+              : null,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            child: widget.builder(context, state),
+          ),
+        ),
       ),
     );
   }

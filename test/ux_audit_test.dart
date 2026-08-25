@@ -1,7 +1,11 @@
 import 'package:club_sandwich/core/config/environment.dart';
 import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
+import 'package:club_sandwich/features/auth/domain/user_account.dart';
+import 'package:club_sandwich/features/auth/presentation/activation_screen.dart';
+import 'package:club_sandwich/features/auth/presentation/forgot_password_screen.dart';
 import 'package:club_sandwich/features/auth/presentation/login_screen.dart';
+import 'package:club_sandwich/features/auth/presentation/reset_password_screen.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_detail_screen.dart';
@@ -11,6 +15,7 @@ import 'package:club_sandwich/features/distributions/presentation/maraude_distri
 import 'package:club_sandwich/features/invitations/data/invitation_providers.dart';
 import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
+import 'package:club_sandwich/features/volunteers/data/volunteer_document_providers.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
 import 'package:club_sandwich/shared/widgets/app_shell.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
@@ -99,6 +104,83 @@ void main() {
 
     expect(find.text('Saisissez une adresse e-mail valide.'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('les quatre écrans d’authentification tiennent sur 320 px', (
+    tester,
+  ) async {
+    await _setViewport(tester, const Size(320, 640));
+    const screens = <Widget>[
+      LoginScreen(),
+      ForgotPasswordScreen(),
+      ResetPasswordScreen(),
+      ActivationScreen(),
+    ];
+
+    for (final screen in screens) {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [currentAuthUserProvider.overrideWithValue(null)],
+          child: MaterialApp(theme: DsTheme.light, home: screen),
+        ),
+      );
+      await tester.pump();
+
+      final card = tester.getRect(find.byType(Card).first);
+      expect(card.left, greaterThanOrEqualTo(0));
+      expect(card.right, lessThanOrEqualTo(320));
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('le dashboard ne charge que les données du rôle courant', (
+    tester,
+  ) async {
+    var creditReads = 0;
+    var pendingDocumentReads = 0;
+
+    Future<void> pumpForRole(AppUserRole role) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          key: ValueKey(role),
+          overrides: [
+            currentUserContextProvider.overrideWith(
+              (ref) async => CurrentUserContext(
+                profileId: 'profile-id',
+                role: role,
+                status: UserAccountStatus.active,
+              ),
+            ),
+            maraudeOverviewProvider.overrideWith((ref) async => const []),
+            invitationCampaignsProvider.overrideWith((ref) async => const []),
+            volunteerCreditSummaryProvider.overrideWith((ref) async {
+              creditReads += 1;
+              return const VolunteerCreditSummary(
+                earned: 0,
+                consumed: 0,
+                available: 0,
+              );
+            }),
+            pendingVolunteerDocumentsProvider.overrideWith((ref) async {
+              pendingDocumentReads += 1;
+              return const [];
+            }),
+          ],
+          child: const MaterialApp(home: DashboardScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await pumpForRole(AppUserRole.volunteer);
+    expect(creditReads, 1);
+    expect(pendingDocumentReads, 0);
+
+    creditReads = 0;
+    pendingDocumentReads = 0;
+    await pumpForRole(AppUserRole.admin);
+    expect(creditReads, 0);
+    expect(pendingDocumentReads, 1);
   });
 
   testWidgets('le shell reste lisible sur mobile et desktop', (tester) async {

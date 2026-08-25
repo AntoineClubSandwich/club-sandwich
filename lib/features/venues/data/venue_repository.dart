@@ -35,7 +35,10 @@ class VenueRepository {
   /// Every venue visible to the current user (admins see inactive ones
   /// too, per the `venues` RLS policy) — backs the Salles admin screen.
   Future<List<Venue>> fetchAllVenues() async {
-    final rows = await _client.from('venues').select(_venueSelect).order('name');
+    final rows = await _client
+        .from('venues')
+        .select(_venueSelect)
+        .order('name');
     return rows.map(Venue.fromJson).toList(growable: false);
   }
 
@@ -65,10 +68,10 @@ class VenueRepository {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final photoUrl =
         '${_client.storage.from('venue-photos').getPublicUrl(path)}?v=$timestamp';
-    await _client.from('venues').update({'photo_url': photoUrl}).eq(
-      'id',
-      venueId,
-    );
+    await _client
+        .from('venues')
+        .update({'photo_url': photoUrl})
+        .eq('id', venueId);
     return photoUrl;
   }
 

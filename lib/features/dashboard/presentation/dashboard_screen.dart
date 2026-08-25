@@ -47,9 +47,12 @@ class DashboardScreen extends ConsumerWidget {
     final invitationCampaigns = ref.watch(invitationCampaignsProvider);
     final invitations =
         invitationCampaigns.value ?? const <InvitationCampaign>[];
-    final creditSummary = ref.watch(volunteerCreditSummaryProvider).value;
-    final hasPendingDocuments =
-        ref.watch(pendingVolunteerDocumentsProvider).value?.isNotEmpty == true;
+    final creditSummary = contextRole == AppUserRole.volunteer
+        ? ref.watch(volunteerCreditSummaryProvider).value
+        : null;
+    final hasPendingDocuments = contextRole == AppUserRole.admin
+        ? ref.watch(pendingVolunteerDocumentsProvider).value?.isNotEmpty == true
+        : false;
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: overview.when(

@@ -165,7 +165,10 @@ class _VenueList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Salles', style: DsTypography.h1.copyWith(color: colors.textPrimary)),
+        Text(
+          'Salles',
+          style: DsTypography.h1.copyWith(color: colors.textPrimary),
+        ),
         const SizedBox(height: 4),
         Text(
           '$totalCount salle${totalCount > 1 ? 's' : ''}',
@@ -176,7 +179,11 @@ class _VenueList extends StatelessWidget {
           onChanged: onQueryChanged,
           decoration: InputDecoration(
             hintText: 'Rechercher une salle',
-            prefixIcon: Icon(DsIcons.search, size: 18, color: colors.textSecondary),
+            prefixIcon: Icon(
+              DsIcons.search,
+              size: 18,
+              color: colors.textSecondary,
+            ),
           ),
         ),
         const SizedBox(height: DsSpacing.lg),
@@ -267,7 +274,9 @@ class _VenueListItem extends StatelessWidget {
                   '${venue.postalCode} ${venue.city}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: DsTypography.caption.copyWith(color: colors.textSecondary),
+                  style: DsTypography.caption.copyWith(
+                    color: colors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -380,12 +389,17 @@ class _VenueDetailsPaneState extends ConsumerState<_VenueDetailsPane> {
           ),
           const SizedBox(height: DsSpacing.md),
           DsPrimaryButton(
-            label: venue.photoUrl == null ? 'Ajouter une photo' : 'Changer la photo',
+            label: venue.photoUrl == null
+                ? 'Ajouter une photo'
+                : 'Changer la photo',
             isLoading: _uploading,
             onPressed: _uploading ? null : _uploadPhoto,
           ),
           const SizedBox(height: DsSpacing.xl),
-          Text(venue.name, style: DsTypography.h2.copyWith(color: colors.textPrimary)),
+          Text(
+            venue.name,
+            style: DsTypography.h2.copyWith(color: colors.textPrimary),
+          ),
           const SizedBox(height: DsSpacing.sm),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -395,7 +409,9 @@ class _VenueDetailsPaneState extends ConsumerState<_VenueDetailsPane> {
               Expanded(
                 child: Text(
                   venue.formattedAddress,
-                  style: DsTypography.body.copyWith(color: colors.textSecondary),
+                  style: DsTypography.body.copyWith(
+                    color: colors.textSecondary,
+                  ),
                 ),
               ),
             ],
@@ -446,7 +462,8 @@ class _VenueDetailsPaneState extends ConsumerState<_VenueDetailsPane> {
             maxLines: 3,
             decoration: const InputDecoration(
               labelText: 'Instructions d\'accès',
-              hintText: 'Ex : sonner à l\'interphone "Régie", accès par la rue...',
+              hintText:
+                  'Ex : sonner à l\'interphone "Régie", accès par la rue...',
             ),
           ),
           const SizedBox(height: DsSpacing.md),
@@ -475,15 +492,18 @@ class _VenueDetailsPaneState extends ConsumerState<_VenueDetailsPane> {
           );
       ref.invalidate(venuesProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Entrée artiste enregistrée.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Entrée artiste enregistrée.')),
+      );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            describeError(error, 'Impossible d\'enregistrer l\'entrée artiste.'),
+            describeError(
+              error,
+              'Impossible d\'enregistrer l\'entrée artiste.',
+            ),
           ),
         ),
       );
@@ -530,7 +550,9 @@ class _VenueDetailsPaneState extends ConsumerState<_VenueDetailsPane> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(describeError(error, 'Impossible de mettre à jour la photo.')),
+          content: Text(
+            describeError(error, 'Impossible de mettre à jour la photo.'),
+          ),
         ),
       );
     } finally {

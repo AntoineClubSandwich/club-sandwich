@@ -17,14 +17,14 @@ Arc Browser.
 ### Principales
 - `primary` (encre) : `#1A1A2E` (deep indigo-black)
 - `primary-light` : `#2D2B55`
-- `secondary` (violet — CTA, interactions) : `#6C5CE7`
+- `secondary` (bleu — CTA, interactions) : `#2563EB`
 - `secondary-light` : `#A29BFE`
 - `accent` (mint-teal) : `#00D2A0` — non utilisé actuellement (voir
   note ci-dessous sur le conflit avec `success`)
 - `accent-light` : `#55EFC4`
 
 > Note : dans `DsColorTokens` (Dart), les rôles sont nommés à
-> l'inverse — `colors.primary` = le violet interactif `#6C5CE7`
+> l'inverse — `colors.primary` = le bleu interactif `#2563EB`
 > (couleur des CTA), `colors.secondary` = l'encre `#1A1A2E` (contour
 > neutre). Les *valeurs* correspondent, seul le *nom* diffère —
 > pas de renommage prévu, `colors.primary` est déjà la bonne couleur
@@ -41,7 +41,7 @@ Arc Browser.
 - `text-secondary` : `#6B7280`
 - `text-muted` : `#9CA3AF`
 - `text-inverse` : `#FFFFFF`
-- `text-link` : `#6C5CE7`
+- `text-link` : `#2563EB`
 
 ### Fonctionnelles (base / bg / text)
 - `success` : `#34D399` / bg `#ECFDF5` / text `#059669`
@@ -73,8 +73,8 @@ Ombres :
 - `shadow-md` : `0 4px 12px rgba(0,0,0,0.08)`
 - `shadow-lg` : `0 8px 24px rgba(0,0,0,0.12)`
 
-Bordures : 1px solid `#E5E7EB` (défaut), focus 2px solid `#6C5CE7` +
-ring `rgba(108,92,231,0.1)`.
+Bordures : 1px solid `#E5E7EB` (défaut), focus 2px solid `#2563EB` +
+ring `rgba(37,99,235,0.1)`.
 
 ## Corrections par page
 
@@ -82,29 +82,29 @@ ring `rgba(108,92,231,0.1)`.
 Garder le fond sombre — ne pas passer en blanc.
 - Fond : `#1A1A2E` (indigo profond, pas violet vif)
 - Items nav : texte `#A1A1AA`, icônes outline 1.5px
-- Item actif : fond `rgba(108,92,231,0.15)`, texte blanc, weight 600
+- Item actif : fond `rgba(37,99,235,0.15)`, texte blanc, weight 600
 - Hover : fond `rgba(255,255,255,0.05)`
-- Bouton "Se déconnecter" : ghost discret, pas violet plein
+- Bouton "Se déconnecter" : ghost discret, pas bleu plein
 
 ### Dashboard
-- Header "BONJOUR" : pas de gradient violet — carte blanche
+- Header "BONJOUR" : pas de gradient saturé — carte blanche
   (shadow-card, radius 16px), texte H1 noir, badge ADMIN en pill
-  (bg `#F5F3FF` text `#6C5CE7`).
+  (fond bleu pâle, texte `#2563EB`).
 - Stat cards : garder bordures existantes + ajouter shadow-card,
   radius 16px, label 11px uppercase muted, chiffre 36px Bold
   tabular-nums.
-- Actions rapides : "Nouvelle maraude" bg `#6C5CE7` text blanc radius
+- Actions rapides : "Nouvelle maraude" bg `#2563EB` text blanc radius
   12px (pas vert) ; les autres bg blanc, border 1px `#E5E7EB`, radius
   12px ; hover translateY(-1px) + shadow-md.
 - Activité récente : garder les carrés arrondis teintés avec emoji
   (pas de remplacement par icônes Lucide) ; badges dates en pill
-  bg `#F5F3FF` text `#6C5CE7` (pas violet plein saturé).
+  fond bleu pâle, texte `#2563EB` (pas bleu plein saturé).
 
 ### Maraudes
 - Toggle Liste/Calendrier : container bg `#F1F0ED` padding 4px radius
   12px ; tab active bg blanc + shadow-sm + radius 8px ; tab inactive
   transparent, text-secondary.
-- Bouton "+ Nouvelle maraude" : bg `#6C5CE7` text blanc (pas
+- Bouton "+ Nouvelle maraude" : bg `#2563EB` text blanc (pas
   vert/teal), radius 12px.
 - Cartes maraudes : garder bordures + ajouter shadow-card, radius
   16px, bordure neutre `#E5E7EB` (pas vert), titre H3 18px Semibold.
@@ -122,7 +122,7 @@ Garder le fond sombre — ne pas passer en blanc.
 4. Icônes activité = garder carrés arrondis teintés avec emoji
 5. Police unique : Inter
 6. Radius minimum 8px — jamais de coins carrés
-7. Couleur interactive = `#6C5CE7` (violet) — pas vert pour les boutons
+7. Couleur interactive = `#2563EB` (bleu) — pas vert pour les boutons
 8. Vert/teal = réservé aux statuts succès/terminé/ouvert
 9. Badges = pills pleines (bg + texte coloré), pas outline
 10. Transitions 200ms ease sur tout élément interactif

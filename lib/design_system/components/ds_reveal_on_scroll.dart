@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 import '../tokens/ds_motion.dart';
@@ -28,10 +30,18 @@ class _DsRevealOnScrollState extends State<DsRevealOnScroll> {
   bool _visible = false;
   bool _revealScheduled = false;
   ScrollPosition? _scrollPosition;
+  Timer? _delayTimer;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
+      _delayTimer?.cancel();
+      _visible = true;
+      _scrollPosition?.removeListener(_maybeReveal);
+      _scrollPosition = null;
+      return;
+    }
     final position = Scrollable.maybeOf(context)?.position;
     if (position != _scrollPosition) {
       _scrollPosition?.removeListener(_maybeReveal);
@@ -45,6 +55,7 @@ class _DsRevealOnScrollState extends State<DsRevealOnScroll> {
 
   @override
   void dispose() {
+    _delayTimer?.cancel();
     _scrollPosition?.removeListener(_maybeReveal);
     super.dispose();
   }
@@ -60,13 +71,16 @@ class _DsRevealOnScrollState extends State<DsRevealOnScroll> {
     // a decorative reveal and avoids depending on RenderAbstractViewport.
     if (top > viewportHeight * 0.94) return;
     _revealScheduled = true;
-    Future.delayed(widget.delay, () {
+    _delayTimer = Timer(widget.delay, () {
       if (mounted) setState(() => _visible = true);
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
+      return widget.child;
+    }
     return AnimatedSlide(
       offset: _visible ? Offset.zero : const Offset(0, 0.04),
       duration: DsMotion.entrance,

@@ -1,4 +1,5 @@
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
+import 'package:club_sandwich/features/auth/presentation/widgets/auth_card_layout.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -58,83 +59,70 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Icon(
-                        Icons.lock_reset_outlined,
-                        size: 52,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Nouveau mot de passe',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 24),
-                      TextFormField(
-                        key: const ValueKey('reset-password-password'),
-                        controller: _password,
-                        autofocus: true,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Nouveau mot de passe',
-                        ),
-                        validator: (value) => value == null || value.length < 8
-                            ? 'Utilisez au moins 8 caractères.'
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        key: const ValueKey('reset-password-confirmation'),
-                        controller: _confirmation,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Confirmer le mot de passe',
-                        ),
-                        validator: (value) => value != _password.text
-                            ? 'Les mots de passe ne correspondent pas.'
-                            : null,
-                      ),
-                      if (_errorMessage != null) ...[
-                        const SizedBox(height: 16),
-                        Semantics(
-                          liveRegion: true,
-                          child: Text(
-                            _errorMessage!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        key: const ValueKey('reset-password-submit'),
-                        onPressed: _saving ? null : _submit,
-                        child: Text(
-                          _saving
-                              ? 'Enregistrement…'
-                              : 'Mettre à jour le mot de passe',
-                        ),
-                      ),
-                    ],
+      body: AuthCardLayout(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Icon(
+                Icons.lock_reset_outlined,
+                size: 52,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Nouveau mot de passe',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 24),
+              TextFormField(
+                key: const ValueKey('reset-password-password'),
+                controller: _password,
+                autofocus: true,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Nouveau mot de passe',
+                ),
+                validator: (value) => value == null || value.length < 8
+                    ? 'Utilisez au moins 8 caractères.'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                key: const ValueKey('reset-password-confirmation'),
+                controller: _confirmation,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Confirmer le mot de passe',
+                ),
+                validator: (value) => value != _password.text
+                    ? 'Les mots de passe ne correspondent pas.'
+                    : null,
+              ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    _errorMessage!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ),
+              ],
+              const SizedBox(height: 24),
+              FilledButton(
+                key: const ValueKey('reset-password-submit'),
+                onPressed: _saving ? null : _submit,
+                child: Text(
+                  _saving ? 'Enregistrement…' : 'Mettre à jour le mot de passe',
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),

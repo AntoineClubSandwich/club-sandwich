@@ -34,8 +34,38 @@
 
   <title>Club Sandwich</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    html, body { height: 100%; margin: 0; background: #f8f7f4; }
+    #app-loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      color: #1a1a2e;
+      font: 600 15px system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    #app-loading-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #dbeafe;
+      border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: app-loading-spin 800ms linear infinite;
+    }
+    @keyframes app-loading-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      #app-loading-spinner { animation: none; border-top-color: #dbeafe; }
+    }
+  </style>
 </head>
 <body>
+  <div id="app-loading" role="status" aria-live="polite">
+    <div id="app-loading-spinner" aria-hidden="true"></div>
+    <span>Chargement de Club Sandwich…</span>
+  </div>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

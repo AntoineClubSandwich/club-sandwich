@@ -16,6 +16,7 @@ import 'package:club_sandwich/features/profiles/presentation/profile_screen.dart
 import 'package:club_sandwich/features/venues/presentation/venues_screen.dart';
 import 'package:club_sandwich/features/volunteers/presentation/volunteers_screen.dart';
 import 'package:club_sandwich/shared/widgets/app_shell.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -42,14 +43,11 @@ abstract final class AppRoutes {
 }
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
+  ref.watch(authStateProvider);
   ref.watch(currentUserContextProvider);
   final repository = ref.read(authRepositoryProvider);
-  final hasInitialSession =
-      authState.value?.session != null || repository.session != null;
 
   return GoRouter(
-    initialLocation: hasInitialSession ? AppRoutes.dashboard : AppRoutes.login,
     redirect: (context, state) {
       final isAuthenticated = repository.session != null;
       final isOnLogin = state.matchedLocation == AppRoutes.login;
@@ -137,12 +135,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '${AppRoutes.maraudes}/:concertId',
-            pageBuilder: (context, state) => dsFadeScalePage(
-              key: state.pageKey,
-              child: ConcertDetailScreen(
+            pageBuilder: (context, state) {
+              final child = ConcertDetailScreen(
                 concertId: state.pathParameters['concertId']!,
-              ),
-            ),
+              );
+              if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
+                return NoTransitionPage(key: state.pageKey, child: child);
+              }
+              return dsFadeScalePage(key: state.pageKey, child: child);
+            },
           ),
           GoRoute(
             path: AppRoutes.invitations,

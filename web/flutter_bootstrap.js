@@ -1,7 +1,21 @@
 {{flutter_js}}
 {{flutter_build_config}}
 
-const loadApplication = () => _flutter.loader.load();
+const loadingElement = document.querySelector('#app-loading');
+
+const loadApplication = () => _flutter.loader.load({
+  onEntrypointLoaded: async (engineInitializer) => {
+    const appRunner = await engineInitializer.initializeEngine();
+    await appRunner.runApp();
+    loadingElement?.remove();
+  },
+}).catch((error) => {
+  if (loadingElement) {
+    loadingElement.textContent =
+      'Le chargement a échoué. Rechargez la page pour réessayer.';
+  }
+  throw error;
+});
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker
