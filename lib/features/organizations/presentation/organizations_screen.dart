@@ -329,10 +329,7 @@ class _OrganizationListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DsTokens>()!.colors;
-    final subtitle =
-        organization.contactEmail ??
-        organization.phone ??
-        'Aucun contact principal';
+    final subtitle = organization.phone ?? 'Aucun contact principal';
     return Container(
       decoration: selected
           ? BoxDecoration(
@@ -444,7 +441,6 @@ class _OrganizationDetailsPane extends ConsumerWidget {
               title: 'Informations',
               children: [
                 _Value('Adresse', organization.address),
-                _Value('E-mail', organization.contactEmail),
                 _Value('Téléphone', organization.phone),
                 _Value('Site web', organization.websiteUrl),
                 _Value('Notes', organization.notes),
@@ -532,7 +528,6 @@ class _OrganizationFormDialogState extends State<_OrganizationFormDialog> {
       TextEditingController(text: value?.name ?? ''),
       TextEditingController(text: value?.slug ?? ''),
       TextEditingController(text: value?.emailDomain ?? ''),
-      TextEditingController(text: value?.contactEmail ?? ''),
       TextEditingController(text: value?.phone ?? ''),
       TextEditingController(text: value?.address ?? ''),
       TextEditingController(text: value?.websiteUrl ?? ''),
@@ -574,11 +569,10 @@ class _OrganizationFormDialogState extends State<_OrganizationFormDialog> {
                     'automatiquement.',
                 validator: _domainValidator,
               ),
-              _field(3, 'Adresse e-mail'),
-              _field(4, 'Téléphone'),
-              _field(5, 'Adresse'),
-              _field(6, 'Site web'),
-              _field(7, 'Notes', maxLines: 3),
+              _field(3, 'Téléphone'),
+              _field(4, 'Adresse'),
+              _field(5, 'Site web'),
+              _field(6, 'Notes', maxLines: 3),
             ],
           ),
         ),
@@ -598,11 +592,10 @@ class _OrganizationFormDialogState extends State<_OrganizationFormDialog> {
               name: _controllers[0].text,
               slug: _controllers[1].text,
               emailDomain: _controllers[2].text,
-              contactEmail: _controllers[3].text,
-              phone: _controllers[4].text,
-              address: _controllers[5].text,
-              websiteUrl: _controllers[6].text,
-              notes: _controllers[7].text,
+              phone: _controllers[3].text,
+              address: _controllers[4].text,
+              websiteUrl: _controllers[5].text,
+              notes: _controllers[6].text,
             ),
           );
         },
