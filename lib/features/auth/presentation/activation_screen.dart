@@ -64,7 +64,6 @@ class _ActivationScreenState extends ConsumerState<ActivationScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Compte activé.')));
-      await Future<void>.delayed(const Duration(milliseconds: 900));
       if (mounted) context.go('/dashboard');
     } catch (error) {
       if (mounted) {

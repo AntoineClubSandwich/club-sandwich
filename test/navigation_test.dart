@@ -6,6 +6,7 @@ import 'package:club_sandwich/design_system/icons/ds_icons.dart';
 import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/data/auth_repository.dart';
+import 'package:club_sandwich/features/auth/data/user_account_repository.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/auth/presentation/activation_screen.dart';
 import 'package:club_sandwich/features/auth/presentation/forgot_password_screen.dart';
@@ -75,6 +76,58 @@ void main() {
       expect(find.byType(ActivationScreen), findsOneWidget);
       expect(find.text('Activer mon compte'), findsOneWidget);
       expect(find.text('Se connecter'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'l’activation reste active pendant la mise à jour Auth puis ouvre le dashboard',
+    (tester) async {
+      final authRepository = _AuthenticatedAuthRepository();
+      final accountRepository = _ActivatingUserAccountRepository();
+      addTearDown(authRepository.dispose);
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(authRepository),
+          userAccountRepositoryProvider.overrideWithValue(accountRepository),
+          currentProfileProvider.overrideWith((ref) async => null),
+          concertsProvider.overrideWith((ref) async => const []),
+          concertDetailsProvider.overrideWith((ref, concertId) async => null),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _RouterTestApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final routerBeforeActivation = container.read(appRouterProvider);
+      expect(find.byType(ActivationScreen), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('activation-password')),
+        'mot-de-passe',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Confirmer le mot de passe'),
+        'mot-de-passe',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Prénom'),
+        'Bénévole',
+      );
+      await tester.enterText(find.widgetWithText(TextFormField, 'Nom'), 'TEST');
+      await tester.tap(find.text('Activer mon compte'));
+      await tester.pumpAndSettle();
+
+      expect(authRepository.passwordUpdateCount, 1);
+      expect(accountRepository.activationCount, 1);
+      expect(container.read(appRouterProvider), same(routerBeforeActivation));
+      expect(find.byType(ActivationScreen), findsNothing);
+      expect(find.byType(DashboardScreen), findsOneWidget);
     },
   );
 
@@ -351,6 +404,7 @@ class _AuthenticatedAuthRepository extends AuthRepository {
   final _authStateController = StreamController<AuthState>.broadcast();
   int signInCount = 0;
   int signOutCount = 0;
+  int passwordUpdateCount = 0;
 
   @override
   Session? get session => _session;
@@ -377,6 +431,12 @@ class _AuthenticatedAuthRepository extends AuthRepository {
     _authStateController.add(const AuthState(AuthChangeEvent.signedOut, null));
   }
 
+  @override
+  Future<void> updatePassword(String password) async {
+    passwordUpdateCount++;
+    _authStateController.add(AuthState(AuthChangeEvent.userUpdated, _session));
+  }
+
   void emitPasswordRecovery() {
     _authStateController.add(
       AuthState(AuthChangeEvent.passwordRecovery, _session),
@@ -384,6 +444,37 @@ class _AuthenticatedAuthRepository extends AuthRepository {
   }
 
   Future<void> dispose() => _authStateController.close();
+}
+
+class _ActivatingUserAccountRepository extends UserAccountRepository {
+  _ActivatingUserAccountRepository()
+    : super(
+        SupabaseClient(
+          'http://localhost',
+          'test-key',
+          authOptions: const AuthClientOptions(autoRefreshToken: false),
+        ),
+      );
+
+  var activationCount = 0;
+  var isActive = false;
+
+  @override
+  Future<CurrentUserContext?> fetchCurrentContext() async => CurrentUserContext(
+    profileId: 'profile-id',
+    role: AppUserRole.volunteer,
+    status: isActive ? UserAccountStatus.active : UserAccountStatus.invited,
+  );
+
+  @override
+  Future<void> activateCurrentUser({
+    required String firstName,
+    required String lastName,
+    String? phone,
+  }) async {
+    activationCount++;
+    isActive = true;
+  }
 }
 
 class _RouterTestApp extends ConsumerWidget {

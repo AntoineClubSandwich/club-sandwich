@@ -50,11 +50,16 @@ abstract final class AppRoutes {
 }
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  ref.watch(authStateProvider);
-  ref.watch(currentUserContextProvider);
+  final refreshNotifier = _RouterRefreshNotifier();
+  ref
+    ..onDispose(refreshNotifier.dispose)
+    ..listen(authStateProvider, (_, _) => refreshNotifier.refresh())
+    ..listen(currentUserContextProvider, (_, _) => refreshNotifier.refresh())
+    ..listen(passwordRecoveryProvider, (_, _) => refreshNotifier.refresh());
   final repository = ref.read(authRepositoryProvider);
 
   return GoRouter(
+    refreshListenable: refreshNotifier,
     redirect: (context, state) {
       final isAuthenticated = repository.session != null;
       final isOnLogin = state.matchedLocation == AppRoutes.login;
@@ -68,7 +73,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // password-recovery link is opened, so this must be checked before
       // the generic isAuthenticated branch below — otherwise the user
       // would land straight on the dashboard instead of the reset form.
-      if (ref.watch(passwordRecoveryProvider)) {
+      if (ref.read(passwordRecoveryProvider)) {
         return isOnResetPassword ? null : AppRoutes.resetPassword;
       }
 
@@ -80,7 +85,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final accountContext = ref.read(currentUserContextProvider).value;
       if (accountContext == null) {
-        return isOnLogin || isOnActivation ? null : AppRoutes.dashboard;
+        return isOnActivation ? null : AppRoutes.dashboard;
       }
       if (accountContext.status == UserAccountStatus.disabled) {
         return isOnLogin ? null : AppRoutes.login;
@@ -219,6 +224,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+class _RouterRefreshNotifier extends ChangeNotifier {
+  void refresh() => notifyListeners();
+}
 
 bool _isAllowed(AppUserRole role, String location) {
   if (location.startsWith('${AppRoutes.maraudes}/')) return true;
