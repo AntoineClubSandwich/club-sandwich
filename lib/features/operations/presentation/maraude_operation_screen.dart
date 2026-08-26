@@ -1,4 +1,5 @@
 import 'package:club_sandwich/design_system/components/buttons/ds_primary_button.dart';
+import 'package:club_sandwich/design_system/components/buttons/ds_secondary_button.dart';
 import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
 import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
 import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
@@ -17,10 +18,12 @@ import 'package:club_sandwich/features/operations/domain/maraude_workflow.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
+import 'package:club_sandwich/features/venues/domain/venue.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MaraudeOperationScreen extends ConsumerStatefulWidget {
   const MaraudeOperationScreen({required this.concertId, super.key});
@@ -565,7 +568,18 @@ class _MaraudeOperationScreenState
           _InfoRow('Artiste', concert.artist),
           _InfoRow('Salle', concert.venueName ?? '-'),
           _InfoRow('Adresse', concert.venue?.formattedAddress ?? '-'),
+          if (concert.venue?.formattedArtistEntrance case final entrance?)
+            _InfoRow('Entrée artiste', entrance),
           _InfoRow('Accès', concert.venue?.accessInstructions ?? '-'),
+          if (_mapsQuery(concert.venue) case final query?) ...[
+            const SizedBox(height: DsSpacing.sm),
+            DsSecondaryButton(
+              onPressed: () => _openInMaps(query),
+              icon: Icons.directions_outlined,
+              label: 'Ouvrir l’itinéraire',
+            ),
+            const SizedBox(height: DsSpacing.sm),
+          ],
           _InfoRow('Fermeture catering', concert.cateringClosesAt ?? '-'),
           _InfoRow(
             'Contact tourneur',
@@ -580,6 +594,24 @@ class _MaraudeOperationScreenState
       ),
     ),
   );
+
+  String? _mapsQuery(Venue? venue) {
+    if (venue == null) return null;
+    return venue.formattedArtistEntrance ?? venue.formattedAddress;
+  }
+
+  Future<void> _openInMaps(String query) async {
+    final url = Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': query,
+    });
+    final opened = await launchUrl(url, webOnlyWindowName: '_blank');
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible d’ouvrir l’itinéraire.')),
+      );
+    }
+  }
 }
 
 class _StepProgress extends StatelessWidget {
