@@ -245,6 +245,7 @@ bool _isAllowed(AppUserRole role, String location) {
       AppRoutes.administration,
       AppRoutes.encounterMap,
       AppRoutes.styleGuide,
+      AppRoutes.profile,
     },
     AppUserRole.promoter => {
       AppRoutes.dashboard,

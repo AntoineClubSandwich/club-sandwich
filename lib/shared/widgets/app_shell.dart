@@ -734,6 +734,12 @@ List<_AppDestination> _destinationsFor(AppUserRole role) {
         selectedIcon: Icons.admin_panel_settings,
         path: '/administration',
       ),
+      _AppDestination(
+        label: 'Mon profil',
+        icon: Icons.person_outline,
+        selectedIcon: Icons.person,
+        path: '/profile',
+      ),
     ],
     AppUserRole.promoter => const [
       dashboard,
