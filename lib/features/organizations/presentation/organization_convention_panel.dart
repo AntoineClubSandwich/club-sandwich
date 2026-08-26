@@ -147,7 +147,7 @@ class _PromoterConventionTileState
               : Icon(icon, color: color),
           label: Text(
             statusLabel != null
-                ? 'Convention de partenariat — $statusLabel'
+                ? 'Convention de partenariat - $statusLabel'
                 : 'Joindre la convention signée',
           ),
         ),

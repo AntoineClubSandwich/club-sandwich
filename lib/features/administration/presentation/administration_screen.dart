@@ -418,7 +418,7 @@ class _UsersTable extends StatelessWidget {
                     ),
                   ),
                   DataCell(Text(user.role.label)),
-                  DataCell(Text(user.organizationName ?? '—')),
+                  DataCell(Text(user.organizationName ?? '-')),
                   DataCell(_UserStatusBadge(status: user.status)),
                   DataCell(Text(_date(user.invitedAt))),
                   DataCell(Text(_date(user.lastSignInAt))),
@@ -471,7 +471,7 @@ class _UserCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${user.role.label} · ${user.organizationName ?? '—'}',
+                    '${user.role.label} · ${user.organizationName ?? '-'}',
                     style: DsTypography.caption.copyWith(
                       color: colors.textSecondary,
                     ),
@@ -839,7 +839,7 @@ class _UserRoleUpdate {
 }
 
 String _date(DateTime? value) {
-  if (value == null) return '—';
+  if (value == null) return '-';
   final local = value.toLocal();
   return '${local.day.toString().padLeft(2, '0')}/'
       '${local.month.toString().padLeft(2, '0')}/${local.year}';

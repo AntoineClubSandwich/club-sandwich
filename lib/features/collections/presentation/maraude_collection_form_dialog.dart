@@ -256,7 +256,7 @@ class _MaraudeCollectionFormDialogState
   String _calculatedWeightLabel() {
     final quantity = _parseNumber(_quantityController.text);
     final average = _parseNumber(_weightController.text);
-    if (quantity == null || average == null) return '—';
+    if (quantity == null || average == null) return '-';
     return '${formatCollectionNumber(quantity * average)} kg';
   }
 }

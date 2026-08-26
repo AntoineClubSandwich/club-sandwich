@@ -623,7 +623,7 @@ void main() {
     expect(find.text('Vous êtes éligible aux invitations'), findsOneWidget);
     expect(
       find.text(
-        '4 crédits disponibles — vous pouvez candidater aux invitations.',
+        '4 crédits disponibles - vous pouvez candidater aux invitations.',
       ),
       findsOneWidget,
     );

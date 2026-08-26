@@ -833,13 +833,13 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
           _DetailRow(
             label: 'Début',
             value: concert.actualStartAt == null
-                ? '—'
+                ? '-'
                 : formatFrenchDateTime(concert.actualStartAt!),
           ),
           _DetailRow(
             label: 'Fin',
             value: concert.actualEndAt == null
-                ? '—'
+                ? '-'
                 : formatFrenchDateTime(concert.actualEndAt!),
             showDivider: widget.canManage,
           ),
@@ -1775,7 +1775,7 @@ enum _CollectionAction { edit, delete }
 
 String _valueOrDash(String? value) {
   final trimmed = value?.trim();
-  return trimmed == null || trimmed.isEmpty ? '—' : trimmed;
+  return trimmed == null || trimmed.isEmpty ? '-' : trimmed;
 }
 
 class _MaraudeReportSection extends ConsumerStatefulWidget {
@@ -1819,8 +1819,8 @@ class _MaraudeReportSectionState extends ConsumerState<_MaraudeReportSection> {
           Text('Général', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
           _DetailRow(label: 'Artiste', value: report.artist),
-          _DetailRow(label: 'Salle', value: report.venueName ?? '—'),
-          _DetailRow(label: 'Tourneur', value: report.promoterName ?? '—'),
+          _DetailRow(label: 'Salle', value: report.venueName ?? '-'),
+          _DetailRow(label: 'Tourneur', value: report.promoterName ?? '-'),
           _DetailRow(
             label: 'Date',
             value: formatLongFrenchDate(report.concertDate),
@@ -1885,16 +1885,16 @@ class _MaraudeReportSectionState extends ConsumerState<_MaraudeReportSection> {
               label: 'Bénéficiaires estimés',
               value:
                   report.distribution!.estimatedBeneficiaries?.toString() ??
-                  '—',
+                  '-',
             ),
             _DetailRow(
               label: 'Repas distribués',
-              value: report.distribution!.distributedMeals?.toString() ?? '—',
+              value: report.distribution!.distributedMeals?.toString() ?? '-',
             ),
             _DetailRow(
               label: 'Poids restant',
               value: report.distribution!.remainingWeightKg == null
-                  ? '—'
+                  ? '-'
                   : '${formatCollectionNumber(report.distribution!.remainingWeightKg!)} kg',
             ),
           ],
@@ -2012,7 +2012,7 @@ class _TeamRosterLine extends StatelessWidget {
             child: Text(
               role == null
                   ? application.displayName
-                  : '${application.displayName} — ${role.label}',
+                  : '${application.displayName} - ${role.label}',
             ),
           ),
           if (attendance != null)
@@ -2178,7 +2178,7 @@ class _DetailHeader extends StatelessWidget {
                 children: [
                   _InlineInformation(
                     icon: Icons.location_on_outlined,
-                    text: concert.venueName ?? '—',
+                    text: concert.venueName ?? '-',
                   ),
                   _InlineInformation(
                     icon: Icons.calendar_today_outlined,
@@ -2246,19 +2246,19 @@ class _InformationSection extends StatelessWidget {
           _DetailRow(label: 'Date', value: formatLongFrenchDate(concert.date)),
           _DetailRow(
             label: 'Producteur',
-            value: concert.promoterOrganizationName ?? '—',
+            value: concert.promoterOrganizationName ?? '-',
           ),
-          _DetailRow(label: 'Notes', value: concert.notes ?? '—'),
+          _DetailRow(label: 'Notes', value: concert.notes ?? '-'),
           _DetailRow(
             label: 'Fermeture du catering',
             value: cateringClosesAt == null
-                ? '—'
+                ? '-'
                 : formatDatabaseTime(cateringClosesAt),
           ),
           _DetailRow(
             label: 'Arrivée recommandée',
             value: cateringClosesAt == null
-                ? '—'
+                ? '-'
                 : recommendedArrivalFromDatabase(cateringClosesAt),
             showDivider: false,
           ),
@@ -2287,14 +2287,14 @@ class _VenueSection extends StatelessWidget {
       icon: Icons.location_on_outlined,
       child: Column(
         children: [
-          _DetailRow(label: 'Nom', value: venue?.name ?? '—'),
-          _DetailRow(label: 'Adresse', value: venue?.publicAddressLine1 ?? '—'),
+          _DetailRow(label: 'Nom', value: venue?.name ?? '-'),
+          _DetailRow(label: 'Adresse', value: venue?.publicAddressLine1 ?? '-'),
           _DetailRow(
             label: 'Complément',
-            value: venue?.publicAddressLine2 ?? '—',
+            value: venue?.publicAddressLine2 ?? '-',
           ),
-          _DetailRow(label: 'Ville', value: venue?.city ?? '—'),
-          _DetailRow(label: 'Code postal', value: venue?.postalCode ?? '—'),
+          _DetailRow(label: 'Ville', value: venue?.city ?? '-'),
+          _DetailRow(label: 'Code postal', value: venue?.postalCode ?? '-'),
           const Divider(height: 24),
           if (hasAccessInfo) ...[
             if (artistEntrance != null)
@@ -3252,7 +3252,7 @@ class _RosterLine extends StatelessWidget {
             child: Text(
               role == null
                   ? entry.displayName
-                  : '${entry.displayName} — ${role.label}',
+                  : '${entry.displayName} - ${role.label}',
             ),
           ),
         ],
@@ -3418,7 +3418,7 @@ class _TeamRoleSummary extends StatelessWidget {
         Text(label, style: Theme.of(context).textTheme.labelMedium),
         const SizedBox(height: 4),
         if (members.isEmpty)
-          const Text('—')
+          const Text('-')
         else
           for (final member in members)
             Padding(
@@ -4184,9 +4184,9 @@ class _ContactDetails extends StatelessWidget {
         if (_isEmpty)
           Text(emptyMessage)
         else ...[
-          _DetailRow(label: 'Nom', value: name ?? '—'),
-          _DetailRow(label: 'Téléphone', value: phone ?? '—'),
-          _DetailRow(label: 'E-mail', value: email ?? '—', showDivider: false),
+          _DetailRow(label: 'Nom', value: name ?? '-'),
+          _DetailRow(label: 'Téléphone', value: phone ?? '-'),
+          _DetailRow(label: 'E-mail', value: email ?? '-', showDivider: false),
         ],
       ],
     );

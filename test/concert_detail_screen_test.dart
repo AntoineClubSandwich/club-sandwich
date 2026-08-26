@@ -71,7 +71,7 @@ void main() {
 
     expect(find.text('Artiste'), findsWidgets);
     expect(find.text('15 septembre 2026'), findsWidgets);
-    expect(find.text('—'), findsWidgets);
+    expect(find.text('-'), findsWidgets);
     expect(find.text('0 candidatures'), findsOneWidget);
     expect(find.text('0 bénévoles sélectionnés'), findsOneWidget);
     expect(find.text('Je me propose'), findsOneWidget);
@@ -356,7 +356,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Camille Martin — Chargé.e de logistique'),
+        find.text('Camille Martin - Chargé.e de logistique'),
         findsOneWidget,
       );
       expect(find.text('Présent'), findsOneWidget);
@@ -408,7 +408,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Fiche de mission — Chargé.e de logistique'),
+      find.text('Fiche de mission - Chargé.e de logistique'),
       findsOneWidget,
     );
     expect(find.text('Responsabilités'), findsOneWidget);
@@ -420,7 +420,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Fiche de mission — Chargé.e de logistique'),
+      find.text('Fiche de mission - Chargé.e de logistique'),
       findsNothing,
     );
 
@@ -428,7 +428,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Fiche de mission — Chargé.e de logistique'),
+      find.text('Fiche de mission - Chargé.e de logistique'),
       findsOneWidget,
     );
   });

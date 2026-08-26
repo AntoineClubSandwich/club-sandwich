@@ -54,7 +54,7 @@ void main() {
       await tester.tap(find.text('Documents'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Documents — Camille Martin'), findsOneWidget);
+      expect(find.text('Documents - Camille Martin'), findsOneWidget);
       expect(find.text('Pièce d’identité'), findsOneWidget);
       expect(find.text('Validé'), findsOneWidget);
     },

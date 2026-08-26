@@ -345,13 +345,13 @@ class _EncounterMapScreenState extends ConsumerState<EncounterMapScreen> {
                 Text('Rencontre', style: DsTypography.h2),
                 const SizedBox(height: DsSpacing.md),
                 _DetailRow('Date', _formatDateTime(encounter.createdAt)),
-                _DetailRow('Maraude', encounter.artist ?? '—'),
-                _DetailRow('Salle', encounter.venueName ?? '—'),
-                _DetailRow('Enregistrée par', encounter.createdByName ?? '—'),
+                _DetailRow('Maraude', encounter.artist ?? '-'),
+                _DetailRow('Salle', encounter.venueName ?? '-'),
+                _DetailRow('Enregistrée par', encounter.createdByName ?? '-'),
                 _DetailRow(
                   'Équipe',
                   encounter.teamNames.isEmpty
-                      ? '—'
+                      ? '-'
                       : encounter.teamNames.join(' · '),
                 ),
                 const SizedBox(height: DsSpacing.sm),

@@ -69,7 +69,7 @@ class MaraudeReport {
 }
 
 String formatMaraudeDuration(Duration? duration) {
-  if (duration == null) return '—';
+  if (duration == null) return '-';
   final hours = duration.inHours;
   final minutes = duration.inMinutes.remainder(60);
   if (hours == 0) return '$minutes min';

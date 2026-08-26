@@ -256,7 +256,7 @@ class _VolunteerPrivateFormState extends ConsumerState<_VolunteerPrivateForm> {
           TextField(
             controller: _emergencyName,
             decoration: const InputDecoration(
-              labelText: 'Contact d’urgence — nom',
+              labelText: 'Contact d’urgence - nom',
             ),
           ),
           const SizedBox(height: DsSpacing.sm),
@@ -264,7 +264,7 @@ class _VolunteerPrivateFormState extends ConsumerState<_VolunteerPrivateForm> {
             controller: _emergencyPhone,
             keyboardType: TextInputType.phone,
             decoration: const InputDecoration(
-              labelText: 'Contact d’urgence — téléphone',
+              labelText: 'Contact d’urgence - téléphone',
             ),
           ),
           const SizedBox(height: DsSpacing.sm),
@@ -454,7 +454,7 @@ class _MyDocumentTileState extends ConsumerState<_MyDocumentTile> {
           isLoading: _uploading,
           icon: icon,
           label: document?.hasFile == true
-              ? '$label — ${_statusLabel(document!)}'
+              ? '$label - ${_statusLabel(document!)}'
               : 'Joindre $label',
         ),
         if (document?.storagePath case final path?)

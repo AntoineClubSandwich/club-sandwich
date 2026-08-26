@@ -213,7 +213,7 @@ class _MaraudeOperationalReportCardState
                     ),
                     _ReportValue(
                       label: 'Commentaire',
-                      value: report.comment ?? '—',
+                      value: report.comment ?? '-',
                       showDivider: false,
                     ),
                   ],

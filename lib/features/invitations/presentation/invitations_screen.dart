@@ -958,7 +958,7 @@ class _CandidateTileState extends ConsumerState<_CandidateTile> {
               ),
               Text(
                 candidate.lastInvitationAt == null
-                    ? 'Dernière invitation : —'
+                    ? 'Dernière invitation : -'
                     : 'Dernière invitation : '
                           '${_date(candidate.lastInvitationAt!)}',
               ),

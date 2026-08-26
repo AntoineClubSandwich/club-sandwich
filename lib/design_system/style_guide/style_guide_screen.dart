@@ -77,7 +77,7 @@ class _StyleGuideBodyState extends State<_StyleGuideBody> {
     return Scaffold(
       backgroundColor: colors.canvas,
       appBar: DsTopBar(
-        title: 'Design system — Club Sandwich',
+        title: 'Design system - Club Sandwich',
         actions: [
           DsNotificationBadge(
             count: 3,
@@ -99,14 +99,14 @@ class _StyleGuideBodyState extends State<_StyleGuideBody> {
           _section(
             context,
             title: 'Typographie',
-            subtitle: 'Inter — H1 à Caption.',
+            subtitle: 'Inter - H1 à Caption.',
             child: const _TypographyShowcase(),
           ),
           _section(
             context,
             title: 'Boutons',
             subtitle:
-                'Primary / Secondary / Ghost — normal, chargement, désactivé.',
+                'Primary / Secondary / Ghost - normal, chargement, désactivé.',
             child: const _ButtonsShowcase(),
           ),
           _section(
@@ -142,7 +142,7 @@ class _StyleGuideBodyState extends State<_StyleGuideBody> {
             context,
             title: 'Cartes métier',
             subtitle:
-                'Données fictives — n\'utilisent ni providers Riverpod ni Supabase.',
+                'Données fictives - n\'utilisent ni providers Riverpod ni Supabase.',
             child: const _DomainCardsShowcase(),
           ),
         ],
@@ -239,27 +239,27 @@ class _TypographyShowcase extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'H1 — Titre de page',
+          'H1 - Titre de page',
           style: DsTypography.h1.copyWith(color: colors.textPrimary),
         ),
         const SizedBox(height: DsSpacing.sm),
         Text(
-          'H2 — Titre de section',
+          'H2 - Titre de section',
           style: DsTypography.h2.copyWith(color: colors.textPrimary),
         ),
         const SizedBox(height: DsSpacing.sm),
         Text(
-          'H3 — Titre de carte',
+          'H3 - Titre de carte',
           style: DsTypography.h3.copyWith(color: colors.textPrimary),
         ),
         const SizedBox(height: DsSpacing.sm),
         Text(
-          'Body — texte courant, pour les paragraphes et le contenu principal.',
+          'Body - texte courant, pour les paragraphes et le contenu principal.',
           style: DsTypography.body.copyWith(color: colors.textPrimary),
         ),
         const SizedBox(height: DsSpacing.sm),
         Text(
-          'CAPTION — LIBELLÉS, MÉTADONNÉES',
+          'CAPTION - LIBELLÉS, MÉTADONNÉES',
           style: DsTypography.caption.copyWith(color: colors.textSecondary),
         ),
       ],
@@ -502,7 +502,7 @@ class _NavigationShowcase extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'DsNavigationRail — vitrine de style uniquement, ne remplace pas '
+          'DsNavigationRail - vitrine de style uniquement, ne remplace pas '
           'la navigation réelle de AppShell.',
           style: DsTypography.caption.copyWith(color: colors.textSecondary),
         ),

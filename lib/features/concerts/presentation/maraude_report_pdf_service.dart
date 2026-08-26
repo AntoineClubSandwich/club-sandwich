@@ -51,10 +51,7 @@ class MaraudeReportPdfService {
             _row('Salle', report.venueName ?? '-'),
             _row('Tourneur', report.promoterName ?? '-'),
             _row('Date', formatLongFrenchDate(report.concertDate)),
-            _row(
-              'Durée réelle',
-              formatMaraudeDuration(report.actualDuration).replaceAll('—', '-'),
-            ),
+            _row('Durée réelle', formatMaraudeDuration(report.actualDuration)),
             if (report.cateringContactName != null &&
                 report.cateringContactName!.trim().isNotEmpty)
               _row('Contact catering', report.cateringContactName!),

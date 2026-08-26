@@ -845,7 +845,7 @@ void main() {
 
     expect(find.text('Qui s’est déjà positionné'), findsOneWidget);
     expect(find.text('Déjà sélectionnés'), findsOneWidget);
-    expect(find.text('Alex Un — Chargé.e de logistique'), findsOneWidget);
+    expect(find.text('Alex Un - Chargé.e de logistique'), findsOneWidget);
     expect(find.text('Candidatures en attente'), findsOneWidget);
     expect(find.text('Blaise Deux'), findsOneWidget);
   });

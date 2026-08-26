@@ -164,7 +164,7 @@ class MaraudeOverviewCard extends StatelessWidget {
                           ),
                           Text(
                             maraude.totalWeightKg == null
-                                ? 'Poids : —'
+                                ? 'Poids : -'
                                 : '${_number(maraude.totalWeightKg!)} kg',
                             style: DsTypography.caption.copyWith(
                               color: colors.textSecondary,

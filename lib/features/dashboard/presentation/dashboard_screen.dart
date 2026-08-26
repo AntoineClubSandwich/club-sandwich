@@ -306,7 +306,7 @@ class _AchievementSummary extends StatelessWidget {
             (
               DsIcons.award,
               'Crédits disponibles',
-              '${creditSummary?.available ?? '—'}',
+              '${creditSummary?.available ?? '-'}',
             ),
           ]
         : [
@@ -398,7 +398,7 @@ class _CreditProgress extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             eligible
-                ? '${summary.available} crédits disponibles — vous pouvez candidater aux invitations.'
+                ? '${summary.available} crédits disponibles - vous pouvez candidater aux invitations.'
                 : '${summary.available}/$_threshold crédits pour pouvoir candidater aux invitations.',
             style: DsTypography.caption.copyWith(color: colors.textSecondary),
           ),
@@ -1288,7 +1288,7 @@ class _ActivityRow extends StatelessWidget {
                       ),
                       Text(
                         item.totalWeightKg == null
-                            ? 'Poids : —'
+                            ? 'Poids : -'
                             : '${_dashboardNumber(item.totalWeightKg!)} kg',
                         style: DsTypography.caption.copyWith(
                           color: colors.textSecondary,
@@ -1498,7 +1498,7 @@ class _PremiumMaraudeCard extends StatelessWidget {
                 ),
                 Text(
                   maraude.totalWeightKg == null
-                      ? 'Poids : —'
+                      ? 'Poids : -'
                       : '${_dashboardNumber(maraude.totalWeightKg!)} kg',
                   style: DsTypography.caption.copyWith(
                     color: colors.textSecondary,

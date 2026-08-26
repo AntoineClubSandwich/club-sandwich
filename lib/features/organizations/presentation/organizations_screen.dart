@@ -839,7 +839,7 @@ class _Value extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            TextSpan(text: _blank(value) ?? '—'),
+            TextSpan(text: _blank(value) ?? '-'),
           ],
         ),
       ),

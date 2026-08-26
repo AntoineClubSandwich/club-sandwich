@@ -45,7 +45,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Convention de partenariat — En attente de contre-signature'),
+      find.text('Convention de partenariat - En attente de contre-signature'),
       findsOneWidget,
     );
   });

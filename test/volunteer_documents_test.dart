@@ -64,8 +64,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Pièce d’identité — Validé'), findsOneWidget);
-    expect(find.text('Carte de sécurité sociale — Refusé'), findsOneWidget);
+    expect(find.text('Pièce d’identité - Validé'), findsOneWidget);
+    expect(find.text('Carte de sécurité sociale - Refusé'), findsOneWidget);
     expect(find.text('Document illisible'), findsOneWidget);
   });
 
@@ -109,13 +109,13 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.dragUntilVisible(
-        find.text('Contrat de bénévolat — En attente de contre-signature'),
+        find.text('Contrat de bénévolat - En attente de contre-signature'),
         find.byType(ListView),
         const Offset(0, -200),
       );
 
       expect(
-        find.text('Contrat de bénévolat — En attente de contre-signature'),
+        find.text('Contrat de bénévolat - En attente de contre-signature'),
         findsOneWidget,
       );
     },

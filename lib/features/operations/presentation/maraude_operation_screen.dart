@@ -563,19 +563,19 @@ class _MaraudeOperationScreenState
           Text('Infos maraude', style: DsTypography.h2),
           const SizedBox(height: DsSpacing.lg),
           _InfoRow('Artiste', concert.artist),
-          _InfoRow('Salle', concert.venueName ?? '—'),
-          _InfoRow('Adresse', concert.venue?.formattedAddress ?? '—'),
-          _InfoRow('Accès', concert.venue?.accessInstructions ?? '—'),
-          _InfoRow('Fermeture catering', concert.cateringClosesAt ?? '—'),
+          _InfoRow('Salle', concert.venueName ?? '-'),
+          _InfoRow('Adresse', concert.venue?.formattedAddress ?? '-'),
+          _InfoRow('Accès', concert.venue?.accessInstructions ?? '-'),
+          _InfoRow('Fermeture catering', concert.cateringClosesAt ?? '-'),
           _InfoRow(
             'Contact tourneur',
             [
               concert.promoterContactName,
               concert.promoterContactPhone,
-            ].whereType<String>().join(' · ').ifEmpty('—'),
+            ].whereType<String>().join(' · ').ifEmpty('-'),
           ),
-          _InfoRow('Organisation', concert.promoterOrganizationName ?? '—'),
-          _InfoRow('Consignes', concert.notes ?? '—'),
+          _InfoRow('Organisation', concert.promoterOrganizationName ?? '-'),
+          _InfoRow('Consignes', concert.notes ?? '-'),
         ],
       ),
     ),
@@ -968,7 +968,7 @@ class _SummaryStep extends StatelessWidget {
   Widget build(BuildContext context) {
     final distribution = data.distribution;
     final duration = concert?.actualStartAt == null
-        ? '—'
+        ? '-'
         : _duration(DateTime.now().difference(concert!.actualStartAt!));
     final incidents = data.equipment
         .where((item) => item.incidentType != null)

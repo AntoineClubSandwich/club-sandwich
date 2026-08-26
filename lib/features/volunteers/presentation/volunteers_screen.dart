@@ -211,7 +211,7 @@ class _VolunteerDirectory extends StatelessWidget {
       builder: (dialogContext) => UncontrolledProviderScope(
         container: ProviderScope.containerOf(context),
         child: AlertDialog(
-          title: Text('Documents — ${volunteer.displayName}'),
+          title: Text('Documents - ${volunteer.displayName}'),
           content: SizedBox(
             width: 480,
             child: SingleChildScrollView(
@@ -358,7 +358,7 @@ String _availabilityLabel(ConcertVolunteerStatus status) {
     ConcertVolunteerStatus.pending => 'Disponibilité transmise',
     ConcertVolunteerStatus.selected => 'Sélectionné',
     ConcertVolunteerStatus.notSelected => 'Non sélectionné',
-    ConcertVolunteerStatus.withdrawn => 'Désisté — repositionnement possible',
+    ConcertVolunteerStatus.withdrawn => 'Désisté - repositionnement possible',
   };
 }
 

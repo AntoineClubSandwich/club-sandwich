@@ -66,7 +66,7 @@ class DsOrganisationCardData {
 
 const List<DsMaraudeCardData> dsMockMaraudes = [
   DsMaraudeCardData(
-    title: 'Accor Arena — Fatal Bazooka',
+    title: 'Accor Arena - Fatal Bazooka',
     dateLabel: '27 août 2026 · 19:30',
     venue: 'Accor Arena, Paris',
     volunteersRegistered: 3,
@@ -74,7 +74,7 @@ const List<DsMaraudeCardData> dsMockMaraudes = [
     status: DsChipStatus.active,
   ),
   DsMaraudeCardData(
-    title: 'Élysée Montmartre — zefe',
+    title: 'Élysée Montmartre - zefe',
     dateLabel: '27 août 2026 · 20:10',
     venue: 'Élysée Montmartre, Paris',
     volunteersRegistered: 5,
@@ -82,7 +82,7 @@ const List<DsMaraudeCardData> dsMockMaraudes = [
     status: DsChipStatus.completed,
   ),
   DsMaraudeCardData(
-    title: 'Le Bataclan — Structures',
+    title: 'Le Bataclan - Structures',
     dateLabel: '3 septembre 2026 · 21:00',
     venue: 'Le Bataclan, Paris',
     volunteersRegistered: 1,

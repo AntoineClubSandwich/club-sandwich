@@ -705,7 +705,7 @@ class _ConcertCard extends ConsumerWidget {
                     const SizedBox(height: DsSpacing.md),
                     _CardInformation(
                       icon: DsIcons.mapPin,
-                      text: concert.venueName ?? '—',
+                      text: concert.venueName ?? '-',
                     ),
                     const SizedBox(height: DsSpacing.sm),
                     _CardInformation(
@@ -736,7 +736,7 @@ class _ConcertCard extends ConsumerWidget {
                       children: [
                         _Metadata(
                           label: 'Producteur',
-                          value: concert.promoterOrganizationName ?? '—',
+                          value: concert.promoterOrganizationName ?? '-',
                         ),
                         _Metadata(
                           label: 'Équipe',
