@@ -2560,7 +2560,7 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
               selectedRole: _draftTeamRoles[application.id],
               isUpdating: _updatingApplications.contains(application.id),
               isRoleAvailable: (role) => _isRoleAvailable(role, application.id),
-              onSelect: () => _selectInDraft(application.id),
+              onSelect: () => _selectVolunteer(application.id),
               onReject: () => _rejectApplication(application.id),
               onRemove: () => _removeVolunteer(application.id),
               onRoleChanged: (role) => _assignDraftRole(application.id, role),
@@ -2697,11 +2697,27 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
     );
   }
 
-  void _selectInDraft(String applicationId) {
-    setState(() {
-      _draftTeamRoles[applicationId] = MaraudeRole.collectionDistribution;
-      _teamDirty = true;
-    });
+  Future<void> _selectVolunteer(String applicationId) async {
+    setState(() => _updatingApplications.add(applicationId));
+    try {
+      await ref
+          .read(concertVolunteerRepositoryProvider)
+          .selectVolunteers(widget.concertId, [applicationId]);
+      _draftTeamRoles[applicationId] ??= MaraudeRole.collectionDistribution;
+      _serverTeamSignature = null;
+      ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bénévole ajouté à l’équipe.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showError(describeError(error, 'Impossible de sélectionner ce bénévole.'));
+    } finally {
+      if (mounted) {
+        setState(() => _updatingApplications.remove(applicationId));
+      }
+    }
   }
 
   Future<void> _removeVolunteer(String applicationId) async {

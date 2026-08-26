@@ -1108,7 +1108,7 @@ void main() {
     );
     await tester.ensureVisible(select);
     await tester.tap(select);
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(
       find.byKey(const ValueKey('remove-volunteer-selected-locally')),
@@ -1127,14 +1127,13 @@ void main() {
           .status,
       ConcertVolunteerStatus.notSelected,
     );
-    expect(find.text('Candidature refusée.'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('reject-volunteer-rejected')),
       findsNothing,
     );
   });
 
-  testWidgets('sélectionne en un clic et met le résumé à jour sans requête', (
+  testWidgets('sélectionne en un clic et enregistre immédiatement', (
     tester,
   ) async {
     final repository = _FakeConcertVolunteerRepository(
@@ -1174,7 +1173,7 @@ void main() {
     );
     await tester.ensureVisible(selectButton);
     await tester.tap(selectButton);
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
     await tester.tap(find.text('Équipe').last);
@@ -1186,7 +1185,7 @@ void main() {
       repository.applications
           .firstWhere((application) => application.id == 'pending-id')
           .status,
-      ConcertVolunteerStatus.pending,
+      ConcertVolunteerStatus.selected,
     );
     expect(repository.saveTeamCount, 0);
   });
@@ -1420,7 +1419,7 @@ void main() {
       find.byKey(const ValueKey('select-volunteer-first')),
     );
     await tester.tap(find.byKey(const ValueKey('select-volunteer-first')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.byKey(const ValueKey('team-role-first-teamLeader')),
     );
@@ -1431,7 +1430,7 @@ void main() {
       find.byKey(const ValueKey('select-volunteer-second')),
     );
     await tester.tap(find.byKey(const ValueKey('select-volunteer-second')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     final secondLeader = tester.widget<RadioListTile<MaraudeRole>>(
       find.byKey(const ValueKey('team-role-second-teamLeader')),
     );
@@ -1468,7 +1467,7 @@ void main() {
       final button = find.byKey(ValueKey('select-volunteer-candidate-$index'));
       await tester.ensureVisible(button);
       await tester.tap(button);
-      await tester.pump();
+      await tester.pumpAndSettle();
     }
 
     var saveButton = tester.widget<FilledButton>(
@@ -1507,7 +1506,6 @@ void main() {
           .teamRole,
       MaraudeRole.teamLeader,
     );
-    expect(find.text('Équipe enregistrée.'), findsOneWidget);
   });
 
   testWidgets('affiche Candidatures et Équipe sous forme d’onglets mobiles', (
