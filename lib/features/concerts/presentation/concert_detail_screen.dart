@@ -2562,7 +2562,7 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
               isRoleAvailable: (role) => _isRoleAvailable(role, application.id),
               onSelect: () => _selectInDraft(application.id),
               onReject: () => _rejectApplication(application.id),
-              onRemove: () => _removeFromDraft(application.id),
+              onRemove: () => _removeVolunteer(application.id),
               onRoleChanged: (role) => _assignDraftRole(application.id, role),
             ),
       ],
@@ -2704,11 +2704,27 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
     });
   }
 
-  void _removeFromDraft(String applicationId) {
-    setState(() {
+  Future<void> _removeVolunteer(String applicationId) async {
+    setState(() => _updatingApplications.add(applicationId));
+    try {
+      await ref
+          .read(concertVolunteerRepositoryProvider)
+          .setStatus(applicationId, ConcertVolunteerStatus.notSelected);
       _draftTeamRoles.remove(applicationId);
-      _teamDirty = true;
-    });
+      _serverTeamSignature = null;
+      ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bénévole retiré de l’équipe.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showError(describeError(error, 'Impossible de retirer ce bénévole.'));
+    } finally {
+      if (mounted) {
+        setState(() => _updatingApplications.remove(applicationId));
+      }
+    }
   }
 
   void _assignDraftRole(String applicationId, MaraudeRole role) {
