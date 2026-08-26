@@ -319,29 +319,36 @@ class _TemplateRowState extends ConsumerState<_TemplateRow> {
       data: (value) => value != null,
       orElse: () => false,
     );
-    return Wrap(
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: DsSpacing.md,
-      runSpacing: DsSpacing.sm,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 280,
-          child: Text(
-            widget.templateKey.label,
-            style: DsTypography.body.copyWith(
-              color: colors.textPrimary,
-              fontWeight: FontWeight.w700,
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: DsSpacing.md,
+          runSpacing: DsSpacing.sm,
+          children: [
+            SizedBox(
+              width: 280,
+              child: Text(
+                widget.templateKey.label,
+                style: DsTypography.body.copyWith(
+                  color: colors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
-          ),
+            DsSecondaryButton(
+              onPressed: _uploading ? null : _replace,
+              isLoading: _uploading,
+              icon: Icons.upload_file,
+              label: hasTemplate ? 'Remplacer' : 'Déposer',
+            ),
+          ],
         ),
-        if (hasTemplate)
+        if (hasTemplate) ...[
+          const SizedBox(height: DsSpacing.xs),
           DocumentTemplateDownloadLink(templateKey: widget.templateKey),
-        DsSecondaryButton(
-          onPressed: _uploading ? null : _replace,
-          isLoading: _uploading,
-          icon: Icons.upload_file,
-          label: hasTemplate ? 'Remplacer' : 'Déposer',
-        ),
+        ],
       ],
     );
   }

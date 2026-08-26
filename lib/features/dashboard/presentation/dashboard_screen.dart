@@ -34,10 +34,10 @@ import 'package:club_sandwich/features/invitations/data/invitation_providers.dar
 import 'package:club_sandwich/features/invitations/domain/invitation_campaign.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
+import 'package:club_sandwich/shared/widgets/inline_document_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -1566,25 +1566,6 @@ class _PendingDocumentCard extends ConsumerStatefulWidget {
 class _PendingDocumentCardState extends ConsumerState<_PendingDocumentCard> {
   bool _busy = false;
 
-  Future<void> _openFile() async {
-    try {
-      final url = await ref
-          .read(volunteerDocumentRepositoryProvider)
-          .signedUrl(widget.document.storagePath);
-      await launchUrl(Uri.parse(url));
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              describeError(error, 'Impossible d’ouvrir ce document.'),
-            ),
-          ),
-        );
-      }
-    }
-  }
-
   Future<void> _review(VolunteerDocumentStatus status) async {
     String? reason;
     if (status == VolunteerDocumentStatus.rejected) {
@@ -1659,11 +1640,6 @@ class _PendingDocumentCardState extends ConsumerState<_PendingDocumentCard> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                TextButton.icon(
-                  onPressed: _busy ? null : _openFile,
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('Voir le document'),
-                ),
                 FilledButton.tonalIcon(
                   onPressed: _busy
                       ? null
@@ -1679,6 +1655,13 @@ class _PendingDocumentCardState extends ConsumerState<_PendingDocumentCard> {
                   label: const Text('Refuser'),
                 ),
               ],
+            ),
+            InlineDocumentPreview(
+              storagePath: widget.document.storagePath,
+              title: widget.document.displayLabel,
+              loadSignedUrl: () => ref
+                  .read(volunteerDocumentRepositoryProvider)
+                  .signedUrl(widget.document.storagePath),
             ),
           ],
         ),

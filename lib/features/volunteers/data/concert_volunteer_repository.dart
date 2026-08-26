@@ -1,5 +1,6 @@
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
+import 'package:club_sandwich/shared/data/avatar_url_resolver.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MaraudeTeamMemberDraft {
@@ -212,13 +213,12 @@ class ConcertVolunteerRepository {
       'get_maraude_attendance',
       params: {'requested_concert_id': concertId},
     );
+    final jsonRows = rows
+        .map((row) => Map<String, dynamic>.from(row! as Map))
+        .toList(growable: false);
+    await _resolveFlatAvatarRows(jsonRows);
     return MaraudeAttendanceData(
-      rows
-          .map(
-            (row) =>
-                MaraudeAttendanceMember.fromJson(row! as Map<String, dynamic>),
-          )
-          .toList(growable: false),
+      jsonRows.map(MaraudeAttendanceMember.fromJson).toList(growable: false),
     );
   }
 
@@ -248,12 +248,12 @@ class ConcertVolunteerRepository {
       'get_concert_volunteer_roster',
       params: {'requested_concert_id': concertId},
     );
-    return rows
-        .map(
-          (row) => ConcertVolunteerRosterEntry.fromJson(
-            row! as Map<String, dynamic>,
-          ),
-        )
+    final jsonRows = rows
+        .map((row) => Map<String, dynamic>.from(row! as Map))
+        .toList(growable: false);
+    await _resolveFlatAvatarRows(jsonRows);
+    return jsonRows
+        .map(ConcertVolunteerRosterEntry.fromJson)
         .toList(growable: false);
   }
 
@@ -300,12 +300,12 @@ class ConcertVolunteerRepository {
       params: {'requested_concert_id': concertId},
     );
 
-    final applications = rows
-        .map(
-          (row) => ConcertVolunteerApplication.fromJson(
-            row! as Map<String, dynamic>,
-          ),
-        )
+    final jsonRows = rows
+        .map((row) => Map<String, dynamic>.from(row! as Map))
+        .toList(growable: false);
+    await _resolveApplicationAvatarRows(jsonRows);
+    final applications = jsonRows
+        .map(ConcertVolunteerApplication.fromJson)
         .toList(growable: false);
     if (isPromoter || applications.isEmpty) return applications;
 
@@ -364,6 +364,47 @@ class ConcertVolunteerRepository {
           );
         })
         .toList(growable: false);
+  }
+
+  Future<void> _resolveFlatAvatarRows(List<Map<String, dynamic>> rows) async {
+    final signedUrls = await resolveAvatarUrls(
+      client,
+      rows.map((row) => row['avatar_url'] as String?),
+    );
+    for (final row in rows) {
+      row['avatar_url'] = resolvedAvatarUrl(
+        row['avatar_url'] as String?,
+        signedUrls,
+      );
+    }
+  }
+
+  Future<void> _resolveApplicationAvatarRows(
+    List<Map<String, dynamic>> rows,
+  ) async {
+    String? avatarValue(Map<String, dynamic> row) {
+      final nested = row['profile'];
+      if (nested is Map) return nested['avatar_url'] as String?;
+      return row['avatar_url'] as String?;
+    }
+
+    final signedUrls = await resolveAvatarUrls(client, rows.map(avatarValue));
+    for (final row in rows) {
+      final nested = row['profile'];
+      if (nested is Map) {
+        final profile = Map<String, dynamic>.from(nested);
+        profile['avatar_url'] = resolvedAvatarUrl(
+          profile['avatar_url'] as String?,
+          signedUrls,
+        );
+        row['profile'] = profile;
+      } else {
+        row['avatar_url'] = resolvedAvatarUrl(
+          row['avatar_url'] as String?,
+          signedUrls,
+        );
+      }
+    }
   }
 }
 

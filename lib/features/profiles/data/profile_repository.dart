@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:club_sandwich/features/profiles/domain/profile.dart';
 import 'package:club_sandwich/features/profiles/domain/volunteer_private_profile.dart';
+import 'package:club_sandwich/shared/data/avatar_url_resolver.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfileRepository {
@@ -18,7 +19,13 @@ class ProfileRepository {
         .select()
         .eq('id', userId)
         .maybeSingle();
-    return row == null ? null : Profile.fromJson(row);
+    if (row == null) return null;
+    final json = Map<String, dynamic>.from(row);
+    json['avatar_url'] = await resolveAvatarUrl(
+      _client,
+      json['avatar_url'] as String?,
+    );
+    return Profile.fromJson(json);
   }
 
   Future<void> updateCurrentProfile({
@@ -57,13 +64,11 @@ class ProfileRepository {
           fileOptions: FileOptions(contentType: contentType, upsert: true),
         );
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final avatarUrl =
-        '${_client.storage.from('profile-avatars').getPublicUrl(path)}?v=$timestamp';
     await _client
         .from('profiles')
-        .update({'avatar_url': avatarUrl})
+        .update({'avatar_url': path})
         .eq('id', userId);
-    return avatarUrl;
+    return '${await _client.storage.from(profileAvatarBucket).createSignedUrl(path, 3600)}&v=$timestamp';
   }
 
   Future<VolunteerPrivateProfile?> fetchCurrentVolunteerProfile() async {

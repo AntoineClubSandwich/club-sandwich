@@ -2,10 +2,10 @@ import 'package:club_sandwich/features/volunteers/data/volunteer_document_provid
 import 'package:club_sandwich/features/volunteers/domain/volunteer_document.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
+import 'package:club_sandwich/shared/widgets/inline_document_preview.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class VolunteerDocumentsPanel extends ConsumerWidget {
   const VolunteerDocumentsPanel({super.key, required this.userId});
@@ -194,27 +194,6 @@ class _AdminDocumentTile extends ConsumerStatefulWidget {
 class _AdminDocumentTileState extends ConsumerState<_AdminDocumentTile> {
   bool _busy = false;
 
-  Future<void> _openFile() async {
-    final path = widget.document?.storagePath;
-    if (path == null) return;
-    try {
-      final url = await ref
-          .read(volunteerDocumentRepositoryProvider)
-          .signedUrl(path);
-      await launchUrl(Uri.parse(url));
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              describeError(error, 'Impossible d’ouvrir ce document.'),
-            ),
-          ),
-        );
-      }
-    }
-  }
-
   Future<void> _uploadOnBehalf() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -375,12 +354,6 @@ class _AdminDocumentTileState extends ConsumerState<_AdminDocumentTile> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (document?.hasFile == true)
-                  TextButton.icon(
-                    onPressed: _busy ? null : _openFile,
-                    icon: const Icon(Icons.open_in_new),
-                    label: const Text('Voir le document'),
-                  ),
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _uploadOnBehalf,
                   icon: _busy
@@ -411,6 +384,16 @@ class _AdminDocumentTileState extends ConsumerState<_AdminDocumentTile> {
                 ],
               ],
             ),
+            if (document?.storagePath case final path?) ...[
+              const SizedBox(height: 4),
+              InlineDocumentPreview(
+                storagePath: path,
+                title: label,
+                loadSignedUrl: () => ref
+                    .read(volunteerDocumentRepositoryProvider)
+                    .signedUrl(path),
+              ),
+            ],
           ],
         ),
       ),

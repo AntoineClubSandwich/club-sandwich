@@ -8,10 +8,10 @@ import 'package:club_sandwich/shared/data/document_template_repository.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
 import 'package:club_sandwich/shared/widgets/document_template_download_link.dart';
+import 'package:club_sandwich/shared/widgets/inline_document_preview.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class OrganizationConventionPanel extends ConsumerWidget {
   const OrganizationConventionPanel({super.key, required this.organizationId});
@@ -151,6 +151,14 @@ class _PromoterConventionTileState
                 : 'Joindre la convention signée',
           ),
         ),
+        if (convention?.storagePath case final path?)
+          InlineDocumentPreview(
+            storagePath: path,
+            title: 'Convention de partenariat',
+            loadSignedUrl: () => ref
+                .read(organizationConventionRepositoryProvider)
+                .signedUrl(path),
+          ),
         if (convention?.status == VolunteerDocumentStatus.rejected &&
             convention?.rejectionReason != null)
           Padding(
@@ -179,27 +187,6 @@ class _AdminConventionTile extends ConsumerStatefulWidget {
 
 class _AdminConventionTileState extends ConsumerState<_AdminConventionTile> {
   bool _busy = false;
-
-  Future<void> _openFile() async {
-    final path = widget.convention?.storagePath;
-    if (path == null) return;
-    try {
-      final url = await ref
-          .read(organizationConventionRepositoryProvider)
-          .signedUrl(path);
-      await launchUrl(Uri.parse(url));
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              describeError(error, 'Impossible d’ouvrir ce document.'),
-            ),
-          ),
-        );
-      }
-    }
-  }
 
   Future<void> _uploadCountersigned() async {
     final result = await FilePicker.platform.pickFiles(
@@ -349,12 +336,6 @@ class _AdminConventionTileState extends ConsumerState<_AdminConventionTile> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (convention?.hasFile == true)
-                  TextButton.icon(
-                    onPressed: _busy ? null : _openFile,
-                    icon: const Icon(Icons.open_in_new),
-                    label: const Text('Voir le document'),
-                  ),
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _uploadCountersigned,
                   icon: _busy
@@ -374,6 +355,16 @@ class _AdminConventionTileState extends ConsumerState<_AdminConventionTile> {
                   ),
               ],
             ),
+            if (convention?.storagePath case final path?) ...[
+              const SizedBox(height: 4),
+              InlineDocumentPreview(
+                storagePath: path,
+                title: 'Convention de partenariat',
+                loadSignedUrl: () => ref
+                    .read(organizationConventionRepositoryProvider)
+                    .signedUrl(path),
+              ),
+            ],
           ],
         ),
       ),

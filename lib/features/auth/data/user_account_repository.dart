@@ -1,4 +1,5 @@
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
+import 'package:club_sandwich/shared/data/avatar_url_resolver.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserAccountRepository {
@@ -15,8 +16,21 @@ class UserAccountRepository {
 
   Future<List<ManagedUser>> fetchManagedUsers() async {
     final rows = await _client.rpc<List<dynamic>>('get_admin_users');
-    return rows
-        .map((row) => ManagedUser.fromJson(row as Map<String, dynamic>))
+    final jsonRows = rows
+        .map((row) => Map<String, dynamic>.from(row as Map))
+        .toList(growable: false);
+    final signedUrls = await resolveAvatarUrls(
+      _client,
+      jsonRows.map((row) => row['avatar_url'] as String?),
+    );
+    return jsonRows
+        .map((row) {
+          row['avatar_url'] = resolvedAvatarUrl(
+            row['avatar_url'] as String?,
+            signedUrls,
+          );
+          return ManagedUser.fromJson(row);
+        })
         .toList(growable: false);
   }
 

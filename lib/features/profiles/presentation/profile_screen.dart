@@ -25,6 +25,7 @@ import 'package:club_sandwich/shared/data/document_template_repository.dart';
 import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
 import 'package:club_sandwich/shared/widgets/document_template_download_link.dart';
+import 'package:club_sandwich/shared/widgets/inline_document_preview.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -328,25 +329,22 @@ class _MyDocumentsSection extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Wrap(
-              spacing: DsSpacing.sm,
-              runSpacing: DsSpacing.sm,
-              children: [
-                _MyDocumentTile(
-                  type: VolunteerDocumentType.identity,
-                  document: identity,
-                ),
-                _MyDocumentTile(
-                  type: VolunteerDocumentType.socialSecurity,
-                  document: socialSecurity,
-                ),
-                for (final document in other)
-                  _MyDocumentTile(
-                    type: VolunteerDocumentType.other,
-                    document: document,
-                  ),
-              ],
+            _MyDocumentTile(
+              type: VolunteerDocumentType.identity,
+              document: identity,
             ),
+            const SizedBox(height: DsSpacing.sm),
+            _MyDocumentTile(
+              type: VolunteerDocumentType.socialSecurity,
+              document: socialSecurity,
+            ),
+            for (final document in other) ...[
+              const SizedBox(height: DsSpacing.sm),
+              _MyDocumentTile(
+                type: VolunteerDocumentType.other,
+                document: document,
+              ),
+            ],
             const SizedBox(height: DsSpacing.md),
             Divider(height: 1, color: colors.border),
             const SizedBox(height: DsSpacing.md),
@@ -459,6 +457,13 @@ class _MyDocumentTileState extends ConsumerState<_MyDocumentTile> {
               ? '$label — ${_statusLabel(document!)}'
               : 'Joindre $label',
         ),
+        if (document?.storagePath case final path?)
+          InlineDocumentPreview(
+            storagePath: path,
+            title: label,
+            loadSignedUrl: () =>
+                ref.read(volunteerDocumentRepositoryProvider).signedUrl(path),
+          ),
         if (document?.status == VolunteerDocumentStatus.rejected &&
             document?.rejectionReason != null)
           Padding(
