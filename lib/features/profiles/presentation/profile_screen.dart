@@ -813,16 +813,27 @@ class _MetricsRow extends StatelessWidget {
   final List<(String, String)> metrics;
 
   @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: DsSpacing.sm,
-    runSpacing: DsSpacing.sm,
-    children: [
-      for (final (label, value) in metrics)
-        SizedBox(
-          width: 160,
-          child: DsMetricCard(label: label, value: value),
-        ),
-    ],
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final columns = constraints.maxWidth >= 900
+          ? metrics.length
+          : constraints.maxWidth >= 520
+          ? (metrics.length / 2).ceil()
+          : 1;
+      final width =
+          (constraints.maxWidth - DsSpacing.sm * (columns - 1)) / columns;
+      return Wrap(
+        spacing: DsSpacing.sm,
+        runSpacing: DsSpacing.sm,
+        children: [
+          for (final (label, value) in metrics)
+            SizedBox(
+              width: width,
+              child: DsMetricCard(label: label, value: value),
+            ),
+        ],
+      );
+    },
   );
 }
 
