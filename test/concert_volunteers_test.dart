@@ -205,6 +205,7 @@ void main() {
           'application_id': 'first',
           'user_id': 'first-user',
           'display_name': 'Camille Martin',
+          'avatar_url': 'https://example.com/camille.jpg',
           'team_role': 'team_leader',
           'confirmation_status': 'confirmed',
           'attendance_status': 'present',
@@ -234,6 +235,22 @@ void main() {
       expect(data.canValidate, isTrue);
       expect(data.isValidated, isTrue);
       expect(data.members.last.teamRole, isNull);
+      expect(data.members.first.avatarUrl, 'https://example.com/camille.jpg');
+    });
+
+    test('parse la photo dans l’aperçu public de l’équipe', () {
+      final entry = ConcertVolunteerRosterEntry.fromJson({
+        'id': 'application-id',
+        'user_id': 'volunteer-id',
+        'status': 'selected',
+        'team_role': 'logistics',
+        'first_name': 'Camille',
+        'last_name': 'Martin',
+        'avatar_url': 'https://example.com/avatar.webp',
+      });
+
+      expect(entry.displayName, 'Camille Martin');
+      expect(entry.avatarUrl, 'https://example.com/avatar.webp');
     });
   });
 

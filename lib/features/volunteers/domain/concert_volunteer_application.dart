@@ -452,6 +452,7 @@ class MaraudeAttendanceMember {
     required this.attendanceStatus,
     required this.lastModifiedAt,
     required this.canValidate,
+    this.avatarUrl,
     this.attendanceValidatedAt,
     this.attendanceValidatedBy,
     this.lastModifiedByName,
@@ -462,6 +463,7 @@ class MaraudeAttendanceMember {
       applicationId: json['application_id'] as String,
       userId: json['user_id'] as String,
       displayName: json['display_name'] as String? ?? 'Bénévole',
+      avatarUrl: json['avatar_url'] as String?,
       teamRole: json['team_role'] == null
           ? null
           : MaraudeRole.fromDatabase(json['team_role'] as String),
@@ -484,6 +486,7 @@ class MaraudeAttendanceMember {
   final String applicationId;
   final String userId;
   final String displayName;
+  final String? avatarUrl;
   final MaraudeRole? teamRole;
   final VolunteerConfirmationStatus confirmationStatus;
   final VolunteerAttendanceStatus attendanceStatus;
@@ -646,6 +649,7 @@ class ConcertVolunteerRosterEntry {
     required this.status,
     required this.firstName,
     required this.lastName,
+    this.avatarUrl,
     this.teamRole,
   });
 
@@ -659,6 +663,7 @@ class ConcertVolunteerRosterEntry {
           : MaraudeRole.fromDatabase(json['team_role'] as String),
       firstName: json['first_name'] as String? ?? '',
       lastName: json['last_name'] as String? ?? '',
+      avatarUrl: json['avatar_url'] as String?,
     );
   }
 
@@ -668,6 +673,7 @@ class ConcertVolunteerRosterEntry {
   final MaraudeRole? teamRole;
   final String firstName;
   final String lastName;
+  final String? avatarUrl;
 
   String get displayName => '$firstName $lastName'.trim();
 }

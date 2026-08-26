@@ -70,6 +70,7 @@ class ManagedUser {
     required this.role,
     required this.status,
     required this.invitedAt,
+    this.avatarUrl,
     this.organizationId,
     this.organizationName,
     this.lastSignInAt,
@@ -81,6 +82,7 @@ class ManagedUser {
       firstName: json['first_name'] as String? ?? '',
       lastName: json['last_name'] as String? ?? '',
       email: json['email'] as String,
+      avatarUrl: json['avatar_url'] as String?,
       role: AppUserRole.fromJson(json['role'] as String),
       organizationId: json['organization_id'] as String?,
       organizationName: json['organization_name'] as String?,
@@ -96,6 +98,7 @@ class ManagedUser {
   final String firstName;
   final String lastName;
   final String email;
+  final String? avatarUrl;
   final AppUserRole role;
   final String? organizationId;
   final String? organizationName;

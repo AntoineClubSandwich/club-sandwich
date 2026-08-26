@@ -50,7 +50,10 @@ class DsAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    // Keep this low-level identity component usable in isolated dialogs and
+    // widget tests that provide a plain Material theme.
+    final colors =
+        (Theme.of(context).extension<DsTokens>() ?? DsTokens.light).colors;
     // A restrained, muted palette an avatar's background is deterministically
     // picked from (by hashing initials) — never the saturated brand purple,
     // to keep a wall of avatars calm rather than busy.

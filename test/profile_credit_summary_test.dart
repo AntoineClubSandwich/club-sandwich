@@ -62,6 +62,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      expect(find.text('Photo de profil'), findsOneWidget);
+      expect(find.text('Ajouter'), findsOneWidget);
       await tester.dragUntilVisible(
         find.text('Mes crédits d’invitation'),
         find.byType(ListView),

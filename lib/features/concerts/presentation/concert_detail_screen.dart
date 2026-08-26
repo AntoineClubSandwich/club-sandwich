@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:club_sandwich/design_system/components/indicators/ds_avatar.dart';
 import 'package:club_sandwich/features/collections/data/maraude_collection_providers.dart';
 import 'package:club_sandwich/features/collections/domain/maraude_collection.dart';
 import 'package:club_sandwich/features/collections/presentation/maraude_collection_form_dialog.dart';
@@ -1192,11 +1193,22 @@ class _AttendanceMemberRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          member.displayName,
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+        Row(
+          children: [
+            DsAvatar(
+              initials: _initialsForName(member.displayName),
+              imageUrl: member.avatarUrl,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                member.displayName,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 2),
         Text(member.teamRole?.label ?? 'Rôle non attribué'),
@@ -1990,6 +2002,12 @@ class _TeamRosterLine extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
+          DsAvatar(
+            initials: _initialsForName(application.displayName),
+            imageUrl: application.profile?.avatarUrl,
+            size: DsAvatarSize.sm,
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               role == null
@@ -3000,13 +3018,10 @@ class _PromoterApplications extends StatelessWidget {
           Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
-              leading: CircleAvatar(
-                backgroundImage: application.profile?.avatarUrl == null
-                    ? null
-                    : NetworkImage(application.profile!.avatarUrl!),
-                child: application.profile?.avatarUrl == null
-                    ? const Icon(Icons.person_outline)
-                    : null,
+              leading: DsAvatar(
+                initials: _initialsForName(application.displayName),
+                imageUrl: application.profile?.avatarUrl,
+                size: DsAvatarSize.lg,
               ),
               title: Text(application.displayName),
               subtitle: Text(application.status.label),
@@ -3225,10 +3240,22 @@ class _RosterLine extends StatelessWidget {
     final role = entry.teamRole;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Text(
-        role == null
-            ? entry.displayName
-            : '${entry.displayName} — ${role.label}',
+      child: Row(
+        children: [
+          DsAvatar(
+            initials: _initialsForName(entry.displayName),
+            imageUrl: entry.avatarUrl,
+            size: DsAvatarSize.sm,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              role == null
+                  ? entry.displayName
+                  : '${entry.displayName} — ${role.label}',
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3298,22 +3325,22 @@ class _TeamBuilderSummary extends StatelessWidget {
             const Divider(height: 28),
             _TeamRoleSummary(
               label: 'Chef d’équipe',
-              names: _namesForRole(MaraudeRole.teamLeader),
+              members: _membersForRole(MaraudeRole.teamLeader),
             ),
             const Divider(height: 24),
             _TeamRoleSummary(
               label: 'Communication',
-              names: _namesForRole(MaraudeRole.communication),
+              members: _membersForRole(MaraudeRole.communication),
             ),
             const Divider(height: 24),
             _TeamRoleSummary(
               label: 'Logistique',
-              names: _namesForRole(MaraudeRole.logistics),
+              members: _membersForRole(MaraudeRole.logistics),
             ),
             const Divider(height: 24),
             _TeamRoleSummary(
               label: 'Récolte & distribution',
-              names: _namesForRole(MaraudeRole.collectionDistribution),
+              members: _membersForRole(MaraudeRole.collectionDistribution),
             ),
             const Divider(height: 28),
             Row(
@@ -3365,22 +3392,23 @@ class _TeamBuilderSummary extends StatelessWidget {
     );
   }
 
-  List<String> _namesForRole(MaraudeRole role) {
+  List<ConcertVolunteerApplication> _membersForRole(MaraudeRole role) {
     final applicationsById = {
       for (final application in applications) application.id: application,
     };
     return roles.entries
         .where((entry) => entry.value == role)
-        .map((entry) => applicationsById[entry.key]?.displayName ?? 'Bénévole')
+        .map((entry) => applicationsById[entry.key])
+        .whereType<ConcertVolunteerApplication>()
         .toList(growable: false);
   }
 }
 
 class _TeamRoleSummary extends StatelessWidget {
-  const _TeamRoleSummary({required this.label, required this.names});
+  const _TeamRoleSummary({required this.label, required this.members});
 
   final String label;
-  final List<String> names;
+  final List<ConcertVolunteerApplication> members;
 
   @override
   Widget build(BuildContext context) {
@@ -3389,7 +3417,24 @@ class _TeamRoleSummary extends StatelessWidget {
       children: [
         Text(label, style: Theme.of(context).textTheme.labelMedium),
         const SizedBox(height: 4),
-        Text(names.isEmpty ? '—' : names.join('\n')),
+        if (members.isEmpty)
+          const Text('—')
+        else
+          for (final member in members)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  DsAvatar(
+                    initials: _initialsForName(member.displayName),
+                    imageUrl: member.profile?.avatarUrl,
+                    size: DsAvatarSize.sm,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(member.displayName)),
+                ],
+              ),
+            ),
       ],
     );
   }
@@ -3699,6 +3744,16 @@ class _VolunteerAvatar extends StatelessWidget {
       ),
     );
   }
+}
+
+String _initialsForName(String displayName) {
+  final parts = displayName
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .take(2);
+  final initials = parts.map((part) => part.characters.first).join();
+  return initials.isEmpty ? '?' : initials;
 }
 
 Future<void> _showVolunteerProfileDialog(

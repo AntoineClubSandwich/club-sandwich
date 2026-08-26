@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:club_sandwich/features/profiles/domain/profile.dart';
 import 'package:club_sandwich/features/profiles/domain/volunteer_private_profile.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -37,6 +39,31 @@ class ProfileRepository {
               : normalizedPhone,
         })
         .eq('id', userId);
+  }
+
+  Future<String> uploadCurrentAvatar({
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw const AuthException('Utilisateur non connecté.');
+
+    final path = '$userId/avatar';
+    await _client.storage
+        .from('profile-avatars')
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: true),
+        );
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final avatarUrl =
+        '${_client.storage.from('profile-avatars').getPublicUrl(path)}?v=$timestamp';
+    await _client
+        .from('profiles')
+        .update({'avatar_url': avatarUrl})
+        .eq('id', userId);
+    return avatarUrl;
   }
 
   Future<VolunteerPrivateProfile?> fetchCurrentVolunteerProfile() async {

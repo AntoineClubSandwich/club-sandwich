@@ -160,6 +160,7 @@ class _VolunteerDirectory extends StatelessWidget {
                               DsAvatar(
                                 initials: volunteer.displayName.characters.first
                                     .toUpperCase(),
+                                imageUrl: volunteer.avatarUrl,
                               ),
                               const SizedBox(width: DsSpacing.md),
                               Expanded(

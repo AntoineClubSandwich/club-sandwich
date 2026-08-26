@@ -51,6 +51,25 @@ void main() {
       expect(context.status, UserAccountStatus.active);
     });
 
+    test('parse la photo d’un utilisateur administré', () {
+      final user = ManagedUser.fromJson({
+        'profile_id': 'profile-id',
+        'first_name': 'Camille',
+        'last_name': 'Martin',
+        'email': 'camille@example.com',
+        'avatar_url': 'https://example.com/camille.jpg',
+        'role': 'volunteer',
+        'organization_id': null,
+        'organization_name': null,
+        'status': 'active',
+        'invited_at': '2026-08-01T10:00:00.000Z',
+        'last_sign_in_at': null,
+      });
+
+      expect(user.avatarUrl, 'https://example.com/camille.jpg');
+      expect(user.displayName, 'Camille Martin');
+    });
+
     test('un +1 consomme deux places dans le quota de la campagne', () {
       final campaign = InvitationCampaign.fromJson({
         'id': 'campaign-id',

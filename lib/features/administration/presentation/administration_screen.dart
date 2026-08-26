@@ -379,22 +379,33 @@ class _UsersTable extends StatelessWidget {
               DataRow(
                 cells: [
                   DataCell(
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Row(
                       children: [
-                        Text(
-                          user.displayName,
-                          style: DsTypography.body.copyWith(
-                            color: colors.textPrimary,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        DsAvatar(
+                          initials: user.displayName.isEmpty
+                              ? '?'
+                              : user.displayName.characters.first.toUpperCase(),
+                          imageUrl: user.avatarUrl,
                         ),
-                        Text(
-                          user.email,
-                          style: DsTypography.caption.copyWith(
-                            color: colors.textSecondary,
-                          ),
+                        const SizedBox(width: DsSpacing.sm),
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user.displayName,
+                              style: DsTypography.body.copyWith(
+                                color: colors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Text(
+                              user.email,
+                              style: DsTypography.caption.copyWith(
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -430,6 +441,7 @@ class _UserCard extends StatelessWidget {
               initials: user.displayName.isEmpty
                   ? '?'
                   : user.displayName.characters.first.toUpperCase(),
+              imageUrl: user.avatarUrl,
             ),
             const SizedBox(width: DsSpacing.md),
             Expanded(

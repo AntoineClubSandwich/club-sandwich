@@ -1,5 +1,6 @@
 import 'package:club_sandwich/design_system/components/buttons/ds_primary_button.dart';
 import 'package:club_sandwich/design_system/components/buttons/ds_secondary_button.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_avatar.dart';
 import 'package:club_sandwich/design_system/components/indicators/ds_badge.dart';
 import 'package:club_sandwich/design_system/components/surfaces/ds_card.dart';
 import 'package:club_sandwich/design_system/components/surfaces/ds_metric_card.dart';
@@ -494,6 +495,7 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
   late final TextEditingController _phone;
   final _key = GlobalKey<FormState>();
   bool _saving = false;
+  bool _uploadingAvatar = false;
 
   @override
   void initState() {
@@ -543,6 +545,54 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
     }
   }
 
+  Future<void> _uploadAvatar() async {
+    if (_uploadingAvatar) return;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+      withData: true,
+    );
+    final file = result?.files.single;
+    if (file?.bytes == null || !mounted) return;
+    if (file!.size > 5 * 1024 * 1024) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('La photo ne doit pas dépasser 5 Mo.')),
+      );
+      return;
+    }
+    final extension = (file.extension ?? '').toLowerCase();
+    final contentType = switch (extension) {
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      _ => 'image/jpeg',
+    };
+
+    setState(() => _uploadingAvatar = true);
+    try {
+      await ref
+          .read(profileRepositoryProvider)
+          .uploadCurrentAvatar(bytes: file.bytes!, contentType: contentType);
+      ref.invalidate(currentProfileProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Photo de profil enregistrée.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              describeError(error, 'Impossible d’enregistrer la photo.'),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DsTokens>()!.colors;
@@ -555,6 +605,47 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
             Text(
               'Informations',
               style: DsTypography.h3.copyWith(color: colors.textPrimary),
+            ),
+            const SizedBox(height: DsSpacing.md),
+            Row(
+              children: [
+                DsAvatar(
+                  initials: _profileInitials(widget.profile),
+                  imageUrl: widget.profile.avatarUrl,
+                  size: DsAvatarSize.lg,
+                ),
+                const SizedBox(width: DsSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Photo de profil',
+                        style: DsTypography.body.copyWith(
+                          color: colors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'JPG, PNG ou WebP · 5 Mo maximum',
+                        style: DsTypography.caption.copyWith(
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: DsSpacing.sm),
+                DsSecondaryButton(
+                  onPressed: _uploadingAvatar ? null : _uploadAvatar,
+                  isLoading: _uploadingAvatar,
+                  icon: Icons.add_a_photo_outlined,
+                  label: widget.profile.avatarUrl == null
+                      ? 'Ajouter'
+                      : 'Modifier',
+                ),
+              ],
             ),
             const SizedBox(height: DsSpacing.md),
             TextFormField(
@@ -588,6 +679,15 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
       ),
     );
   }
+}
+
+String _profileInitials(Profile profile) {
+  final values = [
+    profile.firstName,
+    profile.lastName,
+  ].map((value) => value.trim()).where((value) => value.isNotEmpty).take(2);
+  final initials = values.map((value) => value.characters.first).join();
+  return initials.isEmpty ? '?' : initials;
 }
 
 class _VolunteerStatisticsCard extends ConsumerWidget {

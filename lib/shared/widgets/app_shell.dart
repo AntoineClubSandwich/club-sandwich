@@ -1,6 +1,7 @@
 import 'package:club_sandwich/core/config/environment.dart';
 import 'package:club_sandwich/design_system/components/ds_pressable.dart';
 import 'package:club_sandwich/design_system/components/indicators/ds_badge.dart';
+import 'package:club_sandwich/design_system/components/indicators/ds_avatar.dart';
 import 'package:club_sandwich/design_system/components/indicators/ds_semantic_variant.dart';
 import 'package:club_sandwich/design_system/components/navigation/ds_top_bar.dart';
 import 'package:club_sandwich/design_system/icons/ds_icons.dart';
@@ -322,20 +323,14 @@ class _UserAccountPanelState extends ConsumerState<_UserAccountPanel> {
         children: [
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: colors.primary,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  _accountInitial(primaryLabel),
-                  semanticsLabel: 'Compte utilisateur',
-                  style: DsTypography.body.copyWith(
-                    color: colors.textOnColor,
-                    fontWeight: FontWeight.w800,
+              Semantics(
+                label: 'Compte utilisateur',
+                image: profile?.avatarUrl?.isNotEmpty == true,
+                child: ExcludeSemantics(
+                  child: DsAvatar(
+                    initials: _accountInitial(primaryLabel),
+                    imageUrl: profile?.avatarUrl,
+                    size: DsAvatarSize.lg,
                   ),
                 ),
               ),
