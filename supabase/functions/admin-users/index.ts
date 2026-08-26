@@ -140,14 +140,28 @@ async function resendInvitation(
   if (userError || !userResult.user?.email) {
     throw userError ?? new Error("Utilisateur introuvable.");
   }
-  const { error } = await client.auth.admin.inviteUserByEmail(
-    userResult.user.email,
-    {
-      redirectTo,
-      data: userResult.user.user_metadata,
-    },
-  );
-  if (error) throw error;
+
+  // Un compte qui a déjà cliqué son lien une première fois (email confirmé,
+  // même si l'activation applicative n'a pas abouti) ne peut plus recevoir
+  // d'invitation : GoTrue la refuse pour un e-mail déjà confirmé. On bascule
+  // alors sur un e-mail de réinitialisation, qui redonne un lien valide pour
+  // définir un mot de passe et terminer l'activation.
+  if (userResult.user.email_confirmed_at) {
+    const { error: recoveryError } = await client.auth.resetPasswordForEmail(
+      userResult.user.email,
+      { redirectTo },
+    );
+    if (recoveryError) throw recoveryError;
+  } else {
+    const { error } = await client.auth.admin.inviteUserByEmail(
+      userResult.user.email,
+      {
+        redirectTo,
+        data: userResult.user.user_metadata,
+      },
+    );
+    if (error) throw error;
+  }
   await client.from("user_accounts").update({
     status: "invited",
     invited_at: new Date().toISOString(),
