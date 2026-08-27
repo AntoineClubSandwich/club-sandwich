@@ -36,7 +36,17 @@ final concertDetailsProvider = FutureProvider.family<Concert?, String>((
 final maraudeOverviewProvider =
     FutureProvider.autoDispose<List<MaraudeOverview>>((ref) {
       ref.watch(authStateProvider);
-      return ref.watch(concertRepositoryProvider).fetchMaraudeOverview();
+      final repository = ref.watch(concertRepositoryProvider);
+      watchRealtimeInvalidation(
+        ref: ref,
+        client: repository.client,
+        channelName: 'maraude-overview',
+        watches: const [
+          RealtimeWatch('concerts'),
+          RealtimeWatch('concert_volunteers'),
+        ],
+      );
+      return repository.fetchMaraudeOverview();
     });
 
 final maraudePhotosProvider = FutureProvider.family<List<MaraudePhoto>, String>(

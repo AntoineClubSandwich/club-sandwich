@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:club_sandwich/core/supabase/realtime_invalidation.dart';
 import 'package:club_sandwich/core/supabase/supabase_provider.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart'
@@ -17,15 +18,36 @@ final invitationCampaignsProvider = FutureProvider<List<InvitationCampaign>>((
   ref,
 ) {
   ref.watch(authStateProvider);
-  return ref.watch(invitationRepositoryProvider).fetchCampaigns();
+  final repository = ref.watch(invitationRepositoryProvider);
+  watchRealtimeInvalidation(
+    ref: ref,
+    client: repository.client,
+    channelName: 'invitation-campaigns',
+    watches: const [
+      RealtimeWatch('invitation_campaigns'),
+      RealtimeWatch('invitation_applications'),
+    ],
+  );
+  return repository.fetchCampaigns();
 });
 
 final invitationCandidatesProvider =
     FutureProvider.family<List<InvitationCandidate>, String>((ref, campaignId) {
       ref.watch(authStateProvider);
-      return ref
-          .watch(invitationRepositoryProvider)
-          .fetchCandidates(campaignId);
+      final repository = ref.watch(invitationRepositoryProvider);
+      watchRealtimeInvalidation(
+        ref: ref,
+        client: repository.client,
+        channelName: 'invitation-candidates-$campaignId',
+        watches: [
+          RealtimeWatch(
+            'invitation_applications',
+            filterColumn: 'campaign_id',
+            filterValue: campaignId,
+          ),
+        ],
+      );
+      return repository.fetchCandidates(campaignId);
     });
 
 class InvitationViewModeNotifier extends Notifier<ConcertViewMode> {

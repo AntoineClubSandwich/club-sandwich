@@ -7,6 +7,8 @@ class InvitationRepository {
   const InvitationRepository(this._client);
   final SupabaseClient _client;
 
+  SupabaseClient get client => _client;
+
   static const _invitationFilesBucket = 'invitation-files';
 
   Future<List<InvitationCampaign>> fetchCampaigns() async {
