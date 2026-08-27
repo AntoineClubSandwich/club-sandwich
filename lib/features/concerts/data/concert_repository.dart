@@ -9,6 +9,8 @@ class ConcertRepository {
 
   final SupabaseClient _client;
 
+  SupabaseClient get client => _client;
+
   static const _concertWithDetailsSelect =
       '*, '
       'venue:venues!concerts_venue_id_fkey('

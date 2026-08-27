@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:club_sandwich/core/supabase/realtime_invalidation.dart';
 import 'package:club_sandwich/core/supabase/supabase_provider.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/concerts/data/concert_repository.dart';
@@ -22,7 +23,14 @@ final concertDetailsProvider = FutureProvider.family<Concert?, String>((
   concertId,
 ) {
   ref.watch(authStateProvider);
-  return ref.watch(concertRepositoryProvider).fetchConcert(concertId);
+  final repository = ref.watch(concertRepositoryProvider);
+  watchRealtimeInvalidation(
+    ref: ref,
+    client: repository.client,
+    channelName: 'concert-details-$concertId',
+    watches: [RealtimeWatch('concerts', filterColumn: 'id', filterValue: concertId)],
+  );
+  return repository.fetchConcert(concertId);
 });
 
 final maraudeOverviewProvider =
