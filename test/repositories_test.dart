@@ -137,6 +137,23 @@ void main() {
         'http://localhost',
         'test-key',
         httpClient: MockClient((request) async {
+          if (request.url.path.endsWith('/get_invitation_campaign_counts')) {
+            return Response(
+              jsonEncode([
+                {
+                  'campaign_id': 'campaign-id',
+                  'application_count': 2,
+                  'pending_count': 1,
+                  'selected_count': 1,
+                  'attributed_places_count': 1,
+                  'awaiting_confirmation_count': 0,
+                },
+              ]),
+              200,
+              headers: jsonHeaders,
+              request: request,
+            );
+          }
           capturedRequest = request;
           return Response(
             jsonEncode([

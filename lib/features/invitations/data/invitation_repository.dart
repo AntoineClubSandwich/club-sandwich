@@ -20,39 +20,41 @@ class InvitationRepository {
           'plus_one_name)',
         )
         .order('created_at', ascending: false);
+
+    // The `applications` join above is RLS-filtered per caller — a
+    // volunteer only ever sees their own row there, so counts derived
+    // from it (below, for `ownApplication`) must not be reused for the
+    // campaign-wide totals. Fetch those separately from a function that
+    // sees every application, so "places restantes" matches for every
+    // role looking at the same campaign.
+    final campaignIds = rows
+        .map((row) => row['id'] as String)
+        .toList(growable: false);
+    final countsById = <String, Map<String, dynamic>>{};
+    if (campaignIds.isNotEmpty) {
+      final countRows = await _client.rpc<List<dynamic>>(
+        'get_invitation_campaign_counts',
+        params: {'requested_campaign_ids': campaignIds},
+      );
+      for (final row in countRows) {
+        final map = Map<String, dynamic>.from(row as Map);
+        countsById[map['campaign_id'] as String] = map;
+      }
+    }
+
     return rows
         .map((row) {
           final value = Map<String, dynamic>.from(row);
           final applications =
               value['applications'] as List<dynamic>? ?? const <dynamic>[];
-          final selected = applications.where(
-            (item) => (item as Map<String, dynamic>)['status'] == 'selected',
-          );
-          value['application_count'] = applications
-              .where(
-                (item) =>
-                    (item as Map<String, dynamic>)['status'] != 'withdrawn',
-              )
-              .length;
-          value['selected_count'] = selected.length;
-          value['attributed_places_count'] = selected.fold<int>(
-            0,
-            (total, item) =>
-                total +
-                ((item as Map<String, dynamic>)['plus_one'] == true ? 2 : 1),
-          );
-          value['awaiting_confirmation_count'] = selected
-              .where(
-                (item) =>
-                    (item as Map<String, dynamic>)['confirmation_status'] ==
-                    'pending',
-              )
-              .length;
-          value['pending_count'] = applications
-              .where(
-                (item) => (item as Map<String, dynamic>)['status'] == 'pending',
-              )
-              .length;
+          final counts = countsById[value['id']];
+          value['application_count'] = counts?['application_count'] ?? 0;
+          value['selected_count'] = counts?['selected_count'] ?? 0;
+          value['attributed_places_count'] =
+              counts?['attributed_places_count'] ?? 0;
+          value['awaiting_confirmation_count'] =
+              counts?['awaiting_confirmation_count'] ?? 0;
+          value['pending_count'] = counts?['pending_count'] ?? 0;
           value['applications'] = applications
               .where(
                 (item) => (item as Map<String, dynamic>)['user_id'] == userId,
