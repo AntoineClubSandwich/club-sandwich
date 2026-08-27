@@ -39,6 +39,21 @@ class MaraudeOperationRepository {
     );
   }
 
+  Future<void> addResourceAllocation({
+    required String concertId,
+    String? consumableId,
+    String? equipmentId,
+    required num quantity,
+  }) => client.rpc<void>(
+    'add_maraude_resource_allocation',
+    params: {
+      'requested_concert_id': concertId,
+      'requested_consumable_id': consumableId,
+      'requested_equipment_id': equipmentId,
+      'requested_quantity': quantity,
+    },
+  );
+
   Future<void> validatePreparation({
     required String concertId,
     required Map<String, double> consumableQuantities,

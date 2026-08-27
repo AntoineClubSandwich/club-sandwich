@@ -9,9 +9,12 @@ import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/collections/domain/maraude_collection.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
+import 'package:club_sandwich/features/consumables/data/consumable_providers.dart';
 import 'package:club_sandwich/features/consumables/domain/consumable.dart';
 import 'package:club_sandwich/features/encounters/data/encounter_location_service.dart';
 import 'package:club_sandwich/features/encounters/data/encounter_providers.dart';
+import 'package:club_sandwich/features/equipment/data/equipment_providers.dart';
+import 'package:club_sandwich/features/equipment/domain/equipment_asset.dart';
 import 'package:club_sandwich/features/operations/data/maraude_operation_providers.dart';
 import 'package:club_sandwich/features/operations/data/maraude_operation_repository.dart';
 import 'package:club_sandwich/features/operations/domain/maraude_workflow.dart';
@@ -228,6 +231,8 @@ class _MaraudeOperationScreenState
       saving: _saving,
       active: current == viewed,
       onValidate: () => _validatePreparation(data),
+      onAddConsumable: () => _addConsumable(data),
+      onAddEquipment: () => _addEquipment(data),
     ),
     MaraudeOperationalStep.collection => _CollectionStep(
       data: data,
@@ -288,6 +293,85 @@ class _MaraudeOperationScreenState
     'Préparation validée.',
     nextStep: MaraudeOperationalStep.collection,
   );
+
+  Future<void> _addConsumable(MaraudeOperationBundle data) async {
+    final catalog = await ref.read(consumablesProvider.future);
+    if (!mounted) return;
+    final existingIds = data.consumables
+        .map((item) => item.consumableId)
+        .toSet();
+    final available = catalog
+        .where((item) => !existingIds.contains(item.id))
+        .toList(growable: false);
+    if (available.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tous les consommables du stock sont déjà listés.'),
+        ),
+      );
+      return;
+    }
+    final picked = await showDialog<_PickedResource<Consumable>>(
+      context: context,
+      builder: (_) => _AddResourceDialog<Consumable>(
+        title: 'Ajouter un consommable',
+        items: available,
+        labelFor: (item) =>
+            '${item.name} · ${_number(item.currentQuantity)} ${item.unit.label} en stock',
+        integer: false,
+      ),
+    );
+    if (picked == null) return;
+    await _run(
+      () => ref
+          .read(maraudeOperationRepositoryProvider)
+          .addResourceAllocation(
+            concertId: widget.concertId,
+            consumableId: picked.item.id,
+            quantity: picked.quantity,
+          ),
+      '${picked.item.name} ajouté.',
+    );
+  }
+
+  Future<void> _addEquipment(MaraudeOperationBundle data) async {
+    final catalog = await ref.read(equipmentAssetsProvider.future);
+    if (!mounted) return;
+    final existingIds = data.equipment
+        .map((item) => item.equipmentId)
+        .toSet();
+    final available = catalog
+        .where((item) => !existingIds.contains(item.id))
+        .toList(growable: false);
+    if (available.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tout le matériel du stock est déjà listé.'),
+        ),
+      );
+      return;
+    }
+    final picked = await showDialog<_PickedResource<EquipmentAsset>>(
+      context: context,
+      builder: (_) => _AddResourceDialog<EquipmentAsset>(
+        title: 'Ajouter du matériel',
+        items: available,
+        labelFor: (item) => '${item.name} · ${item.quantityTotal} disponible(s)',
+        integer: true,
+      ),
+    );
+    if (picked == null) return;
+    await _run(
+      () => ref
+          .read(maraudeOperationRepositoryProvider)
+          .addResourceAllocation(
+            concertId: widget.concertId,
+            equipmentId: picked.item.id,
+            quantity: picked.quantity,
+          ),
+      '${picked.item.name} ajouté.',
+    );
+  }
 
   Future<void> _validateStep(MaraudeOperationalStep step) => _run(
     () => ref
@@ -666,12 +750,16 @@ class _PreparationStep extends StatelessWidget {
     required this.saving,
     required this.active,
     required this.onValidate,
+    required this.onAddConsumable,
+    required this.onAddEquipment,
   });
   final MaraudeOperationBundle data;
   final Map<String, TextEditingController> controllers;
   final bool saving;
   final bool active;
   final VoidCallback onValidate;
+  final VoidCallback onAddConsumable;
+  final VoidCallback onAddEquipment;
 
   @override
   Widget build(BuildContext context) => _StepCard(
@@ -687,6 +775,14 @@ class _PreparationStep extends StatelessWidget {
           controller: controllers['c-${item.id}']!,
           enabled: active,
         ),
+      if (active) ...[
+        const SizedBox(height: DsSpacing.sm),
+        OutlinedButton.icon(
+          onPressed: onAddConsumable,
+          icon: const Icon(Icons.add),
+          label: const Text('Ajouter un consommable'),
+        ),
+      ],
       const SizedBox(height: DsSpacing.lg),
       Text('Matériel', style: DsTypography.h3),
       if (data.equipment.isEmpty) const Text('Aucun matériel prévu.'),
@@ -697,6 +793,14 @@ class _PreparationStep extends StatelessWidget {
           enabled: active,
           integer: true,
         ),
+      if (active) ...[
+        const SizedBox(height: DsSpacing.sm),
+        OutlinedButton.icon(
+          onPressed: onAddEquipment,
+          icon: const Icon(Icons.add),
+          label: const Text('Ajouter du matériel'),
+        ),
+      ],
       const SizedBox(height: DsSpacing.xl),
       DsPrimaryButton(
         label: active ? 'Valider et continuer' : 'Préparation validée',
@@ -1246,4 +1350,109 @@ String _duration(Duration duration) =>
 
 extension on String {
   String ifEmpty(String fallback) => isEmpty ? fallback : this;
+}
+
+class _PickedResource<T> {
+  const _PickedResource(this.item, this.quantity);
+  final T item;
+  final double quantity;
+}
+
+class _AddResourceDialog<T> extends StatefulWidget {
+  const _AddResourceDialog({
+    required this.title,
+    required this.items,
+    required this.labelFor,
+    required this.integer,
+  });
+
+  final String title;
+  final List<T> items;
+  final String Function(T item) labelFor;
+  final bool integer;
+
+  @override
+  State<_AddResourceDialog<T>> createState() => _AddResourceDialogState<T>();
+}
+
+class _AddResourceDialogState<T> extends State<_AddResourceDialog<T>> {
+  T? _selected;
+  final _quantityController = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    super.dispose();
+  }
+
+  void _confirm() {
+    if (_selected == null) {
+      setState(() => _error = 'Choisissez un élément.');
+      return;
+    }
+    final quantity = widget.integer
+        ? (int.tryParse(_quantityController.text.trim())?.toDouble() ?? -1)
+        : _tryDouble(_quantityController.text);
+    if (quantity <= 0) {
+      setState(() => _error = 'Saisissez une quantité valide.');
+      return;
+    }
+    Navigator.pop(context, _PickedResource<T>(_selected as T, quantity));
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.title),
+    content: SizedBox(
+      width: 480,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DropdownButtonFormField<T>(
+            initialValue: _selected,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Élément'),
+            items: [
+              for (final item in widget.items)
+                DropdownMenuItem(
+                  value: item,
+                  child: Text(
+                    widget.labelFor(item),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: (value) => setState(() {
+              _selected = value;
+              _error = null;
+            }),
+          ),
+          const SizedBox(height: DsSpacing.md),
+          TextField(
+            controller: _quantityController,
+            keyboardType: TextInputType.numberWithOptions(
+              decimal: !widget.integer,
+            ),
+            decoration: const InputDecoration(labelText: 'Quantité emportée'),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: DsSpacing.sm),
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Annuler'),
+      ),
+      FilledButton(onPressed: _confirm, child: const Text('Ajouter')),
+    ],
+  );
 }
