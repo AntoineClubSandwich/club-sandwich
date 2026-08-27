@@ -141,11 +141,20 @@ async function resendInvitation(
     throw userError ?? new Error("Utilisateur introuvable.");
   }
 
+  const { data: account, error: accountError } = await client
+    .from("user_accounts")
+    .select("status")
+    .eq("profile_id", profileId)
+    .single();
+  if (accountError) throw accountError;
+  const wasAlreadyActive = account?.status === "active";
+
   // Un compte qui a déjà cliqué son lien une première fois (email confirmé,
   // même si l'activation applicative n'a pas abouti) ne peut plus recevoir
   // d'invitation : GoTrue la refuse pour un e-mail déjà confirmé. On bascule
   // alors sur un e-mail de réinitialisation, qui redonne un lien valide pour
-  // définir un mot de passe et terminer l'activation.
+  // définir un mot de passe — que le compte soit encore "invited" (termine
+  // l'activation) ou déjà "active" (a juste oublié son mot de passe).
   if (userResult.user.email_confirmed_at) {
     const { error: recoveryError } = await client.auth.resetPasswordForEmail(
       userResult.user.email,
@@ -162,12 +171,18 @@ async function resendInvitation(
     );
     if (error) throw error;
   }
-  await client.from("user_accounts").update({
-    status: "invited",
-    invited_at: new Date().toISOString(),
-    activated_at: null,
-    disabled_at: null,
-  }).eq("profile_id", profileId);
+
+  // Un compte déjà actif qui redemande juste un lien (mot de passe oublié)
+  // ne doit jamais être rétrogradé en "invited" : ça le renverrait à tort
+  // vers l'écran d'activation au prochain lien cliqué.
+  if (!wasAlreadyActive) {
+    await client.from("user_accounts").update({
+      status: "invited",
+      invited_at: new Date().toISOString(),
+      activated_at: null,
+      disabled_at: null,
+    }).eq("profile_id", profileId);
+  }
   return json({ ok: true });
 }
 
