@@ -1,3 +1,4 @@
+import 'package:club_sandwich/core/config/auth_redirect.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/presentation/widgets/auth_card_layout.dart';
 import 'package:club_sandwich/shared/widgets/brand_header.dart';
@@ -19,6 +20,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _errorMessage = initialAuthErrorMessage;
+    initialAuthErrorMessage = null;
+  }
 
   @override
   void dispose() {
