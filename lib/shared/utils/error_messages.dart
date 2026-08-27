@@ -21,6 +21,10 @@ String describeError(Object error, String fallback) {
     final message = error.message.trim();
     if (message.isNotEmpty && _isCuratedMessage(message)) return message;
   }
+  if (error is AuthException) {
+    final curated = _describeAuthError(error);
+    if (curated != null) return curated;
+  }
   return fallback;
 }
 
@@ -28,4 +32,19 @@ bool _isCuratedMessage(String message) {
   final firstLetter = message[0];
   return firstLetter == firstLetter.toUpperCase() &&
       firstLetter != firstLetter.toLowerCase();
+}
+
+/// Curated messages for the handful of Supabase Auth error codes a
+/// volunteer can actually act on. Everything else falls back to the
+/// caller's generic message rather than leaking an SDK-worded string.
+String? _describeAuthError(AuthException error) {
+  return switch (error.code) {
+    'same_password' =>
+      'Le nouveau mot de passe doit être différent de l’ancien.',
+    'weak_password' =>
+      'Ce mot de passe est trop faible. Utilisez au moins 8 caractères, '
+          'avec des lettres et des chiffres.',
+    'otp_expired' => 'Ce lien a expiré. Demandez-en un nouveau.',
+    _ => null,
+  };
 }
