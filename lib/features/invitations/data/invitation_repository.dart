@@ -1,9 +1,13 @@
+import 'dart:typed_data';
+
 import 'package:club_sandwich/features/invitations/domain/invitation_campaign.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InvitationRepository {
   const InvitationRepository(this._client);
   final SupabaseClient _client;
+
+  static const _invitationFilesBucket = 'invitation-files';
 
   Future<List<InvitationCampaign>> fetchCampaigns() async {
     final userId = _client.auth.currentUser?.id;
@@ -17,7 +21,8 @@ class InvitationRepository {
           'applications:invitation_applications('
           'id, user_id, status, created_at, confirmation_status, '
           'confirmation_due_at, confirmation_responded_at, plus_one, '
-          'plus_one_name)',
+          'plus_one_name, invitation_file_path, on_guest_list, '
+          'invitation_sent_at)',
         )
         .order('created_at', ascending: false);
 
@@ -174,6 +179,52 @@ class InvitationRepository {
         'requested_application_id': applicationId,
         'requested_status': status.jsonValue,
       },
+    );
+  }
+
+  Future<String> uploadInvitationFile({
+    required String applicationId,
+    required Uint8List bytes,
+    required String extension,
+    required String contentType,
+  }) async {
+    final path =
+        '$applicationId/${DateTime.now().microsecondsSinceEpoch}.$extension';
+    await _client.storage
+        .from(_invitationFilesBucket)
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: true),
+        );
+    return path;
+  }
+
+  Future<String> invitationFileSignedUrl(String storagePath) {
+    return _client.storage
+        .from(_invitationFilesBucket)
+        .createSignedUrl(storagePath, 300);
+  }
+
+  Future<void> setInvitationDelivery({
+    required String applicationId,
+    String? filePath,
+    required bool onGuestList,
+  }) async {
+    await _client.rpc<void>(
+      'set_invitation_delivery',
+      params: {
+        'requested_application_id': applicationId,
+        'requested_file_path': filePath,
+        'requested_on_guest_list': onGuestList,
+      },
+    );
+  }
+
+  Future<void> sendInvitationEmail(String applicationId) async {
+    await _client.rpc<void>(
+      'send_invitation_delivery_email',
+      params: {'requested_application_id': applicationId},
     );
   }
 }

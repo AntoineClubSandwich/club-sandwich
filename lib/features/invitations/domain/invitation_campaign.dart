@@ -146,6 +146,9 @@ class InvitationApplication {
     this.confirmationRespondedAt,
     this.plusOne = false,
     this.plusOneName,
+    this.invitationFilePath,
+    this.onGuestList = false,
+    this.invitationSentAt,
   });
 
   factory InvitationApplication.fromJson(Map<String, dynamic> json) {
@@ -167,6 +170,11 @@ class InvitationApplication {
           : DateTime.parse(json['confirmation_responded_at'] as String),
       plusOne: json['plus_one'] as bool? ?? false,
       plusOneName: json['plus_one_name'] as String?,
+      invitationFilePath: json['invitation_file_path'] as String?,
+      onGuestList: json['on_guest_list'] as bool? ?? false,
+      invitationSentAt: json['invitation_sent_at'] == null
+          ? null
+          : DateTime.parse(json['invitation_sent_at'] as String),
     );
   }
 
@@ -179,6 +187,11 @@ class InvitationApplication {
   final DateTime? confirmationRespondedAt;
   final bool plusOne;
   final String? plusOneName;
+  final String? invitationFilePath;
+  final bool onGuestList;
+  final DateTime? invitationSentAt;
+
+  bool get hasInvitationDelivery => invitationFilePath != null || onGuestList;
 
   bool get isValidated =>
       status == InvitationApplicationStatus.selected &&
@@ -246,6 +259,9 @@ class InvitationCandidate {
     this.confirmationDueAt,
     this.plusOne = false,
     this.plusOneName,
+    this.invitationFilePath,
+    this.onGuestList = false,
+    this.invitationSentAt,
   });
 
   factory InvitationCandidate.fromJson(Map<String, dynamic> json) {
@@ -273,6 +289,11 @@ class InvitationCandidate {
           : DateTime.parse(json['confirmation_due_at'] as String),
       plusOne: json['plus_one'] as bool? ?? false,
       plusOneName: json['plus_one_name'] as String?,
+      invitationFilePath: json['invitation_file_path'] as String?,
+      onGuestList: json['on_guest_list'] as bool? ?? false,
+      invitationSentAt: json['invitation_sent_at'] == null
+          ? null
+          : DateTime.parse(json['invitation_sent_at'] as String),
     );
   }
 
@@ -291,6 +312,11 @@ class InvitationCandidate {
   final DateTime? confirmationDueAt;
   final bool plusOne;
   final String? plusOneName;
+  final String? invitationFilePath;
+  final bool onGuestList;
+  final DateTime? invitationSentAt;
+
+  bool get hasInvitationDelivery => invitationFilePath != null || onGuestList;
 
   String get displayName => '$firstName $lastName'.trim();
 }

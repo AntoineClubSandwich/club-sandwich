@@ -25,6 +25,8 @@ import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_appli
     show VolunteerConfirmationStatus;
 import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
+import 'package:club_sandwich/shared/widgets/inline_document_preview.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -669,9 +671,37 @@ class _VolunteerCampaignActionState
     final application = widget.campaign.ownApplication;
     final creditCount = ref.watch(volunteerCreditCountProvider);
     if (application != null && application.isValidated) {
-      return Text(
-        'Invitation validée.${_plusOneSuffix(application)}',
-        style: Theme.of(context).textTheme.titleSmall,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Invitation validée.${_plusOneSuffix(application)}',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          if (application.hasInvitationDelivery) ...[
+            const SizedBox(height: 8),
+            if (application.onGuestList)
+              const Text('Vous êtes sur liste à l’entrée.')
+            else
+              const Text('Votre invitation est disponible ci-dessous.'),
+            if (application.invitationFilePath != null) ...[
+              const SizedBox(height: 4),
+              InlineDocumentPreview(
+                storagePath: application.invitationFilePath!,
+                title: 'Mon invitation',
+                loadSignedUrl: () => ref
+                    .read(invitationRepositoryProvider)
+                    .invitationFileSignedUrl(application.invitationFilePath!),
+              ),
+            ],
+          ] else ...[
+            const SizedBox(height: 4),
+            Text(
+              'Votre invitation vous sera transmise par un organisateur.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ],
       );
     }
     if (application != null && application.awaitsConfirmation) {
@@ -911,6 +941,112 @@ class _CandidateTileState extends ConsumerState<_CandidateTile> {
     }
   }
 
+  Future<void> _uploadInvitationFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+      withData: true,
+    );
+    final file = result?.files.single;
+    if (file?.bytes == null || !mounted) return;
+    final extension = (file!.extension ?? '').toLowerCase();
+    final contentType = switch (extension) {
+      'pdf' => 'application/pdf',
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      _ => 'image/jpeg',
+    };
+    setState(() => _saving = true);
+    try {
+      final path = await ref
+          .read(invitationRepositoryProvider)
+          .uploadInvitationFile(
+            applicationId: widget.candidate.applicationId,
+            bytes: file.bytes!,
+            extension: extension,
+            contentType: contentType,
+          );
+      await ref
+          .read(invitationRepositoryProvider)
+          .setInvitationDelivery(
+            applicationId: widget.candidate.applicationId,
+            filePath: path,
+            onGuestList: widget.candidate.onGuestList,
+          );
+      ref.invalidate(invitationCandidatesProvider(widget.campaignId));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invitation déposée.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              describeError(error, 'Impossible de déposer ce fichier.'),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _toggleGuestList(bool value) async {
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(invitationRepositoryProvider)
+          .setInvitationDelivery(
+            applicationId: widget.candidate.applicationId,
+            filePath: widget.candidate.invitationFilePath,
+            onGuestList: value,
+          );
+      ref.invalidate(invitationCandidatesProvider(widget.campaignId));
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              describeError(error, 'Impossible de mettre à jour la liste.'),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _sendInvitationEmail() async {
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(invitationRepositoryProvider)
+          .sendInvitationEmail(widget.candidate.applicationId);
+      ref.invalidate(invitationCandidatesProvider(widget.campaignId));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invitation envoyée par e-mail.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              describeError(error, 'Impossible d’envoyer l’invitation.'),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final candidate = widget.candidate;
@@ -936,6 +1072,25 @@ class _CandidateTileState extends ConsumerState<_CandidateTile> {
                               candidate.plusOneName!.isEmpty
                           ? '+1'
                           : '+1 · ${candidate.plusOneName}',
+                    ),
+                  ),
+                ),
+              if (candidate.hasInvitationDelivery)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Chip(
+                    avatar: Icon(
+                      candidate.invitationSentAt != null
+                          ? Icons.mark_email_read_outlined
+                          : Icons.confirmation_number_outlined,
+                      size: 18,
+                    ),
+                    label: Text(
+                      candidate.invitationSentAt != null
+                          ? 'Invitation envoyée'
+                          : candidate.onGuestList
+                          ? 'Sur liste'
+                          : 'Invitation déposée',
                     ),
                   ),
                 ),
@@ -1017,6 +1172,70 @@ class _CandidateTileState extends ConsumerState<_CandidateTile> {
               ],
             ],
           ),
+          if (candidate.canManage &&
+              candidate.status == InvitationApplicationStatus.selected) ...[
+            const SizedBox(height: 8),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            Text(
+              'Remise de l’invitation',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(height: 4),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              dense: true,
+              title: const Text('Sur liste (entrée sans fichier)'),
+              value: candidate.onGuestList,
+              onChanged: _saving
+                  ? null
+                  : (value) => _toggleGuestList(value ?? false),
+            ),
+            if (candidate.invitationFilePath != null)
+              InlineDocumentPreview(
+                storagePath: candidate.invitationFilePath!,
+                title: 'Invitation - ${candidate.displayName}',
+                loadSignedUrl: () => ref
+                    .read(invitationRepositoryProvider)
+                    .invitationFileSignedUrl(candidate.invitationFilePath!),
+              ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _saving ? null : _uploadInvitationFile,
+                  icon: const Icon(Icons.upload_file_outlined),
+                  label: Text(
+                    candidate.invitationFilePath == null
+                        ? 'Déposer un fichier'
+                        : 'Remplacer le fichier',
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed: _saving || !candidate.hasInvitationDelivery
+                      ? null
+                      : _sendInvitationEmail,
+                  icon: const Icon(Icons.send_outlined),
+                  label: Text(
+                    candidate.invitationSentAt == null
+                        ? 'Envoyer par e-mail'
+                        : 'Renvoyer par e-mail',
+                  ),
+                ),
+              ],
+            ),
+            if (candidate.invitationSentAt != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Envoyée le ${_date(candidate.invitationSentAt!)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+          ],
         ],
       ),
     );
