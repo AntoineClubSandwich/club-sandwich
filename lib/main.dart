@@ -10,6 +10,28 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   Environment.validate();
 
+  // A URL carrying fresh auth tokens (`#access_token=...`) means someone
+  // just clicked an invite/recovery link for a *specific* account. On
+  // initialize(), supabase_flutter first restores whatever session this
+  // browser already has persisted, then processes the link on top of it —
+  // if that second step fails for any reason (network hiccup, a link that
+  // was already exchanged once), the stale restored session silently
+  // stays active instead. On a shared browser used to test several
+  // accounts, that means clicking one person's link can land you in
+  // whoever was last signed in here. Drop the stale session first, so
+  // this load can only ever end up with the session the link itself
+  // produces (or none at all).
+  if (Uri.base.fragment.contains('access_token=')) {
+    try {
+      final host = Uri.parse(Environment.supabaseUrl).host.split('.').first;
+      web.window.localStorage.removeItem('sb-$host-auth-token');
+    } catch (_) {
+      // Best-effort: storage can be unavailable (e.g. private browsing
+      // with storage blocked). Falling through just means the pre-existing
+      // race remains possible, not that startup fails.
+    }
+  }
+
   await Supabase.initialize(
     url: Environment.supabaseUrl,
     publishableKey: Environment.supabaseAnonKey,
