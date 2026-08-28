@@ -18,7 +18,7 @@ enum ConcertVolunteerStatus {
     return values.firstWhere(
       (status) => status.databaseValue == value,
       orElse: () =>
-          throw FormatException('Statut de candidature inconnu : $value'),
+          throw FormatException('Statut de volontariat inconnu : $value'),
     );
   }
 }

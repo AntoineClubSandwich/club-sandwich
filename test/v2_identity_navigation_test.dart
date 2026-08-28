@@ -610,7 +610,7 @@ void main() {
     );
 
     expect(find.text('Point Éphémère'), findsOneWidget);
-    expect(find.text('Je candidate'), findsOneWidget);
+    expect(find.text('Je me propose'), findsOneWidget);
   });
 
   testWidgets('réserve les invitations aux bénévoles ayant trois crédits', (
@@ -627,7 +627,7 @@ void main() {
     expect(
       tester
           .widget<FilledButton>(
-            find.widgetWithText(FilledButton, 'Je candidate'),
+            find.widgetWithText(FilledButton, 'Je me propose'),
           )
           .onPressed,
       isNull,
@@ -644,7 +644,7 @@ void main() {
     expect(
       tester
           .widget<FilledButton>(
-            find.widgetWithText(FilledButton, 'Je candidate'),
+            find.widgetWithText(FilledButton, 'Je me propose'),
           )
           .onPressed,
       isNotNull,
@@ -666,7 +666,7 @@ void main() {
       find.byKey(const ValueKey('apply-plus-one-name-field')),
       'Camille',
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Je candidate'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Je me propose'));
     await tester.pumpAndSettle();
 
     expect(repository.appliedPlusOnes, [true]);

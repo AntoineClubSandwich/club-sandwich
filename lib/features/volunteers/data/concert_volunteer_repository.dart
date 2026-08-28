@@ -161,7 +161,7 @@ class ConcertVolunteerRepository {
       throw ArgumentError.value(
         ids,
         'applicationIds',
-        'Sélectionnez au moins une candidature.',
+        'Sélectionnez au moins un volontaire.',
       );
     }
 

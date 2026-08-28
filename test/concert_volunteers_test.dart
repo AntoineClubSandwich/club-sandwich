@@ -770,19 +770,19 @@ void main() {
     final repository = _FakeConcertVolunteerRepository();
     await _pumpDetail(tester, repository);
 
-    expect(find.text('0 candidatures'), findsOneWidget);
+    expect(find.text('0 volontaires'), findsOneWidget);
     expect(find.text('Je me propose'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Je me propose'));
     await tester.tap(find.text('Je me propose'));
     await tester.pumpAndSettle();
 
-    expect(find.text('1 candidature'), findsOneWidget);
+    expect(find.text('1 volontaire'), findsOneWidget);
     expect(find.text('En attente'), findsOneWidget);
     expect(find.text('Je me désiste'), findsOneWidget);
     expect(
       find.text(
-        'Votre candidature a été enregistrée.\n\n'
+        'Votre volontariat a été enregistré.\n\n'
         'Vous serez informé si vous êtes sélectionné.',
       ),
       findsOneWidget,
@@ -807,7 +807,7 @@ void main() {
 
     expect(
       find.text(
-        'Impossible d’enregistrer votre candidature. Veuillez réessayer.',
+        'Impossible d’enregistrer votre volontariat. Veuillez réessayer.',
       ),
       findsOneWidget,
     );
@@ -846,7 +846,7 @@ void main() {
     expect(find.text('Qui s’est déjà positionné'), findsOneWidget);
     expect(find.text('Déjà sélectionnés'), findsOneWidget);
     expect(find.text('Alex Un - Chargé.e de logistique'), findsOneWidget);
-    expect(find.text('Candidatures en attente'), findsOneWidget);
+    expect(find.text('Volontaires en attente'), findsOneWidget);
     expect(find.text('Blaise Deux'), findsOneWidget);
   });
 
@@ -864,7 +864,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Désisté'), findsOneWidget);
-    expect(find.text('0 candidatures'), findsOneWidget);
+    expect(find.text('0 volontaires'), findsOneWidget);
     expect(repository.ownApplication, isNotNull);
     expect(repository.ownApplication!.status, ConcertVolunteerStatus.withdrawn);
   });
@@ -955,7 +955,7 @@ void main() {
 
     expect(find.text('Voir mon profil'), findsNothing);
     expect(find.text('Préparer le démarrage de la maraude'), findsOneWidget);
-    expect(find.text('Suivre votre candidature'), findsNothing);
+    expect(find.text('Suivre votre volontariat'), findsNothing);
     expect(find.text('Rôle : Chef.fe d’équipe'), findsOneWidget);
     expect(find.textContaining('Présence :'), findsOneWidget);
     expect(find.text('Je me désiste'), findsOneWidget);
@@ -1163,7 +1163,7 @@ void main() {
     );
     await _pumpDetail(tester, repository);
 
-    expect(find.text('2 candidatures'), findsOneWidget);
+    expect(find.text('2 volontaires'), findsOneWidget);
     expect(find.text('1 bénévole sélectionné'), findsOneWidget);
     expect(find.text('Camille Martin'), findsOneWidget);
     expect(find.text('Alex Durand'), findsWidgets);
@@ -1594,7 +1594,7 @@ void main() {
     expect(find.text('1 / 3 bénévoles'), findsOneWidget);
     expect(find.text('Ajoutez au moins 3 bénévoles.'), findsOneWidget);
     await tester.ensureVisible(find.byKey(const ValueKey('team-mobile-tabs')));
-    await tester.tap(find.text('Candidatures').last);
+    await tester.tap(find.text('Volontaires').last);
     await tester.pump();
     final selectedCard = find.byKey(
       const ValueKey('volunteer-card-selected-id'),

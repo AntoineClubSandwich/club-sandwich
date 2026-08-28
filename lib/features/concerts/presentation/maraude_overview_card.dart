@@ -125,7 +125,7 @@ class MaraudeOverviewCard extends StatelessWidget {
                           ),
                           if (maraude.pendingApplicationCount > 0)
                             Text(
-                              '${maraude.pendingApplicationCount} candidature'
+                              '${maraude.pendingApplicationCount} volontaire'
                               '${maraude.pendingApplicationCount > 1 ? 's' : ''} '
                               'à examiner',
                               style: DsTypography.caption.copyWith(

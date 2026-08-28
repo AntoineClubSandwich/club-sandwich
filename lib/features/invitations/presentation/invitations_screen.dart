@@ -800,7 +800,7 @@ class _VolunteerCampaignActionState
               _saving
                   ? 'Enregistrement…'
                   : application == null
-                  ? 'Je candidate'
+                  ? 'Je me propose'
                   : 'Je me désiste',
             ),
           ),

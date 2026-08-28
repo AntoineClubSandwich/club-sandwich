@@ -624,7 +624,7 @@ class _FeedbackShowcase extends StatelessWidget {
                 context: context,
                 title: 'Supprimer la maraude ?',
                 content: const Text(
-                  'Cette action est définitive et supprimera les candidatures, '
+                  'Cette action est définitive et supprimera les volontaires, '
                   'la collecte et le bilan associés.',
                 ),
                 actions: [

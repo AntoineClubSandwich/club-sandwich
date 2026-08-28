@@ -438,7 +438,7 @@ class _MaraudeProgress extends StatelessWidget {
   final bool attendanceValidated;
 
   static const _steps = [
-    'Candidature',
+    'Volontariat',
     'Confirmation',
     'Préparation',
     'En cours',
@@ -664,7 +664,7 @@ class _NextActionCard extends StatelessWidget {
       }
       return (
         'Suivre la constitution de l’équipe',
-        'Consultez les candidatures et l’équipe retenue.',
+        'Consultez les volontaires et l’équipe retenue.',
         _MaraudeWorkspace.team,
         'Voir l’équipe',
         null,
@@ -786,10 +786,10 @@ class _NextActionCard extends StatelessWidget {
     return (
       ownApplication == null
           ? 'Proposer votre participation'
-          : 'Suivre votre candidature',
+          : 'Suivre votre volontariat',
       ownApplication == null
           ? 'Consultez les informations puis proposez-vous dans l’espace équipe.'
-          : 'Consultez l’état de votre candidature dans l’espace équipe.',
+          : 'Consultez l’état de votre volontariat dans l’espace équipe.',
       _MaraudeWorkspace.team,
       'Consulter',
       null,
@@ -2417,7 +2417,7 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       child: section.when(
         loading: () => const AppLoadingState(label: 'Chargement des bénévoles'),
         error: (_, _) => AppErrorState(
-          message: 'Impossible de charger les candidatures.',
+          message: 'Impossible de charger les volontaires.',
           onRetry: () =>
               ref.invalidate(concertVolunteerSectionProvider(widget.concertId)),
         ),
@@ -2525,7 +2525,7 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Candidatures',
+          'Volontaires',
           style: Theme.of(
             context,
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -2613,7 +2613,7 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
             SegmentedButton<int>(
               key: const ValueKey('team-mobile-tabs'),
               segments: const [
-                ButtonSegment(value: 0, label: Text('Candidatures')),
+                ButtonSegment(value: 0, label: Text('Volontaires')),
                 ButtonSegment(value: 1, label: Text('Équipe')),
               ],
               selected: {_mobileTeamView},
@@ -2746,7 +2746,7 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Votre candidature a été enregistrée.\n\n'
+            'Votre volontariat a été enregistré.\n\n'
             'Vous serez informé si vous êtes sélectionné.',
           ),
         ),
@@ -2756,7 +2756,7 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       _showError(
         describeError(
           error,
-          'Impossible d’enregistrer votre candidature. Veuillez réessayer.',
+          'Impossible d’enregistrer votre volontariat. Veuillez réessayer.',
         ),
       );
     } finally {
@@ -2783,7 +2783,7 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       builder: (context) => AlertDialog(
         title: const Text('Confirmer le désistement ?'),
         content: const Text(
-          'Votre candidature restera dans l’historique avec le statut '
+          'Votre volontariat restera dans l’historique avec le statut '
           '« Désisté ». Cette action ne peut pas être annulée.',
         ),
         actions: [
@@ -2957,11 +2957,11 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Candidature refusée.')));
+      ).showSnackBar(const SnackBar(content: Text('Volontariat non retenu.')));
     } catch (error) {
       if (!mounted) return;
       _showError(
-        describeError(error, 'Impossible de refuser cette candidature.'),
+        describeError(error, 'Impossible de ne pas retenir ce volontariat.'),
       );
     } finally {
       if (mounted) {
@@ -2992,7 +2992,7 @@ class _PromoterApplications extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Candidatures',
+          'Volontaires',
           style: Theme.of(
             context,
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -3202,7 +3202,7 @@ class _VolunteerRosterPreview extends ConsumerWidget {
             ],
             if (pending.isNotEmpty) ...[
               Text(
-                'Candidatures en attente',
+                'Volontaires en attente',
                 style: Theme.of(context).textTheme.labelMedium,
               ),
               for (final entry in pending) _RosterLine(entry: entry),
@@ -3404,7 +3404,7 @@ class _FilteredApplicationsEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Padding(
       padding: EdgeInsets.symmetric(vertical: 24),
-      child: Center(child: Text('Aucune candidature ne correspond.')),
+      child: Center(child: Text('Aucun volontaire ne correspond.')),
     );
   }
 }
@@ -3988,7 +3988,7 @@ class _ProfileDetailRow extends StatelessWidget {
 }
 
 String _applicationCountLabel(int count) {
-  return '$count ${count == 1 ? 'candidature' : 'candidatures'}';
+  return '$count ${count == 1 ? 'volontaire' : 'volontaires'}';
 }
 
 String _selectedCountLabel(int count) {
@@ -3996,7 +3996,7 @@ String _selectedCountLabel(int count) {
 }
 
 String _totalApplicationsLabel(int count) {
-  return '$count ${count == 1 ? 'candidature' : 'candidatures'}';
+  return '$count ${count == 1 ? 'volontaire' : 'volontaires'}';
 }
 
 String _selectedMissionsLabel(int count) {

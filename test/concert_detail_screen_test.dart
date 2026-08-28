@@ -72,7 +72,7 @@ void main() {
     expect(find.text('Artiste'), findsWidgets);
     expect(find.text('15 septembre 2026'), findsWidgets);
     expect(find.text('-'), findsWidgets);
-    expect(find.text('0 candidatures'), findsOneWidget);
+    expect(find.text('0 volontaires'), findsOneWidget);
     expect(find.text('0 bénévoles sélectionnés'), findsOneWidget);
     expect(find.text('Je me propose'), findsOneWidget);
     expect(

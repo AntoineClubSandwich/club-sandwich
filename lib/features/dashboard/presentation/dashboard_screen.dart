@@ -183,7 +183,7 @@ class _RoleDashboardHero extends StatelessWidget {
     final subtitle = isVolunteer
         ? openCount == 0
               ? 'Retrouvez ici vos missions et votre impact.'
-              : '$openCount maraude${openCount > 1 ? 's' : ''} ouverte${openCount > 1 ? 's' : ''} aux candidatures.'
+              : '$openCount maraude${openCount > 1 ? 's' : ''} ouverte${openCount > 1 ? 's' : ''} au volontariat.'
         : upcoming.isEmpty
         ? 'Aucune maraude à venir pour le moment.'
         : '${upcoming.length} maraude${upcoming.length > 1 ? 's' : ''} à venir.';
@@ -764,7 +764,7 @@ class _AdminDashboard extends ConsumerWidget {
             actionLabel: 'Ouvrir la fiche opérationnelle',
           ),
           _PremiumMaraudeSection(
-            title: 'Candidatures à examiner',
+            title: 'Volontaires à examiner',
             items: openWithApplications,
             actionLabel: 'Constituer l’équipe',
           ),
@@ -1460,7 +1460,7 @@ class _PremiumMaraudeCard extends StatelessWidget {
                 ),
                 if (maraude.pendingApplicationCount > 0)
                   Text(
-                    '${maraude.pendingApplicationCount} candidature'
+                    '${maraude.pendingApplicationCount} volontaire'
                     '${maraude.pendingApplicationCount > 1 ? 's' : ''} '
                     'à examiner',
                     style: DsTypography.caption.copyWith(

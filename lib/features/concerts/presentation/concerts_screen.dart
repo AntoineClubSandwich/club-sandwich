@@ -872,7 +872,7 @@ Future<bool> deleteConcertWithConfirmation(
     builder: (context) => AlertDialog(
       title: const Text('Supprimer la maraude ?'),
       content: Text(
-        'La maraude « ${concert.artist} », ses candidatures, sa collecte, '
+        'La maraude « ${concert.artist} », ses volontaires, sa collecte, '
         'sa distribution et son bilan seront définitivement supprimés.'
         '${isDraft ? '' : '\n\nCette maraude n’est pas un brouillon : '
               'les crédits déjà attribués aux bénévoles qui l’ont réalisée '

@@ -259,9 +259,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('CANDIDATURES À EXAMINER'), findsOneWidget);
+    expect(find.text('VOLONTAIRES À EXAMINER'), findsOneWidget);
     expect(find.text('Équipe non constituée'), findsWidgets);
-    expect(find.text('2 candidatures à examiner'), findsOneWidget);
+    expect(find.text('2 volontaires à examiner'), findsOneWidget);
     expect(find.text('AUJOURD’HUI'), findsOneWidget);
     expect(find.text('MARAUDES PASSÉES NON CLÔTURÉES'), findsOneWidget);
     expect(find.text('Constituer l’équipe'), findsOneWidget);
@@ -504,7 +504,7 @@ void main() {
     expect(find.text('Prochaine mission'), findsOneWidget);
     expect(find.text('Disponibilités en attente'), findsOneWidget);
     expect(find.text('Rôle : Chargé.e de logistique'), findsOneWidget);
-    expect(find.text('CANDIDATURES À EXAMINER'), findsNothing);
+    expect(find.text('VOLONTAIRES À EXAMINER'), findsNothing);
   });
 
   testWidgets(
