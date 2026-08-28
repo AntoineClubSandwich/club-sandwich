@@ -195,6 +195,23 @@ class ConcertVolunteerRepository {
         .eq('id', applicationId);
   }
 
+  /// Immediately persists a team role assignment (admin/organization-member
+  /// only, validated server-side: application must be selected, the
+  /// maraude's team must still be editable, and only one team leader is
+  /// allowed at a time). Unlike [setTeamRole] this goes through
+  /// `set_volunteer_team_role`, which also resets the volunteer's
+  /// confirmation to pending if they had already confirmed under a
+  /// different role.
+  Future<void> assignTeamRole(String applicationId, MaraudeRole role) async {
+    await client.rpc<void>(
+      'set_volunteer_team_role',
+      params: {
+        'requested_application_id': applicationId,
+        'requested_role': role.databaseValue,
+      },
+    );
+  }
+
   Future<void> setAttendanceStatus(
     String applicationId,
     VolunteerAttendanceStatus status,

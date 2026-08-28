@@ -1212,14 +1212,11 @@ void main() {
     );
     await tester.ensureVisible(leaderRole);
     await tester.tap(leaderRole);
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Chef.fe d’équipe'), findsWidgets);
-    expect(
-      repository.applications.single.teamRole,
-      MaraudeRole.collectionDistribution,
-    );
-    expect(repository.saveTeamCount, 0);
+    expect(repository.applications.single.teamRole, MaraudeRole.teamLeader);
+    expect(repository.assignTeamRoleCount, 1);
   });
 
   testWidgets('verrouille la composition de l’équipe après le démarrage', (
@@ -1320,7 +1317,9 @@ void main() {
     },
   );
 
-  testWidgets('refuse une équipe d’un bénévole sans chef', (tester) async {
+  testWidgets('signale une équipe incomplète tant que le minimum n’est pas atteint', (
+    tester,
+  ) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1440, 900);
     addTearDown(() {
@@ -1345,14 +1344,11 @@ void main() {
     );
     await tester.ensureVisible(select);
     await tester.tap(select);
-    await tester.pump();
-    final save = find.byKey(const ValueKey('save-maraude-team'));
-    expect(tester.widget<FilledButton>(save).onPressed, isNull);
+    await tester.pumpAndSettle();
     expect(find.text('Ajoutez au moins 3 bénévoles.'), findsOneWidget);
-    expect(repository.saveTeamCount, 0);
   });
 
-  testWidgets('refuse une équipe vide après le retrait du dernier membre', (
+  testWidgets('retire immédiatement le dernier membre de l’équipe', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -1381,14 +1377,16 @@ void main() {
     );
     await tester.ensureVisible(remove);
     await tester.tap(remove);
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    final save = find.byKey(const ValueKey('save-maraude-team'));
-    expect(tester.widget<FilledButton>(save).onPressed, isNull);
-    expect(repository.saveTeamCount, 0);
+    expect(
+      repository.applications.single.status,
+      ConcertVolunteerStatus.notSelected,
+    );
+    expect(find.text('Ajoutez au moins 3 bénévoles.'), findsOneWidget);
   });
 
-  testWidgets('empêche plusieurs chefs d’équipe dans le brouillon', (
+  testWidgets('empêche plusieurs chefs d’équipe', (
     tester,
   ) async {
     final repository = _FakeConcertVolunteerRepository(
@@ -1424,7 +1422,7 @@ void main() {
       find.byKey(const ValueKey('team-role-first-teamLeader')),
     );
     await tester.tap(find.byKey(const ValueKey('team-role-first-teamLeader')));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('select-volunteer-second')),
@@ -1438,75 +1436,70 @@ void main() {
     expect(secondLeader.enabled, isFalse);
   });
 
-  testWidgets('valide atomiquement une équipe complète avec un chef', (
-    tester,
-  ) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(1440, 1100);
-    addTearDown(() {
-      tester.view.resetDevicePixelRatio();
-      tester.view.resetPhysicalSize();
-    });
-    final repository = _FakeConcertVolunteerRepository(
-      isAdmin: true,
-      applications: [
-        for (var index = 1; index <= 4; index++)
-          _application(
-            id: 'candidate-$index',
-            userId: 'user-$index',
-            profile: VolunteerProfile(
+  testWidgets(
+    'compose une équipe complète en enregistrant chaque action immédiatement',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1440, 1100);
+      addTearDown(() {
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPhysicalSize();
+      });
+      final repository = _FakeConcertVolunteerRepository(
+        isAdmin: true,
+        applications: [
+          for (var index = 1; index <= 4; index++)
+            _application(
+              id: 'candidate-$index',
               userId: 'user-$index',
-              firstName: 'Bénévole $index',
+              profile: VolunteerProfile(
+                userId: 'user-$index',
+                firstName: 'Bénévole $index',
+              ),
             ),
-          ),
-      ],
-    );
-    await _pumpDetail(tester, repository);
+        ],
+      );
+      await _pumpDetail(tester, repository);
 
-    for (var index = 1; index <= 4; index++) {
-      final button = find.byKey(ValueKey('select-volunteer-candidate-$index'));
-      await tester.ensureVisible(button);
-      await tester.tap(button);
+      for (var index = 1; index <= 4; index++) {
+        final button = find.byKey(
+          ValueKey('select-volunteer-candidate-$index'),
+        );
+        await tester.ensureVisible(button);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+      }
+
+      expect(
+        repository.applications
+            .where(
+              (application) =>
+                  application.status == ConcertVolunteerStatus.selected,
+            )
+            .length,
+        4,
+      );
+      expect(find.text('Attribuez le rôle de chef d’équipe à une personne.'), findsOneWidget);
+
+      final leaderRole = find.byKey(
+        const ValueKey('team-role-candidate-1-teamLeader'),
+      );
+      await tester.ensureVisible(leaderRole);
+      await tester.tap(leaderRole);
       await tester.pumpAndSettle();
-    }
 
-    var saveButton = tester.widget<FilledButton>(
-      find.byKey(const ValueKey('save-maraude-team')),
-    );
-    expect(saveButton.onPressed, isNull);
-
-    final leaderRole = find.byKey(
-      const ValueKey('team-role-candidate-1-teamLeader'),
-    );
-    await tester.ensureVisible(leaderRole);
-    await tester.tap(leaderRole);
-    await tester.pump();
-
-    saveButton = tester.widget<FilledButton>(
-      find.byKey(const ValueKey('save-maraude-team')),
-    );
-    expect(saveButton.onPressed, isNotNull);
-    await tester.ensureVisible(find.byKey(const ValueKey('save-maraude-team')));
-    await tester.tap(find.byKey(const ValueKey('save-maraude-team')));
-    await tester.pumpAndSettle();
-
-    expect(repository.saveTeamCount, 1);
-    expect(
-      repository.applications
-          .where(
-            (application) =>
-                application.status == ConcertVolunteerStatus.selected,
-          )
-          .length,
-      4,
-    );
-    expect(
-      repository.applications
-          .firstWhere((application) => application.id == 'candidate-1')
-          .teamRole,
-      MaraudeRole.teamLeader,
-    );
-  });
+      expect(
+        repository.applications
+            .firstWhere((application) => application.id == 'candidate-1')
+            .teamRole,
+        MaraudeRole.teamLeader,
+      );
+      expect(
+        find.text('Équipe complète : un chef et au moins deux autres bénévoles.'),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('affiche Candidatures et Équipe sous forme d’onglets mobiles', (
     tester,
@@ -1702,7 +1695,6 @@ void main() {
     expect(find.text('Chargé.e de communication'), findsWidgets);
     expect(find.text('Chargé.e de logistique'), findsWidgets);
     expect(find.text('Chargé.e de récolte et distribution'), findsWidgets);
-    expect(find.text('Équipe enregistrée'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -2303,6 +2295,29 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
 
   @override
   Future<void> setTeamRole(String applicationId, MaraudeRole role) async {
+    final index = applications.indexWhere(
+      (application) => application.id == applicationId,
+    );
+    applications[index] = applications[index].copyWith(teamRole: role);
+  }
+
+  int assignTeamRoleCount = 0;
+
+  @override
+  Future<void> assignTeamRole(String applicationId, MaraudeRole role) async {
+    assignTeamRoleCount++;
+    if (role == MaraudeRole.teamLeader &&
+        applications.any(
+          (application) =>
+              application.id != applicationId &&
+              application.status == ConcertVolunteerStatus.selected &&
+              application.teamRole == MaraudeRole.teamLeader,
+        )) {
+      throw const PostgrestException(
+        message: 'Un autre bénévole est déjà chef d’équipe',
+        code: '23505',
+      );
+    }
     final index = applications.indexWhere(
       (application) => application.id == applicationId,
     );

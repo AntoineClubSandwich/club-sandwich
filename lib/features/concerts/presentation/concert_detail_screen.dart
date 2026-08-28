@@ -20,7 +20,6 @@ import 'package:club_sandwich/features/concerts/presentation/concerts_screen.dar
 import 'package:club_sandwich/features/operations/data/maraude_operation_providers.dart';
 import 'package:club_sandwich/features/operations/presentation/maraude_resources_card.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
-import 'package:club_sandwich/features/volunteers/data/concert_volunteer_repository.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
 import 'package:club_sandwich/features/volunteers/domain/volunteer_profile.dart';
 import 'package:club_sandwich/features/volunteers/presentation/volunteer_documents_panel.dart';
@@ -2394,12 +2393,8 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
   static const _minimumTeamSize = 3;
 
   bool _isSubmitting = false;
-  bool _isSavingTeam = false;
-  bool _teamDirty = false;
   int _mobileTeamView = 0;
   final Set<String> _updatingApplications = {};
-  final Map<String, MaraudeRole> _draftTeamRoles = {};
-  String? _serverTeamSignature;
   final TextEditingController _searchController = TextEditingController();
   _ApplicationFilter _filter = _ApplicationFilter.all;
 
@@ -2439,7 +2434,6 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
   }
 
   Widget _buildContent(ConcertVolunteerSectionData data) {
-    _synchronizeTeamDraft(data.applications);
     final visibleApplications = _visibleApplications(data.applications);
     final ownApplication =
         data.activeRole == AppUserRole.volunteer &&
@@ -2579,24 +2573,23 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
           for (final application in visibleApplications)
             _TeamCandidateCard(
               application: application,
-              selectedRole: _draftTeamRoles[application.id],
+              selectedRole: application.status == ConcertVolunteerStatus.selected
+                  ? application.teamRole
+                  : null,
               isUpdating: _updatingApplications.contains(application.id),
-              isRoleAvailable: (role) => _isRoleAvailable(role, application.id),
+              isRoleAvailable: (role) =>
+                  _isRoleAvailable(role, application.id, data.applications),
               onSelect: () => _selectVolunteer(application.id),
               onReject: () => _rejectApplication(application.id),
               onRemove: () => _removeVolunteer(application.id),
-              onRoleChanged: (role) => _assignDraftRole(application.id, role),
+              onRoleChanged: (role) => _assignRole(application.id, role),
             ),
       ],
     );
 
     final summary = _TeamBuilderSummary(
       applications: data.applications,
-      roles: _draftTeamRoles,
       minimumTeamSize: _minimumTeamSize,
-      isDirty: _teamDirty,
-      isSaving: _isSavingTeam,
-      onSave: _canSaveTeam ? _saveTeam : null,
     );
 
     return LayoutBuilder(
@@ -2629,66 +2622,10 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
             ),
             const SizedBox(height: 16),
             if (_mobileTeamView == 0) candidates else summary,
-            if (_teamDirty && _mobileTeamView == 0) ...[
-              const SizedBox(height: 16),
-              _MobileTeamSaveBar(
-                hasLeader: _draftTeamRoles.values.contains(
-                  MaraudeRole.teamLeader,
-                ),
-                hasMinimumSize: _draftTeamRoles.length >= _minimumTeamSize,
-                minimumTeamSize: _minimumTeamSize,
-                isSaving: _isSavingTeam,
-                onSave: _canSaveTeam ? _saveTeam : null,
-              ),
-            ],
           ],
         );
       },
     );
-  }
-
-  bool get _canSaveTeam {
-    return _teamDirty &&
-        !_isSavingTeam &&
-        _draftTeamRoles.length >= _minimumTeamSize &&
-        _draftTeamRoles.values
-                .where((role) => role == MaraudeRole.teamLeader)
-                .length ==
-            1;
-  }
-
-  void _synchronizeTeamDraft(List<ConcertVolunteerApplication> applications) {
-    final serverMembers =
-        applications
-            .where(
-              (application) =>
-                  application.status == ConcertVolunteerStatus.selected,
-            )
-            .map(
-              (application) =>
-                  '${application.id}:${application.teamRole?.databaseValue}',
-            )
-            .toList()
-          ..sort();
-    final signature = serverMembers.join('|');
-    if (_serverTeamSignature == signature || _teamDirty) return;
-
-    _serverTeamSignature = signature;
-    _draftTeamRoles
-      ..clear()
-      ..addEntries(
-        applications
-            .where(
-              (application) =>
-                  application.status == ConcertVolunteerStatus.selected,
-            )
-            .map(
-              (application) => MapEntry(
-                application.id,
-                application.teamRole ?? MaraudeRole.collectionDistribution,
-              ),
-            ),
-      );
   }
 
   List<ConcertVolunteerApplication> _visibleApplications(
@@ -2697,12 +2634,7 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
     final query = _normalizeVolunteerSearch(_searchController.text);
     final visible =
         applications.where((application) {
-          final effectiveStatus = _draftTeamRoles.containsKey(application.id)
-              ? ConcertVolunteerStatus.selected
-              : application.status == ConcertVolunteerStatus.selected
-              ? ConcertVolunteerStatus.notSelected
-              : application.status;
-          if (!_filter.matches(effectiveStatus)) return false;
+          if (!_filter.matches(application.status)) return false;
           if (query.isEmpty) return true;
 
           final profile = application.profile;
@@ -2715,19 +2647,27 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
           );
           return searchableValue.contains(query);
         }).toList()..sort((left, right) {
-          final leftSelected = _draftTeamRoles.containsKey(left.id);
-          final rightSelected = _draftTeamRoles.containsKey(right.id);
+          final leftSelected =
+              left.status == ConcertVolunteerStatus.selected;
+          final rightSelected =
+              right.status == ConcertVolunteerStatus.selected;
           if (leftSelected != rightSelected) return leftSelected ? -1 : 1;
           return _compareApplications(left, right);
         });
     return visible;
   }
 
-  bool _isRoleAvailable(MaraudeRole role, String applicationId) {
+  bool _isRoleAvailable(
+    MaraudeRole role,
+    String applicationId,
+    List<ConcertVolunteerApplication> applications,
+  ) {
     if (role != MaraudeRole.teamLeader) return true;
-    return !_draftTeamRoles.entries.any(
-      (entry) =>
-          entry.key != applicationId && entry.value == MaraudeRole.teamLeader,
+    return !applications.any(
+      (application) =>
+          application.id != applicationId &&
+          application.status == ConcertVolunteerStatus.selected &&
+          application.teamRole == MaraudeRole.teamLeader,
     );
   }
 
@@ -2737,8 +2677,6 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       await ref
           .read(concertVolunteerRepositoryProvider)
           .selectVolunteers(widget.concertId, [applicationId]);
-      _draftTeamRoles[applicationId] ??= MaraudeRole.collectionDistribution;
-      _serverTeamSignature = null;
       ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2760,8 +2698,6 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       await ref
           .read(concertVolunteerRepositoryProvider)
           .setStatus(applicationId, ConcertVolunteerStatus.notSelected);
-      _draftTeamRoles.remove(applicationId);
-      _serverTeamSignature = null;
       ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2777,12 +2713,25 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
     }
   }
 
-  void _assignDraftRole(String applicationId, MaraudeRole role) {
-    if (!_isRoleAvailable(role, applicationId)) return;
-    setState(() {
-      _draftTeamRoles[applicationId] = role;
-      _teamDirty = true;
-    });
+  Future<void> _assignRole(String applicationId, MaraudeRole role) async {
+    setState(() => _updatingApplications.add(applicationId));
+    try {
+      await ref
+          .read(concertVolunteerRepositoryProvider)
+          .assignTeamRole(applicationId, role);
+      ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Rôle enregistré : ${role.label}.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showError(describeError(error, 'Impossible d’attribuer ce rôle.'));
+    } finally {
+      if (mounted) {
+        setState(() => _updatingApplications.remove(applicationId));
+      }
+    }
   }
 
   Future<void> _apply() async {
@@ -2998,43 +2947,12 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
     }
   }
 
-  Future<void> _saveTeam() async {
-    setState(() => _isSavingTeam = true);
-    try {
-      await ref
-          .read(concertVolunteerRepositoryProvider)
-          .saveTeam(
-            widget.concertId,
-            _draftTeamRoles.entries.map(
-              (entry) => MaraudeTeamMemberDraft(
-                applicationId: entry.key,
-                role: entry.value,
-              ),
-            ),
-          );
-      _teamDirty = false;
-      _serverTeamSignature = null;
-      ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Équipe enregistrée.')));
-    } catch (error) {
-      if (!mounted) return;
-      _showError(describeError(error, 'Impossible d’enregistrer l’équipe.'));
-    } finally {
-      if (mounted) setState(() => _isSavingTeam = false);
-    }
-  }
-
   Future<void> _rejectApplication(String applicationId) async {
     setState(() => _updatingApplications.add(applicationId));
     try {
       await ref
           .read(concertVolunteerRepositoryProvider)
           .setStatus(applicationId, ConcertVolunteerStatus.notSelected);
-      _draftTeamRoles.remove(applicationId);
-      _serverTeamSignature = null;
       ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -3327,107 +3245,35 @@ class _RosterLine extends StatelessWidget {
   }
 }
 
-class _MobileTeamSaveBar extends StatelessWidget {
-  const _MobileTeamSaveBar({
-    required this.hasLeader,
-    required this.hasMinimumSize,
-    required this.minimumTeamSize,
-    required this.isSaving,
-    required this.onSave,
-  });
-
-  final bool hasLeader;
-  final bool hasMinimumSize;
-  final int minimumTeamSize;
-  final bool isSaving;
-  final VoidCallback? onSave;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final isValidTeam = hasLeader && hasMinimumSize;
-    return Card.filled(
-      key: const ValueKey('team-mobile-save-bar'),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  isValidTeam
-                      ? Icons.check_circle_outline
-                      : Icons.pending_actions_outlined,
-                  color: isValidTeam ? colors.primary : colors.tertiary,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    isValidTeam
-                        ? 'Équipe complète, prête à enregistrer.'
-                        : !hasMinimumSize
-                        ? 'Ajoutez au moins $minimumTeamSize bénévoles.'
-                        : 'Attribuez le rôle de chef d’équipe à une personne.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              key: const ValueKey('save-team-mobile-button'),
-              onPressed: onSave,
-              icon: isSaving
-                  ? const SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.save_outlined),
-              label: Text(isSaving ? 'Enregistrement…' : 'Enregistrer l’équipe'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _TeamBuilderSummary extends StatelessWidget {
   const _TeamBuilderSummary({
     required this.applications,
-    required this.roles,
     required this.minimumTeamSize,
-    required this.isDirty,
-    required this.isSaving,
-    required this.onSave,
   });
 
   final List<ConcertVolunteerApplication> applications;
-  final Map<String, MaraudeRole> roles;
   final int minimumTeamSize;
-  final bool isDirty;
-  final bool isSaving;
-  final VoidCallback? onSave;
+
+  List<ConcertVolunteerApplication> get _team => applications
+      .where((application) => application.status == ConcertVolunteerStatus.selected)
+      .toList(growable: false);
 
   @override
   Widget build(BuildContext context) {
-    final hasLeader = roles.containsValue(MaraudeRole.teamLeader);
-    final hasMinimumSize = roles.length >= minimumTeamSize;
-    final isValidTeam = hasMinimumSize && hasLeader;
-    final teamApplications = applications.where(
-      (application) => roles.containsKey(application.id),
+    final team = _team;
+    final hasLeader = team.any(
+      (application) => application.teamRole == MaraudeRole.teamLeader,
     );
-    final confirmedCount = teamApplications
+    final hasMinimumSize = team.length >= minimumTeamSize;
+    final isValidTeam = hasMinimumSize && hasLeader;
+    final confirmedCount = team
         .where(
           (application) =>
               application.confirmationStatus ==
               VolunteerConfirmationStatus.confirmed,
         )
         .length;
-    final pendingConfirmationCount = roles.length - confirmedCount;
+    final pendingConfirmationCount = team.length - confirmedCount;
     final colors = Theme.of(context).colorScheme;
 
     return Card.filled(
@@ -3446,7 +3292,7 @@ class _TeamBuilderSummary extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '${roles.length} / $minimumTeamSize bénévoles',
+              '${team.length} / $minimumTeamSize bénévoles',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
@@ -3459,22 +3305,25 @@ class _TeamBuilderSummary extends StatelessWidget {
             const Divider(height: 28),
             _TeamRoleSummary(
               label: 'Chef d’équipe',
-              members: _membersForRole(MaraudeRole.teamLeader),
+              members: _membersForRole(team, MaraudeRole.teamLeader),
             ),
             const Divider(height: 24),
             _TeamRoleSummary(
               label: 'Communication',
-              members: _membersForRole(MaraudeRole.communication),
+              members: _membersForRole(team, MaraudeRole.communication),
             ),
             const Divider(height: 24),
             _TeamRoleSummary(
               label: 'Logistique',
-              members: _membersForRole(MaraudeRole.logistics),
+              members: _membersForRole(team, MaraudeRole.logistics),
             ),
             const Divider(height: 24),
             _TeamRoleSummary(
               label: 'Récolte & distribution',
-              members: _membersForRole(MaraudeRole.collectionDistribution),
+              members: _membersForRole(
+                team,
+                MaraudeRole.collectionDistribution,
+              ),
             ),
             const Divider(height: 28),
             Row(
@@ -3498,44 +3347,18 @@ class _TeamBuilderSummary extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              key: const ValueKey('save-maraude-team'),
-              onPressed: onSave,
-              icon: isSaving
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.check),
-              label: Text(
-                !isDirty ? 'Équipe enregistrée' : 'Enregistrer l’équipe',
-              ),
-            ),
-            if (!hasLeader) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Aucun rôle Chef.fe d’équipe n’est attribué. '
-                'Cette recommandation ne bloque pas l’enregistrement.',
-                style: TextStyle(fontSize: 12),
-              ),
-            ],
           ],
         ),
       ),
     );
   }
 
-  List<ConcertVolunteerApplication> _membersForRole(MaraudeRole role) {
-    final applicationsById = {
-      for (final application in applications) application.id: application,
-    };
-    return roles.entries
-        .where((entry) => entry.value == role)
-        .map((entry) => applicationsById[entry.key])
-        .whereType<ConcertVolunteerApplication>()
-        .toList(growable: false);
-  }
+  List<ConcertVolunteerApplication> _membersForRole(
+    List<ConcertVolunteerApplication> team,
+    MaraudeRole role,
+  ) => team
+      .where((application) => application.teamRole == role)
+      .toList(growable: false);
 }
 
 class _TeamRoleSummary extends StatelessWidget {
