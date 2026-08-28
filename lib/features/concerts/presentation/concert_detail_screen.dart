@@ -2629,6 +2629,18 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
             ),
             const SizedBox(height: 16),
             if (_mobileTeamView == 0) candidates else summary,
+            if (_teamDirty && _mobileTeamView == 0) ...[
+              const SizedBox(height: 16),
+              _MobileTeamSaveBar(
+                hasLeader: _draftTeamRoles.values.contains(
+                  MaraudeRole.teamLeader,
+                ),
+                hasMinimumSize: _draftTeamRoles.length >= _minimumTeamSize,
+                minimumTeamSize: _minimumTeamSize,
+                isSaving: _isSavingTeam,
+                onSave: _canSaveTeam ? _saveTeam : null,
+              ),
+            ],
           ],
         );
       },
@@ -3310,6 +3322,74 @@ class _RosterLine extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MobileTeamSaveBar extends StatelessWidget {
+  const _MobileTeamSaveBar({
+    required this.hasLeader,
+    required this.hasMinimumSize,
+    required this.minimumTeamSize,
+    required this.isSaving,
+    required this.onSave,
+  });
+
+  final bool hasLeader;
+  final bool hasMinimumSize;
+  final int minimumTeamSize;
+  final bool isSaving;
+  final VoidCallback? onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final isValidTeam = hasLeader && hasMinimumSize;
+    return Card.filled(
+      key: const ValueKey('team-mobile-save-bar'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isValidTeam
+                      ? Icons.check_circle_outline
+                      : Icons.pending_actions_outlined,
+                  color: isValidTeam ? colors.primary : colors.tertiary,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isValidTeam
+                        ? 'Équipe complète, prête à enregistrer.'
+                        : !hasMinimumSize
+                        ? 'Ajoutez au moins $minimumTeamSize bénévoles.'
+                        : 'Attribuez le rôle de chef d’équipe à une personne.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              key: const ValueKey('save-team-mobile-button'),
+              onPressed: onSave,
+              icon: isSaving
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(isSaving ? 'Enregistrement…' : 'Enregistrer l’équipe'),
+            ),
+          ],
+        ),
       ),
     );
   }
