@@ -1219,6 +1219,64 @@ void main() {
     expect(repository.assignTeamRoleCount, 1);
   });
 
+  testWidgets(
+    'verrouiller un rôle empêche de le changer ou de retirer le bénévole',
+    (tester) async {
+      final repository = _FakeConcertVolunteerRepository(
+        isAdmin: true,
+        applications: [
+          _application(
+            status: ConcertVolunteerStatus.selected,
+            teamRole: MaraudeRole.teamLeader,
+            profile: const VolunteerProfile(
+              userId: 'user-id',
+              firstName: 'Macéo',
+              lastName: 'Texeira',
+            ),
+          ),
+        ],
+      );
+      await _pumpDetail(tester, repository);
+
+      final lockButton = find.byKey(
+        const ValueKey('toggle-role-lock-application-id'),
+      );
+      await tester.ensureVisible(lockButton);
+      await tester.tap(lockButton);
+      await tester.pumpAndSettle();
+
+      expect(repository.applications.single.teamRoleLocked, isTrue);
+      expect(
+        find.text(
+          'Rôle verrouillé : il ne peut pas être changé ni retiré '
+          'par erreur.',
+        ),
+        findsOneWidget,
+      );
+
+      final communicationRole = tester.widget<RadioListTile<MaraudeRole>>(
+        find.byKey(
+          const ValueKey('team-role-application-id-communication'),
+        ),
+      );
+      expect(communicationRole.enabled, isFalse);
+      final removeButton = tester.widget<TextButton>(
+        find.byKey(const ValueKey('remove-volunteer-application-id')),
+      );
+      expect(removeButton.onPressed, isNull);
+
+      await tester.ensureVisible(lockButton);
+      await tester.tap(lockButton);
+      await tester.pumpAndSettle();
+
+      expect(repository.applications.single.teamRoleLocked, isFalse);
+      final unlockedRemoveButton = tester.widget<TextButton>(
+        find.byKey(const ValueKey('remove-volunteer-application-id')),
+      );
+      expect(unlockedRemoveButton.onPressed, isNotNull);
+    },
+  );
+
   testWidgets('verrouille la composition de l’équipe après le démarrage', (
     tester,
   ) async {
@@ -2020,6 +2078,7 @@ ConcertVolunteerApplication _application({
   VolunteerProfile? profile,
   VolunteerStatistics statistics = const VolunteerStatistics.empty(),
   MaraudeRole? teamRole,
+  bool teamRoleLocked = false,
   VolunteerAttendanceStatus? attendanceStatus,
   VolunteerConfirmationStatus? confirmationStatus,
 }) {
@@ -2033,6 +2092,7 @@ ConcertVolunteerApplication _application({
     profile: profile,
     statistics: statistics,
     teamRole: teamRole,
+    teamRoleLocked: teamRoleLocked,
     attendanceStatus: attendanceStatus,
     confirmationStatus:
         confirmationStatus ??
@@ -2231,6 +2291,12 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
     final index = applications.indexWhere(
       (application) => application.id == applicationId,
     );
+    if (applications[index].teamRoleLocked) {
+      throw const PostgrestException(
+        message: 'Le rôle de ce bénévole est verrouillé',
+        code: '55000',
+      );
+    }
     applications[index] = applications[index].copyWith(
       status: status,
       teamRole: status == ConcertVolunteerStatus.selected
@@ -2306,6 +2372,15 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
   @override
   Future<void> assignTeamRole(String applicationId, MaraudeRole role) async {
     assignTeamRoleCount++;
+    final index = applications.indexWhere(
+      (application) => application.id == applicationId,
+    );
+    if (applications[index].teamRoleLocked) {
+      throw const PostgrestException(
+        message: 'Le rôle de ce bénévole est verrouillé',
+        code: '55000',
+      );
+    }
     if (role == MaraudeRole.teamLeader &&
         applications.any(
           (application) =>
@@ -2318,10 +2393,17 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
         code: '23505',
       );
     }
+    applications[index] = applications[index].copyWith(teamRole: role);
+  }
+
+  @override
+  Future<void> setRoleLock(String applicationId, bool locked) async {
     final index = applications.indexWhere(
       (application) => application.id == applicationId,
     );
-    applications[index] = applications[index].copyWith(teamRole: role);
+    applications[index] = applications[index].copyWith(
+      teamRoleLocked: locked,
+    );
   }
 
   @override

@@ -2583,6 +2583,8 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
               onReject: () => _rejectApplication(application.id),
               onRemove: () => _removeVolunteer(application.id),
               onRoleChanged: (role) => _assignRole(application.id, role),
+              onToggleLock: (locked) =>
+                  _toggleRoleLock(application.id, locked),
             ),
       ],
     );
@@ -2727,6 +2729,35 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
     } catch (error) {
       if (!mounted) return;
       _showError(describeError(error, 'Impossible d’attribuer ce rôle.'));
+    } finally {
+      if (mounted) {
+        setState(() => _updatingApplications.remove(applicationId));
+      }
+    }
+  }
+
+  Future<void> _toggleRoleLock(String applicationId, bool locked) async {
+    setState(() => _updatingApplications.add(applicationId));
+    try {
+      await ref
+          .read(concertVolunteerRepositoryProvider)
+          .setRoleLock(applicationId, locked);
+      ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            locked
+                ? 'Rôle verrouillé : il ne peut plus être changé par erreur.'
+                : 'Rôle déverrouillé.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showError(
+        describeError(error, 'Impossible de modifier le verrouillage.'),
+      );
     } finally {
       if (mounted) {
         setState(() => _updatingApplications.remove(applicationId));
@@ -3455,6 +3486,7 @@ class _TeamCandidateCard extends StatelessWidget {
     required this.onReject,
     required this.onRemove,
     required this.onRoleChanged,
+    required this.onToggleLock,
   });
 
   final ConcertVolunteerApplication application;
@@ -3465,6 +3497,7 @@ class _TeamCandidateCard extends StatelessWidget {
   final VoidCallback onReject;
   final VoidCallback onRemove;
   final ValueChanged<MaraudeRole> onRoleChanged;
+  final ValueChanged<bool> onToggleLock;
 
   @override
   Widget build(BuildContext context) {
@@ -3600,10 +3633,39 @@ class _TeamCandidateCard extends StatelessWidget {
                 ],
               )
             else ...[
-              Text(
-                'Rôle dans la maraude',
-                style: Theme.of(context).textTheme.labelLarge,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Rôle dans la maraude',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ),
+                  TextButton.icon(
+                    key: ValueKey('toggle-role-lock-${application.id}'),
+                    onPressed: isUpdating
+                        ? null
+                        : () => onToggleLock(!application.teamRoleLocked),
+                    icon: Icon(
+                      application.teamRoleLocked
+                          ? Icons.lock_outline
+                          : Icons.lock_open_outlined,
+                      size: 18,
+                    ),
+                    label: Text(
+                      application.teamRoleLocked ? 'Déverrouiller' : 'Verrouiller',
+                    ),
+                  ),
+                ],
               ),
+              if (application.teamRoleLocked) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Rôle verrouillé : il ne peut pas être changé ni retiré '
+                  'par erreur.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               const SizedBox(height: 6),
               RadioGroup<MaraudeRole>(
                 groupValue: selectedRole,
@@ -3622,6 +3684,7 @@ class _TeamCandidateCard extends StatelessWidget {
                         value: role,
                         enabled:
                             !isUpdating &&
+                            !application.teamRoleLocked &&
                             (isRoleAvailable(role) || selectedRole == role),
                         dense: true,
                         contentPadding: EdgeInsets.zero,
@@ -3635,7 +3698,9 @@ class _TeamCandidateCard extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
                   key: ValueKey('remove-volunteer-${application.id}'),
-                  onPressed: isUpdating ? null : onRemove,
+                  onPressed: isUpdating || application.teamRoleLocked
+                      ? null
+                      : onRemove,
                   icon: const Icon(Icons.person_remove_outlined),
                   label: const Text('Retirer de l’équipe'),
                 ),

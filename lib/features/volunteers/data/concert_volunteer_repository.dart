@@ -212,6 +212,19 @@ class ConcertVolunteerRepository {
     );
   }
 
+  /// Locks (or unlocks) a volunteer's team role so it can't be changed, or
+  /// the volunteer removed from the team, by accident — e.g. a misclick on
+  /// "Retirer de l'équipe" right after a confirmed team leader was set up.
+  Future<void> setRoleLock(String applicationId, bool locked) async {
+    await client.rpc<void>(
+      'set_volunteer_role_lock',
+      params: {
+        'requested_application_id': applicationId,
+        'requested_locked': locked,
+      },
+    );
+  }
+
   Future<void> setAttendanceStatus(
     String applicationId,
     VolunteerAttendanceStatus status,

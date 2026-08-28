@@ -220,6 +220,7 @@ class ConcertVolunteerApplication {
     this.profile,
     this.statistics = const VolunteerStatistics.empty(),
     this.teamRole,
+    this.teamRoleLocked = false,
     this.attendanceStatus,
     this.confirmationStatus,
     this.confirmationRequestedAt,
@@ -247,6 +248,7 @@ class ConcertVolunteerApplication {
       teamRole: json['team_role'] == null
           ? null
           : MaraudeRole.fromDatabase(json['team_role'] as String),
+      teamRoleLocked: json['team_role_locked'] as bool? ?? false,
       attendanceStatus: json['attendance_status'] == null
           ? null
           : VolunteerAttendanceStatus.fromDatabase(
@@ -292,6 +294,7 @@ class ConcertVolunteerApplication {
   final VolunteerProfile? profile;
   final VolunteerStatistics statistics;
   final MaraudeRole? teamRole;
+  final bool teamRoleLocked;
   final VolunteerAttendanceStatus? attendanceStatus;
   final VolunteerConfirmationStatus? confirmationStatus;
   final DateTime? confirmationRequestedAt;
@@ -320,6 +323,7 @@ class ConcertVolunteerApplication {
     'user_id': userId,
     'status': status.databaseValue,
     'team_role': teamRole?.databaseValue,
+    'team_role_locked': teamRoleLocked,
     'attendance_status': attendanceStatus?.databaseValue,
     'confirmation_status': confirmationStatus?.databaseValue,
     'confirmation_requested_at': confirmationRequestedAt?.toIso8601String(),
@@ -343,6 +347,7 @@ class ConcertVolunteerApplication {
     VolunteerProfile? profile,
     VolunteerStatistics? statistics,
     Object? teamRole = _unset,
+    bool? teamRoleLocked,
     Object? attendanceStatus = _unset,
     Object? confirmationStatus = _unset,
     Object? confirmationRequestedAt = _unset,
@@ -365,6 +370,7 @@ class ConcertVolunteerApplication {
       teamRole: identical(teamRole, _unset)
           ? this.teamRole
           : teamRole as MaraudeRole?,
+      teamRoleLocked: teamRoleLocked ?? this.teamRoleLocked,
       attendanceStatus: identical(attendanceStatus, _unset)
           ? this.attendanceStatus
           : attendanceStatus as VolunteerAttendanceStatus?,
@@ -408,6 +414,7 @@ class ConcertVolunteerApplication {
             profile == other.profile &&
             statistics == other.statistics &&
             teamRole == other.teamRole &&
+            teamRoleLocked == other.teamRoleLocked &&
             attendanceStatus == other.attendanceStatus &&
             confirmationStatus == other.confirmationStatus &&
             confirmationRequestedAt == other.confirmationRequestedAt &&
@@ -430,6 +437,7 @@ class ConcertVolunteerApplication {
     profile,
     statistics,
     teamRole,
+    teamRoleLocked,
     attendanceStatus,
     confirmationStatus,
     confirmationRequestedAt,
