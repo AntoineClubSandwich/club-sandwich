@@ -280,6 +280,7 @@ class _ConcertDetailsState extends ConsumerState<_ConcertDetails> {
                             canManage: canManageMaraude,
                             canComplete: canCompleteMaraude,
                             canOperate: canManageMaraude || isSelectedVolunteer,
+                            canPublishDraft: canManageConcert,
                           ),
                         ),
                       if (selectedWorkspace == _MaraudeWorkspace.operations &&
@@ -367,7 +368,7 @@ class _ConcertDetailsState extends ConsumerState<_ConcertDetails> {
       context: context,
       builder: (context) => ConcertForm(
         initialConcert: concert,
-        onSubmit: (draft) => ref
+        onSubmit: (draft, {required asDraft}) => ref
             .read(concertRepositoryProvider)
             .updateConcert(concert.id, draft),
       ),
@@ -803,12 +804,14 @@ class _MaraudeSection extends ConsumerStatefulWidget {
     required this.canManage,
     required this.canComplete,
     required this.canOperate,
+    required this.canPublishDraft,
   });
 
   final Concert concert;
   final bool canManage;
   final bool canComplete;
   final bool canOperate;
+  final bool canPublishDraft;
 
   @override
   ConsumerState<_MaraudeSection> createState() => _MaraudeSectionState();
@@ -875,6 +878,23 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
               label: const Text('Corriger les horaires'),
             ),
           ],
+          if (!widget.canManage &&
+              widget.canPublishDraft &&
+              concert.maraudeStatus == MaraudeStatus.draft) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Cette maraude est en brouillon : elle n’est pas visible des '
+              'bénévoles.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              key: const ValueKey('publish-draft-maraude'),
+              onPressed: _isSubmitting ? null : _publishDraft,
+              icon: const Icon(Icons.publish_outlined),
+              label: const Text('Publier la maraude'),
+            ),
+          ],
           if (widget.canManage &&
               (concert.maraudeStatus == MaraudeStatus.completed ||
                   concert.maraudeStatus == MaraudeStatus.cancelled)) ...[
@@ -932,6 +952,8 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
       context.go('/maraudes/${widget.concert.id}/operation');
     }
   }
+
+  Future<void> _publishDraft() => _setStatus(MaraudeStatus.open);
 
   Future<void> _correctTiming() async {
     final correction = await showDialog<_MaraudeTimingCorrection>(

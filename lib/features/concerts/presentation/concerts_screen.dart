@@ -282,8 +282,9 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
       context: context,
       builder: (context) => ConcertForm(
         promoterOrganizations: promoterOrganizations,
-        onSubmit: (draft) =>
-            ref.read(concertRepositoryProvider).createConcert(draft),
+        onSubmit: (draft, {required asDraft}) => ref
+            .read(concertRepositoryProvider)
+            .createConcert(draft, asDraft: asDraft),
       ),
     );
     if (created != true || !context.mounted) return;
@@ -777,7 +778,7 @@ class _ConcertCard extends ConsumerWidget {
       context: context,
       builder: (context) => ConcertForm(
         initialConcert: concert,
-        onSubmit: (draft) => ref
+        onSubmit: (draft, {required asDraft}) => ref
             .read(concertRepositoryProvider)
             .updateConcert(concert.id, draft),
       ),
@@ -865,13 +866,19 @@ Future<bool> deleteConcertWithConfirmation(
   WidgetRef ref,
   Concert concert,
 ) async {
+  final isDraft = concert.maraudeStatus == MaraudeStatus.draft;
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
       title: const Text('Supprimer la maraude ?'),
       content: Text(
         'La maraude « ${concert.artist} », ses candidatures, sa collecte, '
-        'sa distribution et son bilan seront définitivement supprimés.',
+        'sa distribution et son bilan seront définitivement supprimés.'
+        '${isDraft ? '' : '\n\nCette maraude n’est pas un brouillon : '
+              'les crédits déjà attribués aux bénévoles qui l’ont réalisée '
+              'seront retirés. Si un bénévole avait déjà utilisé un de ces '
+              'crédits pour une invitation confirmée, son solde de '
+              'crédits passera en négatif à rattraper.'}',
       ),
       actions: [
         TextButton(

@@ -261,6 +261,48 @@ class MaraudeOperationBundle {
       collections.fold(0, (total, line) => total + (line.weightKg ?? 0));
 }
 
+class MaraudeResourceCatalogConsumable {
+  const MaraudeResourceCatalogConsumable({
+    required this.id,
+    required this.name,
+    required this.unit,
+    required this.currentQuantity,
+  });
+
+  factory MaraudeResourceCatalogConsumable.fromJson(
+    Map<String, dynamic> json,
+  ) => MaraudeResourceCatalogConsumable(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    unit: InventoryUnit.fromJson(json['unit'] as String),
+    currentQuantity: (json['current_quantity'] as num).toDouble(),
+  );
+
+  final String id;
+  final String name;
+  final InventoryUnit unit;
+  final double currentQuantity;
+}
+
+class MaraudeResourceCatalogEquipment {
+  const MaraudeResourceCatalogEquipment({
+    required this.id,
+    required this.name,
+    required this.quantityTotal,
+  });
+
+  factory MaraudeResourceCatalogEquipment.fromJson(Map<String, dynamic> json) =>
+      MaraudeResourceCatalogEquipment(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        quantityTotal: (json['quantity_total'] as num).toInt(),
+      );
+
+  final String id;
+  final String name;
+  final int quantityTotal;
+}
+
 DateTime? _date(Object? value) =>
     value == null ? null : DateTime.parse(value as String);
 

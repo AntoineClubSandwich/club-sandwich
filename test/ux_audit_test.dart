@@ -350,7 +350,9 @@ void main() {
       ProviderScope(
         child: MaterialApp(
           theme: DsTheme.light,
-          home: Scaffold(body: ConcertForm(onSubmit: (_) async {})),
+          home: Scaffold(
+            body: ConcertForm(onSubmit: (_, {required asDraft}) async {}),
+          ),
         ),
       ),
     );

@@ -9,12 +9,9 @@ import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/collections/domain/maraude_collection.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
-import 'package:club_sandwich/features/consumables/data/consumable_providers.dart';
 import 'package:club_sandwich/features/consumables/domain/consumable.dart';
 import 'package:club_sandwich/features/encounters/data/encounter_location_service.dart';
 import 'package:club_sandwich/features/encounters/data/encounter_providers.dart';
-import 'package:club_sandwich/features/equipment/data/equipment_providers.dart';
-import 'package:club_sandwich/features/equipment/domain/equipment_asset.dart';
 import 'package:club_sandwich/features/operations/data/maraude_operation_providers.dart';
 import 'package:club_sandwich/features/operations/data/maraude_operation_repository.dart';
 import 'package:club_sandwich/features/operations/domain/maraude_workflow.dart';
@@ -295,7 +292,9 @@ class _MaraudeOperationScreenState
   );
 
   Future<void> _addConsumable(MaraudeOperationBundle data) async {
-    final catalog = await ref.read(consumablesProvider.future);
+    final catalog = await ref
+        .read(maraudeOperationRepositoryProvider)
+        .fetchConsumableCatalog(widget.concertId);
     if (!mounted) return;
     final existingIds = data.consumables
         .map((item) => item.consumableId)
@@ -305,15 +304,19 @@ class _MaraudeOperationScreenState
         .toList(growable: false);
     if (available.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tous les consommables du stock sont déjà listés.'),
+        SnackBar(
+          content: Text(
+            catalog.isEmpty
+                ? 'Aucun consommable disponible dans le stock.'
+                : 'Tous les consommables du stock sont déjà listés.',
+          ),
         ),
       );
       return;
     }
-    final picked = await showDialog<_PickedResource<Consumable>>(
+    final picked = await showDialog<_PickedResource<MaraudeResourceCatalogConsumable>>(
       context: context,
-      builder: (_) => _AddResourceDialog<Consumable>(
+      builder: (_) => _AddResourceDialog<MaraudeResourceCatalogConsumable>(
         title: 'Ajouter un consommable',
         items: available,
         labelFor: (item) =>
@@ -335,7 +338,9 @@ class _MaraudeOperationScreenState
   }
 
   Future<void> _addEquipment(MaraudeOperationBundle data) async {
-    final catalog = await ref.read(equipmentAssetsProvider.future);
+    final catalog = await ref
+        .read(maraudeOperationRepositoryProvider)
+        .fetchEquipmentCatalog(widget.concertId);
     if (!mounted) return;
     final existingIds = data.equipment
         .map((item) => item.equipmentId)
@@ -345,15 +350,19 @@ class _MaraudeOperationScreenState
         .toList(growable: false);
     if (available.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tout le matériel du stock est déjà listé.'),
+        SnackBar(
+          content: Text(
+            catalog.isEmpty
+                ? 'Aucun matériel disponible dans le stock.'
+                : 'Tout le matériel du stock est déjà listé.',
+          ),
         ),
       );
       return;
     }
-    final picked = await showDialog<_PickedResource<EquipmentAsset>>(
+    final picked = await showDialog<_PickedResource<MaraudeResourceCatalogEquipment>>(
       context: context,
-      builder: (_) => _AddResourceDialog<EquipmentAsset>(
+      builder: (_) => _AddResourceDialog<MaraudeResourceCatalogEquipment>(
         title: 'Ajouter du matériel',
         items: available,
         labelFor: (item) => '${item.name} · ${item.quantityTotal} disponible(s)',

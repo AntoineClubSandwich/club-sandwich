@@ -51,7 +51,10 @@ class ConcertRepository {
     return row == null ? null : Concert.fromJson(row);
   }
 
-  Future<Concert> createConcert(ConcertDraft draft) async {
+  Future<Concert> createConcert(
+    ConcertDraft draft, {
+    bool asDraft = false,
+  }) async {
     final context = await _currentContext();
     final promoterOrganizationId =
         context.promoterOrganizationId ?? draft.promoterOrganizationId;
@@ -60,6 +63,7 @@ class ConcertRepository {
         .insert({
           ...draft.toJson(),
           'status': ConcertStatus.planned.jsonValue,
+          if (asDraft) 'maraude_status': MaraudeStatus.draft.jsonValue,
           'organization_id': context.organizationId,
           'created_by': context.userId,
           'promoter_organization_id': ?promoterOrganizationId,

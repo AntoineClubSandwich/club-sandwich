@@ -39,6 +39,38 @@ class MaraudeOperationRepository {
     );
   }
 
+  Future<List<MaraudeResourceCatalogConsumable>> fetchConsumableCatalog(
+    String concertId,
+  ) async {
+    final rows = await client.rpc<List<dynamic>>(
+      'get_maraude_consumable_catalog',
+      params: {'requested_concert_id': concertId},
+    );
+    return rows
+        .map(
+          (row) => MaraudeResourceCatalogConsumable.fromJson(
+            row as Map<String, dynamic>,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<List<MaraudeResourceCatalogEquipment>> fetchEquipmentCatalog(
+    String concertId,
+  ) async {
+    final rows = await client.rpc<List<dynamic>>(
+      'get_maraude_equipment_catalog',
+      params: {'requested_concert_id': concertId},
+    );
+    return rows
+        .map(
+          (row) => MaraudeResourceCatalogEquipment.fromJson(
+            row as Map<String, dynamic>,
+          ),
+        )
+        .toList(growable: false);
+  }
+
   Future<void> addResourceAllocation({
     required String concertId,
     String? consumableId,

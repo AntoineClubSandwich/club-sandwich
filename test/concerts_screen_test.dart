@@ -181,7 +181,10 @@ void main() {
         child: MaterialApp(
           theme: DsTheme.light,
           home: Scaffold(
-            body: ConcertForm(initialConcert: concert, onSubmit: (_) async {}),
+            body: ConcertForm(
+              initialConcert: concert,
+              onSubmit: (_, {required asDraft}) async {},
+            ),
           ),
         ),
       ),
@@ -290,7 +293,7 @@ void main() {
           home: Scaffold(
             body: ConcertForm(
               initialConcert: buildConcert(venue: testVenue),
-              onSubmit: (_) => completer.future,
+              onSubmit: (_, {required asDraft}) => completer.future,
             ),
           ),
         ),
@@ -836,13 +839,15 @@ class _FakeConcertRepository extends ConcertRepository {
   _FakeConcertRepository() : super(_testClient());
 
   ConcertDraft? createdDraft;
+  bool? createdAsDraft;
   String? updatedConcertId;
   ConcertDraft? updatedDraft;
   String? deletedConcertId;
 
   @override
-  Future<Concert> createConcert(ConcertDraft draft) async {
+  Future<Concert> createConcert(ConcertDraft draft, {bool asDraft = false}) async {
     createdDraft = draft;
+    createdAsDraft = asDraft;
     return buildConcert(
       artist: draft.artist,
       date: draft.date,

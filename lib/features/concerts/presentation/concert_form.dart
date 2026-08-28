@@ -16,7 +16,8 @@ class ConcertForm extends ConsumerStatefulWidget {
 
   final Concert? initialConcert;
   final List<Organization> promoterOrganizations;
-  final Future<void> Function(ConcertDraft draft) onSubmit;
+  final Future<void> Function(ConcertDraft draft, {required bool asDraft})
+  onSubmit;
 
   bool get isEditing => initialConcert != null;
 
@@ -36,6 +37,7 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
   Venue? _selectedVenue;
   String? _promoterOrganizationId;
   bool _isSubmitting = false;
+  bool _saveAsDraft = false;
 
   @override
   void initState() {
@@ -227,6 +229,22 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
                   minLines: 3,
                   maxLines: 3,
                 ),
+                if (!widget.isEditing) ...[
+                  const SizedBox(height: 8),
+                  CheckboxListTile(
+                    key: const ValueKey('concert-save-as-draft-checkbox'),
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: _saveAsDraft,
+                    onChanged: (value) =>
+                        setState(() => _saveAsDraft = value ?? false),
+                    title: const Text('Enregistrer comme brouillon'),
+                    subtitle: const Text(
+                      'Non visible des bénévoles tant qu’elle n’est pas '
+                      'publiée.',
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -248,6 +266,8 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
               : Text(
                   widget.isEditing
                       ? 'Enregistrer les modifications'
+                      : _saveAsDraft
+                      ? 'Enregistrer comme brouillon'
                       : 'Ouvrir la maraude',
                 ),
         ),
@@ -303,6 +323,7 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
             _promoterContactPhoneController.text,
           ),
         ),
+        asDraft: _saveAsDraft,
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
