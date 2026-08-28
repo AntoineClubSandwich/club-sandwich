@@ -1,5 +1,6 @@
 import 'package:club_sandwich/core/supabase/supabase_provider.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
+import 'package:club_sandwich/features/notifications/data/push_subscription_repository.dart';
 import 'package:club_sandwich/features/notifications/data/workflow_notification_repository.dart';
 import 'package:club_sandwich/features/notifications/domain/workflow_notification.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,3 +16,16 @@ final workflowNotificationsProvider =
       ref.watch(authStateProvider);
       return ref.watch(workflowNotificationRepositoryProvider).fetchMine();
     });
+
+final pushSubscriptionRepositoryProvider = Provider<PushSubscriptionRepository>(
+  (ref) => PushSubscriptionRepository(ref.watch(supabaseClientProvider)),
+);
+
+final pushSubscriptionStatusProvider = FutureProvider.autoDispose<bool>((
+  ref,
+) {
+  ref.watch(authStateProvider);
+  return ref
+      .watch(pushSubscriptionRepositoryProvider)
+      .isSubscribedOnThisDevice();
+});

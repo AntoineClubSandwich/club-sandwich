@@ -63,6 +63,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Pièce d’identité - Validé'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
 
     expect(find.text('Pièce d’identité - Validé'), findsOneWidget);
     expect(find.text('Carte de sécurité sociale - Refusé'), findsOneWidget);

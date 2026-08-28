@@ -10,8 +10,10 @@ import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
 import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
 import 'package:club_sandwich/design_system/widgets/club_sandwich_mascot.dart';
+import 'package:club_sandwich/core/config/environment.dart';
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
+import 'package:club_sandwich/features/notifications/data/workflow_notification_providers.dart';
 import 'package:club_sandwich/features/profiles/data/profile_providers.dart';
 import 'package:club_sandwich/features/profiles/domain/profile.dart';
 import 'package:club_sandwich/features/profiles/domain/volunteer_private_profile.dart';
@@ -74,6 +76,8 @@ class ProfileScreen extends ConsumerWidget {
                       ? const _EmptyProfile()
                       : _ProfileForm(profile: value),
                 ),
+                const SizedBox(height: DsSpacing.md),
+                const _NotificationSettingsCard(),
                 if (userContext?.role == AppUserRole.volunteer) ...[
                   const SizedBox(height: DsSpacing.md),
                   const _VolunteerPrivateInformation(),
@@ -112,6 +116,112 @@ class _EmptyProfile extends StatelessWidget {
               'Votre profil n’est pas disponible pour le moment.',
               style: DsTypography.body.copyWith(color: colors.textSecondary),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationSettingsCard extends ConsumerStatefulWidget {
+  const _NotificationSettingsCard();
+
+  @override
+  ConsumerState<_NotificationSettingsCard> createState() =>
+      _NotificationSettingsCardState();
+}
+
+class _NotificationSettingsCardState
+    extends ConsumerState<_NotificationSettingsCard> {
+  bool _working = false;
+
+  Future<void> _toggle(bool enable) async {
+    setState(() => _working = true);
+    try {
+      if (enable) {
+        await ref
+            .read(pushSubscriptionRepositoryProvider)
+            .enableOnThisDevice(Environment.vapidPublicKey);
+      } else {
+        await ref.read(pushSubscriptionRepositoryProvider).disableOnThisDevice();
+      }
+      ref.invalidate(pushSubscriptionStatusProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              enable
+                  ? 'Notifications activées sur cet appareil.'
+                  : 'Notifications désactivées sur cet appareil.',
+            ),
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              describeError(
+                error,
+                'Impossible de modifier les notifications de cet appareil.',
+              ),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DsTokens>()!.colors;
+    final status = ref.watch(pushSubscriptionStatusProvider);
+    final isSubscribed = status.value ?? false;
+    return DsCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(Icons.notifications_active_outlined, color: colors.textPrimary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Notifications sur cet appareil',
+                    style: DsTypography.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isSubscribed
+                        ? 'Activées : vous recevrez des notifications même '
+                              'quand l’onglet est fermé.'
+                        : 'Installez Club Sandwich sur votre téléphone puis '
+                              'activez-les ici pour ne rien manquer.',
+                    style: DsTypography.meta.copyWith(
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            _working
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Switch(
+                    value: isSubscribed,
+                    onChanged: status.isLoading ? null : _toggle,
+                  ),
           ],
         ),
       ),
