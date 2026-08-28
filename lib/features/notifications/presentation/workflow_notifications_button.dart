@@ -114,9 +114,11 @@ class _NotificationTile extends ConsumerWidget {
             .markAsRead(notification.id);
         ref.invalidate(workflowNotificationsProvider);
       }
-      if (!context.mounted || notification.concertId == null) return;
+      if (!context.mounted) return;
+      final destination = _destinationFor(notification);
+      if (destination == null) return;
       Navigator.of(context).pop();
-      context.go('/concerts/${notification.concertId}');
+      context.go(destination);
     }
 
     return DsPressable(
@@ -183,4 +185,25 @@ class _NotificationTile extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Where tapping this notification should take the user. Maraude-related
+/// notifications already carry a concert_id; the rest are routed by type
+/// (verified against every notify_user/notify_active_admins call site
+/// currently live, not just what happened to fire in this environment).
+String? _destinationFor(WorkflowNotification notification) {
+  if (notification.concertId != null) {
+    return '/maraudes/${notification.concertId}';
+  }
+  return switch (notification.type) {
+    'invitation_delivered' ||
+    'invitation_not_selected' ||
+    'invitation_selected' => '/invitations',
+    'volunteer_document_requested' ||
+    'volunteer_document_reviewed' ||
+    'volunteer_documents_missing' => '/profile',
+    'volunteer_document_submitted' => '/volunteers',
+    'organization_convention_submitted' => '/organizations',
+    _ => null,
+  };
 }
