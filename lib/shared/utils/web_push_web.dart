@@ -58,10 +58,18 @@ Future<WebPushSubscription> subscribeToWebPush(String vapidPublicKey) async {
 
 /// Returns the endpoint of the current subscription for this device, or
 /// null if this device was never subscribed.
+///
+/// Uses [web.ServiceWorkerContainer.getRegistration] rather than `.ready`:
+/// `.ready` only resolves once a service worker is actively controlling the
+/// page, so on a device that has never registered one (i.e. never opted in
+/// before) it hangs forever — which left the notification toggle stuck
+/// disabled, unable to ever complete its initial status check.
 Future<String?> currentWebPushEndpoint() async {
   try {
-    final registration = await web.window.navigator.serviceWorker.ready
+    final registration = await web.window.navigator.serviceWorker
+        .getRegistration()
         .toDart;
+    if (registration == null) return null;
     final subscription = await registration.pushManager.getSubscription().toDart;
     return subscription?.endpoint;
   } catch (_) {
@@ -72,8 +80,10 @@ Future<String?> currentWebPushEndpoint() async {
 /// Unsubscribes the current device from push, if it was subscribed.
 Future<void> unsubscribeFromWebPush() async {
   try {
-    final registration = await web.window.navigator.serviceWorker.ready
+    final registration = await web.window.navigator.serviceWorker
+        .getRegistration()
         .toDart;
+    if (registration == null) return;
     final subscription = await registration.pushManager.getSubscription().toDart;
     await subscription?.unsubscribe().toDart;
   } catch (_) {
