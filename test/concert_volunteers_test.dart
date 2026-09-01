@@ -1557,7 +1557,7 @@ void main() {
         MaraudeRole.teamLeader,
       );
       expect(
-        find.text('Équipe complète : un chef et au moins deux autres bénévoles.'),
+        find.text('Équipe complète : en attente des dernières confirmations.'),
         findsOneWidget,
       );
     },
@@ -1750,7 +1750,11 @@ void main() {
     expect(find.byType(DataTable), findsNothing);
     expect(find.text('4 / 3 bénévoles'), findsOneWidget);
     expect(
-      find.text('Équipe complète : un chef et au moins deux autres bénévoles.'),
+      find.text('Équipe confirmée : validez-la pour permettre le démarrage.'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('validate-team-from-summary')),
       findsOneWidget,
     );
     expect(find.text('Équipe retenue'), findsOneWidget);

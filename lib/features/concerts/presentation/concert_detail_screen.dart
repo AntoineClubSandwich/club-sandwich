@@ -2606,6 +2606,10 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
     final summary = _TeamBuilderSummary(
       applications: data.applications,
       minimumTeamSize: _minimumTeamSize,
+      maraudeStatus: widget.maraudeStatus,
+      canValidate: data.isAdmin,
+      isSubmitting: _isSubmitting,
+      onValidate: _validateTeam,
     );
 
     return LayoutBuilder(
@@ -2776,6 +2780,27 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       if (mounted) {
         setState(() => _updatingApplications.remove(applicationId));
       }
+    }
+  }
+
+  Future<void> _validateTeam() async {
+    setState(() => _isSubmitting = true);
+    try {
+      await ref
+          .read(concertRepositoryProvider)
+          .setMaraudeStatus(widget.concertId, MaraudeStatus.teamReady);
+      ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
+      ref.invalidate(concertDetailsProvider(widget.concertId));
+      ref.invalidate(concertsProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Équipe validée.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showError(describeError(error, 'Impossible de valider l’équipe.'));
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -3294,10 +3319,18 @@ class _TeamBuilderSummary extends StatelessWidget {
   const _TeamBuilderSummary({
     required this.applications,
     required this.minimumTeamSize,
+    required this.maraudeStatus,
+    required this.canValidate,
+    required this.isSubmitting,
+    required this.onValidate,
   });
 
   final List<ConcertVolunteerApplication> applications;
   final int minimumTeamSize;
+  final MaraudeStatus maraudeStatus;
+  final bool canValidate;
+  final bool isSubmitting;
+  final VoidCallback onValidate;
 
   List<ConcertVolunteerApplication> get _team => applications
       .where((application) => application.status == ConcertVolunteerStatus.selected)
@@ -3318,6 +3351,16 @@ class _TeamBuilderSummary extends StatelessWidget {
               VolunteerConfirmationStatus.confirmed,
         )
         .length;
+    final confirmedLeaderCount = team
+        .where(
+          (application) =>
+              application.confirmationStatus ==
+                  VolunteerConfirmationStatus.confirmed &&
+              application.teamRole == MaraudeRole.teamLeader,
+        )
+        .length;
+    final isReadyToValidate =
+        confirmedCount >= minimumTeamSize && confirmedLeaderCount == 1;
     final pendingConfirmationCount = team.length - confirmedCount;
     final colors = Theme.of(context).colorScheme;
 
@@ -3382,16 +3425,33 @@ class _TeamBuilderSummary extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    isValidTeam
-                        ? 'Équipe complète : un chef et au moins deux autres bénévoles.'
-                        : !hasMinimumSize
+                    !hasMinimumSize
                         ? 'Ajoutez au moins $minimumTeamSize bénévoles.'
-                        : 'Attribuez le rôle de chef d’équipe à une personne.',
+                        : !hasLeader
+                        ? 'Attribuez le rôle de chef d’équipe à une personne.'
+                        : maraudeStatus != MaraudeStatus.open
+                        ? 'Équipe complète : un chef et au moins deux autres bénévoles.'
+                        : isReadyToValidate
+                        ? (canValidate
+                              ? 'Équipe confirmée : validez-la pour permettre le démarrage.'
+                              : 'Équipe confirmée, en attente de validation par un administrateur.')
+                        : 'Équipe complète : en attente des dernières confirmations.',
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),
               ],
             ),
+            if (maraudeStatus == MaraudeStatus.open &&
+                isReadyToValidate &&
+                canValidate) ...[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                key: const ValueKey('validate-team-from-summary'),
+                onPressed: isSubmitting ? null : onValidate,
+                icon: const Icon(Icons.verified_outlined),
+                label: const Text('Valider l’équipe'),
+              ),
+            ],
           ],
         ),
       ),
