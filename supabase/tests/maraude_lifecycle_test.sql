@@ -288,7 +288,7 @@ select throws_ok(
     )
   $$,
   '22023',
-  'Une maraude archivée ne peut plus changer d''état',
+  'Seule une maraude planifiée peut être validée',
   'Une maraude clôturée ne revient pas à Équipe prête'
 );
 

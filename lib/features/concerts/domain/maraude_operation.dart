@@ -92,6 +92,8 @@ class MaraudeOverview {
     this.pendingApplicationCount = 0,
     required this.selectedCount,
     this.pendingConfirmationCount = 0,
+    this.confirmedCount = 0,
+    this.confirmedLeaderCount = 0,
     this.pendingCreditValidationCount = 0,
     required this.isAdmin,
     this.time,
@@ -122,6 +124,9 @@ class MaraudeOverview {
       selectedCount: (json['selected_count'] as num?)?.toInt() ?? 0,
       pendingConfirmationCount:
           (json['pending_confirmation_count'] as num?)?.toInt() ?? 0,
+      confirmedCount: (json['confirmed_count'] as num?)?.toInt() ?? 0,
+      confirmedLeaderCount:
+          (json['confirmed_leader_count'] as num?)?.toInt() ?? 0,
       pendingCreditValidationCount:
           (json['pending_credit_validation_count'] as num?)?.toInt() ?? 0,
       totalWeightKg: (json['total_weight_kg'] as num?)?.toDouble(),
@@ -154,6 +159,8 @@ class MaraudeOverview {
   final int pendingApplicationCount;
   final int selectedCount;
   final int pendingConfirmationCount;
+  final int confirmedCount;
+  final int confirmedLeaderCount;
   final int pendingCreditValidationCount;
   final double? totalWeightKg;
   final int? estimatedMeals;
@@ -166,6 +173,15 @@ class MaraudeOverview {
   /// volunteer hasn't applied to it yet.
   bool get isOpenForApplication =>
       maraudeStatus == MaraudeStatus.open && ownStatus == null;
+
+  /// Whether the team has confirmed enough members (3+, exactly one
+  /// confirmed team leader) for an admin to validate it — see
+  /// `set_maraude_status`'s `team_ready` gate, which enforces the same
+  /// rule server-side.
+  bool get isReadyForTeamValidation =>
+      maraudeStatus == MaraudeStatus.open &&
+      confirmedCount >= 3 &&
+      confirmedLeaderCount == 1;
 
   DateTime get recommendedArrival {
     final value = cateringClosesAt;

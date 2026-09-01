@@ -914,8 +914,20 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
               label: const Text('Corriger les horaires'),
             ),
           ],
-          if ((widget.canManage || widget.canComplete) &&
-              (concert.maraudeStatus == MaraudeStatus.open ||
+          if (widget.canManage &&
+              concert.maraudeStatus == MaraudeStatus.open) ...[
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              key: const ValueKey('validate-maraude-team'),
+              onPressed: _isSubmitting ? null : _validateTeam,
+              icon: const Icon(Icons.verified_outlined),
+              label: const Text('Valider l’équipe'),
+            ),
+          ],
+          if ((widget.canManage &&
+                  (concert.maraudeStatus == MaraudeStatus.open ||
+                      concert.maraudeStatus == MaraudeStatus.teamReady)) ||
+              (widget.canComplete &&
                   concert.maraudeStatus == MaraudeStatus.teamReady)) ...[
             const SizedBox(height: 16),
             FilledButton.icon(
@@ -944,6 +956,8 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
       ),
     );
   }
+
+  Future<void> _validateTeam() => _setStatus(MaraudeStatus.teamReady);
 
   Future<void> _startGuided() async {
     final changed = await _setStatus(MaraudeStatus.inProgress);

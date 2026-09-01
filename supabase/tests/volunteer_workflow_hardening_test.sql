@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(37);
+select plan(38);
 
 select has_table(
   'public',
@@ -339,17 +339,22 @@ select isnt_empty(
   'La lecture de la fiche de mission est horodatée'
 );
 
+select set_config(
+  'request.jwt.claim.sub',
+  '81000000-0000-0000-0000-000000000001',
+  true
+);
 select throws_ok(
   $$
     select public.set_maraude_status(
       '82000000-0000-0000-0000-000000000001',
-      'in_progress'::public.maraude_status,
+      'team_ready'::public.maraude_status,
       null
     )
   $$,
   '22023',
   'Trois bénévoles confirmés sont requis, dont exactement un chef d’équipe',
-  'La maraude ne démarre pas sans chef présent'
+  'L’administrateur ne peut pas valider une équipe incomplète'
 );
 
 select set_config(
@@ -399,6 +404,27 @@ select throws_ok(
   'Le chef ne renseigne pas les présences'
 );
 
+select set_config(
+  'request.jwt.claim.sub',
+  '81000000-0000-0000-0000-000000000001',
+  true
+);
+select lives_ok(
+  $$
+    select public.set_maraude_status(
+      '82000000-0000-0000-0000-000000000001',
+      'team_ready'::public.maraude_status,
+      null
+    )
+  $$,
+  'L’administrateur valide l’équipe désormais complète'
+);
+
+select set_config(
+  'request.jwt.claim.sub',
+  '81000000-0000-0000-0000-000000000002',
+  true
+);
 select lives_ok(
   $$
     select public.set_maraude_status(
@@ -407,7 +433,7 @@ select lives_ok(
       null
     )
   $$,
-  'Le chef confirmé démarre sans saisie de présence'
+  'Le chef confirmé démarre une fois l’équipe validée par l’admin'
 );
 
 select lives_ok(

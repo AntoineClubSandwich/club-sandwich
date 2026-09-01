@@ -598,10 +598,21 @@ class _AdminDashboard extends ConsumerWidget {
         )
         .toList();
     final todayIds = todayMaraudes.map((item) => item.concertId).toSet();
+    final teamsReadyToValidate = items
+        .where(
+          (item) =>
+              !todayIds.contains(item.concertId) &&
+              item.isReadyForTeamValidation,
+        )
+        .toList();
+    final readyToValidateIds = teamsReadyToValidate
+        .map((item) => item.concertId)
+        .toSet();
     final confirmationsPending = items
         .where(
           (item) =>
               !todayIds.contains(item.concertId) &&
+              !readyToValidateIds.contains(item.concertId) &&
               !item.date.isBefore(today) &&
               item.pendingConfirmationCount > 0 &&
               item.maraudeStatus != MaraudeStatus.completed &&
@@ -615,6 +626,7 @@ class _AdminDashboard extends ConsumerWidget {
         .where(
           (item) =>
               !todayIds.contains(item.concertId) &&
+              !readyToValidateIds.contains(item.concertId) &&
               !confirmationIds.contains(item.concertId) &&
               !item.date.isBefore(today) &&
               item.maraudeStatus == MaraudeStatus.open &&
@@ -628,6 +640,7 @@ class _AdminDashboard extends ConsumerWidget {
         .where(
           (item) =>
               !todayIds.contains(item.concertId) &&
+              !readyToValidateIds.contains(item.concertId) &&
               !applicationIds.contains(item.concertId) &&
               !confirmationIds.contains(item.concertId) &&
               !item.date.isBefore(today) &&
@@ -645,6 +658,7 @@ class _AdminDashboard extends ConsumerWidget {
               (item) =>
                   !item.date.isBefore(today) &&
                   !todayIds.contains(item.concertId) &&
+                  !readyToValidateIds.contains(item.concertId) &&
                   !applicationIds.contains(item.concertId) &&
                   !confirmationIds.contains(item.concertId) &&
                   !teamNotValidatedIds.contains(item.concertId) &&
@@ -713,6 +727,27 @@ class _AdminDashboard extends ConsumerWidget {
             .length ??
         0;
 
+    final actionableInvitations = invitations
+        .where(
+          (campaign) =>
+              campaign.status == InvitationCampaignStatus.open ||
+              campaign.status == InvitationCampaignStatus.draft ||
+              campaign.awaitingConfirmationCount > 0,
+        )
+        .toList(growable: false);
+    final pendingDocuments =
+        ref.watch(pendingVolunteerDocumentsProvider).value ??
+        const <PendingVolunteerDocument>[];
+    final maraudeActionsCount =
+        teamsReadyToValidate.length +
+        openWithApplications.length +
+        teamNotValidated.length +
+        confirmationsPending.length +
+        pastNotClosed.length +
+        creditsToValidate.length;
+    final totalActionsCount =
+        maraudeActionsCount + actionableInvitations.length + pendingDocuments.length;
+
     return Theme(
       data: DsTheme.light,
       child: Column(
@@ -725,18 +760,55 @@ class _AdminDashboard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: DsSpacing.xxl),
+          if (totalActionsCount > 0) ...[
+            DsSectionHeader(
+              title: 'Actions à effectuer',
+              subtitle: 'Ce qui a besoin de votre attention en priorité',
+              trailing: DsBadge(
+                label: '$totalActionsCount',
+                variant: DsSemanticVariant.warning,
+              ),
+            ),
+            const SizedBox(height: DsSpacing.lg),
+          ],
           _InvitationDashboardSection(
             role: AppUserRole.admin,
-            campaigns: invitations
-                .where(
-                  (campaign) =>
-                      campaign.status == InvitationCampaignStatus.open ||
-                      campaign.status == InvitationCampaignStatus.draft ||
-                      campaign.awaitingConfirmationCount > 0,
-                )
-                .toList(growable: false),
+            campaigns: actionableInvitations,
           ),
           const _PendingDocumentsSection(),
+          _PremiumMaraudeSection(
+            title: 'Équipes prêtes à valider',
+            items: teamsReadyToValidate,
+            actionLabel: 'Valider la maraude',
+          ),
+          _PremiumMaraudeSection(
+            title: 'Volontaires à examiner',
+            items: openWithApplications,
+            actionLabel: 'Constituer l’équipe',
+          ),
+          _PremiumMaraudeSection(
+            title: 'Équipes non validées',
+            items: teamNotValidated,
+            actionLabel: 'Valider l’organisation retenue',
+          ),
+          _PremiumMaraudeSection(
+            title: 'Confirmations bénévoles en attente',
+            items: confirmationsPending,
+            actionLabel: 'Suivre les confirmations',
+          ),
+          _PremiumMaraudeSection(
+            title: 'Maraudes passées non clôturées',
+            items: pastNotClosed,
+            actionLabel: 'Saisir le compte rendu',
+          ),
+          _PremiumMaraudeSection(
+            title: 'Présences et crédits à valider',
+            items: creditsToValidate,
+            actionLabelFor: (item) =>
+                '${item.pendingCreditValidationCount} '
+                '${item.pendingCreditValidationCount == 1 ? 'crédit à valider' : 'crédits à valider'}',
+          ),
+          if (totalActionsCount > 0) const SizedBox(height: DsSpacing.xxl),
           _FadeIn(
             child: _AdminKpiGrid(
               monthlyMaraudes: monthItems.length,
@@ -759,41 +831,14 @@ class _AdminDashboard extends ConsumerWidget {
           _FadeIn(child: _ActivityTimeline(history: history)),
           const SizedBox(height: DsSpacing.xxl),
           _PremiumMaraudeSection(
-            title: 'Prochaines maraudes',
-            items: upcoming.take(5).toList(),
-            actionLabel: 'Ouvrir la fiche opérationnelle',
-          ),
-          _PremiumMaraudeSection(
-            title: 'Volontaires à examiner',
-            items: openWithApplications,
-            actionLabel: 'Constituer l’équipe',
-          ),
-          _PremiumMaraudeSection(
-            title: 'Équipes non validées',
-            items: teamNotValidated,
-            actionLabel: 'Valider l’organisation retenue',
-          ),
-          _PremiumMaraudeSection(
-            title: 'Confirmations bénévoles en attente',
-            items: confirmationsPending,
-            actionLabel: 'Suivre les confirmations',
-          ),
-          _PremiumMaraudeSection(
             title: 'Aujourd’hui',
             items: todayMaraudes,
             actionLabelFor: _adminTodayAction,
           ),
           _PremiumMaraudeSection(
-            title: 'Maraudes passées non clôturées',
-            items: pastNotClosed,
-            actionLabel: 'Saisir le compte rendu',
-          ),
-          _PremiumMaraudeSection(
-            title: 'Présences et crédits à valider',
-            items: creditsToValidate,
-            actionLabelFor: (item) =>
-                '${item.pendingCreditValidationCount} '
-                '${item.pendingCreditValidationCount == 1 ? 'crédit à valider' : 'crédits à valider'}',
+            title: 'Prochaines maraudes',
+            items: upcoming.take(5).toList(),
+            actionLabel: 'Ouvrir la fiche opérationnelle',
           ),
         ],
       ),

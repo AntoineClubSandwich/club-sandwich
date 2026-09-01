@@ -951,7 +951,11 @@ void main() {
         ),
       ),
     );
-    await _pumpDetail(tester, repository);
+    await _pumpDetail(
+      tester,
+      repository,
+      maraudeStatus: MaraudeStatus.teamReady,
+    );
 
     expect(find.text('Voir mon profil'), findsNothing);
     expect(find.text('Préparer le démarrage de la maraude'), findsOneWidget);
