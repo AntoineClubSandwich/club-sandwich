@@ -301,6 +301,16 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
       return;
     }
 
+    final initial = widget.initialConcert;
+    if (initial != null &&
+        initial.selectedVolunteerCount > 0 &&
+        !_isSameDate(_date, initial.date)) {
+      final confirmed = await _confirmDateChangeResetsTeam(
+        initial.selectedVolunteerCount,
+      );
+      if (!confirmed) return;
+    }
+
     setState(() => _isSubmitting = true);
     try {
       await widget.onSubmit(
@@ -342,6 +352,37 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
         ),
       );
     }
+  }
+
+  bool _isSameDate(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  Future<bool> _confirmDateChangeResetsTeam(int selectedCount) async {
+    final label = selectedCount == 1
+        ? '1 bénévole est déjà positionné'
+        : '$selectedCount bénévoles sont déjà positionnés';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Changer la date de la maraude ?'),
+        content: Text(
+          '$label sur cette maraude. Changer la date les fera repasser '
+          'en attente de sélection : il faudra reconstituer l’équipe '
+          'pour la nouvelle date.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Changer la date quand même'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
   }
 }
 
