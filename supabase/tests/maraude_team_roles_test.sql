@@ -203,11 +203,15 @@ select results_eq(
   $$
     select count(*)::bigint
     from public.concert_volunteers
-    where status = 'selected'
-      and team_role = 'collection_distribution'
+    where id in (
+      '50000000-0000-0000-0000-000000000001',
+      '50000000-0000-0000-0000-000000000002'
+    )
+      and status = 'selected'
+      and team_role is null
   $$,
   array[2::bigint],
-  'La sélection groupée affecte le rôle Récolte et distribution par défaut'
+  'La sélection groupée n’invente aucun rôle par défaut : à attribuer explicitement'
 );
 
 select lives_ok(
