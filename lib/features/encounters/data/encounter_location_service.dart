@@ -45,33 +45,55 @@ class EncounterLocationService {
       );
     }
 
+    // A single getCurrentPosition() shot often returns an early, coarse fix
+    // (especially on web/mobile-browser geolocation) well above the 25 m
+    // bar, even though a much better fix arrives a few seconds later. Watch
+    // the position stream for a bounded window and keep the best sample
+    // seen, instead of failing on whatever the first callback reports.
+    Position? best;
+    final completer = Completer<void>();
+    StreamSubscription<Position>? subscription;
+    final timer = Timer(const Duration(seconds: 12), () {
+      if (!completer.isCompleted) completer.complete();
+    });
+
     try {
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.best,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
-      if (position.accuracy > maximumAcceptedAccuracyMeters) {
-        throw const EncounterLocationException(
-          EncounterLocationFailure.unavailable,
-        );
-      }
-      return EncounterPosition(
-        latitude: position.latitude,
-        longitude: position.longitude,
-        accuracy: position.accuracy,
-      );
-    } on EncounterLocationException {
-      rethrow;
-    } on TimeoutException {
-      throw const EncounterLocationException(
-        EncounterLocationFailure.unavailable,
-      );
-    } catch (_) {
+      subscription =
+          Geolocator.getPositionStream(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.best,
+            ),
+          ).listen(
+            (position) {
+              final current = best;
+              if (current == null || position.accuracy < current.accuracy) {
+                best = position;
+              }
+              if (position.accuracy <= maximumAcceptedAccuracyMeters &&
+                  !completer.isCompleted) {
+                completer.complete();
+              }
+            },
+            onError: (_) {
+              if (!completer.isCompleted) completer.complete();
+            },
+          );
+      await completer.future;
+    } finally {
+      timer.cancel();
+      await subscription?.cancel();
+    }
+
+    final result = best;
+    if (result == null || result.accuracy > maximumAcceptedAccuracyMeters) {
       throw const EncounterLocationException(
         EncounterLocationFailure.unavailable,
       );
     }
+    return EncounterPosition(
+      latitude: result.latitude,
+      longitude: result.longitude,
+      accuracy: result.accuracy,
+    );
   }
 }
