@@ -281,7 +281,7 @@ void main() {
     expect(find.text('Mon profil'), findsOneWidget);
     expect(find.text('Stock'), findsNothing);
     expect(find.text('Administration'), findsNothing);
-    expect(find.text('Carte des rencontres'), findsNothing);
+    expect(find.text('Carte des rencontres'), findsOneWidget);
   });
 
   testWidgets('valide le mot de passe et le profil à l’activation', (

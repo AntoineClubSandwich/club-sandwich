@@ -18,3 +18,9 @@ final adminEncounterMapProvider = FutureProvider.autoDispose
       ref.watch(authStateProvider);
       return ref.watch(encounterRepositoryProvider).fetchAdminMap(period);
     });
+
+final myEncounterMapProvider = FutureProvider.autoDispose
+    .family<List<MaraudeEncounter>, EncounterMapPeriod>((ref, period) {
+      ref.watch(authStateProvider);
+      return ref.watch(encounterRepositoryProvider).fetchMyMap(period);
+    });

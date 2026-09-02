@@ -43,4 +43,20 @@ class EncounterRepository {
         )
         .toList(growable: false);
   }
+
+  Future<List<MaraudeEncounter>> fetchMyMap(EncounterMapPeriod period) async {
+    final rows = await client.rpc<List<dynamic>>(
+      'get_my_encounter_map',
+      params: {
+        'requested_from': period.from.toUtc().toIso8601String(),
+        'requested_to': period.to.toUtc().toIso8601String(),
+      },
+    );
+    return rows
+        .map(
+          (row) =>
+              MaraudeEncounter.fromJson(Map<String, dynamic>.from(row as Map)),
+        )
+        .toList(growable: false);
+  }
 }

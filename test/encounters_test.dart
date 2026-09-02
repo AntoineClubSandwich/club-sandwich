@@ -79,6 +79,13 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            currentUserContextProvider.overrideWith(
+              (ref) async => const CurrentUserContext(
+                profileId: 'admin-1',
+                role: AppUserRole.admin,
+                status: UserAccountStatus.active,
+              ),
+            ),
             adminEncounterMapProvider.overrideWith(
               (ref, period) async => const [],
             ),

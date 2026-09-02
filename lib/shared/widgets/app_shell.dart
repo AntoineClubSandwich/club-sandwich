@@ -777,6 +777,12 @@ List<_AppDestination> _destinationsFor(AppUserRole role) {
       ),
       invitations,
       _AppDestination(
+        label: 'Carte des rencontres',
+        icon: Icons.map_outlined,
+        selectedIcon: Icons.map,
+        path: '/encounters-map',
+      ),
+      _AppDestination(
         label: 'Mon profil',
         icon: Icons.person_outline,
         selectedIcon: Icons.person,

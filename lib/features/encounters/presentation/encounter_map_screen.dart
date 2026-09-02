@@ -5,6 +5,8 @@ import 'package:club_sandwich/design_system/tokens/ds_spacing.dart';
 import 'package:club_sandwich/design_system/tokens/ds_theme.dart';
 import 'package:club_sandwich/design_system/tokens/ds_tokens.dart';
 import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
+import 'package:club_sandwich/features/auth/application/auth_providers.dart';
+import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/encounters/data/encounter_providers.dart';
 import 'package:club_sandwich/features/encounters/domain/encounter_cluster.dart';
 import 'package:club_sandwich/features/encounters/domain/maraude_encounter.dart';
@@ -76,7 +78,13 @@ class _EncounterMapScreenState extends ConsumerState<EncounterMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final encounters = ref.watch(adminEncounterMapProvider(_period));
+    final isAdmin =
+        ref.watch(currentUserContextProvider).value?.role ==
+        AppUserRole.admin;
+    final mapProvider = isAdmin
+        ? adminEncounterMapProvider(_period)
+        : myEncounterMapProvider(_period);
+    final encounters = ref.watch(mapProvider);
     return Theme(
       data: DsTheme.light,
       child: Scaffold(
@@ -94,7 +102,7 @@ class _EncounterMapScreenState extends ConsumerState<EncounterMapScreen> {
             ),
             error: (_, _) => AppErrorState(
               message: 'Impossible de charger la carte des rencontres.',
-              onRetry: () => ref.invalidate(adminEncounterMapProvider(_period)),
+              onRetry: () => ref.invalidate(mapProvider),
             ),
             data: _buildContent,
           ),

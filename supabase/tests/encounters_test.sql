@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(19);
+select plan(22);
 
 select has_table(
   'public',
@@ -32,6 +32,12 @@ select has_function(
   'get_admin_encounter_map',
   array['timestamp with time zone', 'timestamp with time zone', 'uuid', 'uuid', 'uuid'],
   'La carte Admin est alimentée par une RPC groupée'
+);
+select has_function(
+  'public',
+  'get_my_encounter_map',
+  array['timestamp with time zone', 'timestamp with time zone'],
+  'La carte personnelle du bénévole est alimentée par une RPC dédiée'
 );
 
 insert into auth.users (id, email, raw_user_meta_data)
@@ -261,6 +267,42 @@ select throws_ok(
   '42501',
   'Carte des rencontres inaccessible',
   'Un bénévole ne peut pas appeler la carte globale'
+);
+
+select results_eq(
+  $$
+    select artist, venue_name, cardinality(team_names)
+    from public.get_my_encounter_map(
+      clock_timestamp() - interval '1 day',
+      clock_timestamp() + interval '1 day'
+    )
+  $$,
+  $$ values ('Rencontres test'::text, 'Salle carte rencontres'::text, 1) $$,
+  'Un bénévole affecté voit la rencontre de sa propre maraude sur sa carte'
+);
+
+select set_config(
+  'request.jwt.claim.sub',
+  '94000000-0000-0000-0000-000000000003',
+  true
+);
+
+select is(
+  (
+    select count(*)
+    from public.get_my_encounter_map(
+      clock_timestamp() - interval '1 day',
+      clock_timestamp() + interval '1 day'
+    )
+  ),
+  0::bigint,
+  'Un bénévole extérieur ne voit rien sur sa carte personnelle'
+);
+
+select set_config(
+  'request.jwt.claim.sub',
+  '94000000-0000-0000-0000-000000000002',
+  true
 );
 
 reset role;
