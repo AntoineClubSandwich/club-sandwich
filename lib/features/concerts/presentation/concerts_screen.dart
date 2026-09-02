@@ -1013,8 +1013,8 @@ MaraudeCalendarItem _concertCalendarItem(Concert concert) {
   if (concert.maraudeStatus == MaraudeStatus.inProgress) {
     return ('En cours', MaraudeCalendarTone.primary);
   }
-  if (concert.selectedVolunteerCount >= 4) {
-    return ('Préparation · Équipe complète', MaraudeCalendarTone.green);
+  if (concert.maraudeStatus == MaraudeStatus.teamReady) {
+    return ('Préparation · Équipe validée', MaraudeCalendarTone.green);
   }
   return ('Préparation · Équipe incomplète', MaraudeCalendarTone.tertiary);
 }
