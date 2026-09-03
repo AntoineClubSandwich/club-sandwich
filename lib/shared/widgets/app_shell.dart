@@ -756,6 +756,12 @@ List<_AppDestination> _destinationsFor(AppUserRole role) {
         path: '/invitations',
       ),
       _AppDestination(
+        label: 'Carte des rencontres',
+        icon: Icons.map_outlined,
+        selectedIcon: Icons.map,
+        path: '/encounters-map',
+      ),
+      _AppDestination(
         label: 'Mon compte',
         icon: Icons.account_circle_outlined,
         selectedIcon: Icons.account_circle,

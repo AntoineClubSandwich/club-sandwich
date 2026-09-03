@@ -268,7 +268,7 @@ void main() {
     expect(find.text('Organisations'), findsNothing);
     expect(find.text('Stock'), findsNothing);
     expect(find.text('Administration'), findsNothing);
-    expect(find.text('Carte des rencontres'), findsNothing);
+    expect(find.text('Carte des rencontres'), findsOneWidget);
   });
 
   testWidgets('affiche la navigation personnelle du Bénévole', (tester) async {

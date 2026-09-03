@@ -251,6 +251,7 @@ bool _isAllowed(AppUserRole role, String location) {
       AppRoutes.dashboard,
       AppRoutes.maraudes,
       AppRoutes.invitations,
+      AppRoutes.encounterMap,
       AppRoutes.account,
     },
     AppUserRole.volunteer => {
