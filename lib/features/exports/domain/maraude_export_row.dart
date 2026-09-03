@@ -10,7 +10,6 @@ class MaraudeExportRow {
     this.durationHours,
     this.distanceKm,
     this.totalWeightKg,
-    this.estimatedMeals,
     this.distributedMeals,
     this.estimatedBeneficiaries,
     required this.volunteerCount,
@@ -34,7 +33,6 @@ class MaraudeExportRow {
       durationHours: (json['duration_hours'] as num?)?.toDouble(),
       distanceKm: (json['distance_km'] as num?)?.toDouble(),
       totalWeightKg: (json['total_weight_kg'] as num?)?.toDouble(),
-      estimatedMeals: (json['estimated_meals'] as num?)?.toInt(),
       distributedMeals: (json['distributed_meals'] as num?)?.toInt(),
       estimatedBeneficiaries: (json['estimated_beneficiaries'] as num?)
           ?.toInt(),
@@ -54,7 +52,6 @@ class MaraudeExportRow {
   final double? durationHours;
   final double? distanceKm;
   final double? totalWeightKg;
-  final int? estimatedMeals;
   final int? distributedMeals;
   final int? estimatedBeneficiaries;
   final int volunteerCount;
