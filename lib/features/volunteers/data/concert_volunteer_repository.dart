@@ -23,32 +23,37 @@ class ConcertVolunteerRepository {
 
   final SupabaseClient client;
 
+  /// A single RPC round-trip (`get_concert_volunteer_bundle`, mirroring the
+  /// "mode terrain" operation screen's one-bundle pattern) instead of the
+  /// six separate calls this used to make: one blocking expiry sweep that
+  /// doesn't belong on a read path, a duplicate current-account fetch
+  /// (already available from [currentUserContextProvider] on screen), and
+  /// counts/access/applications each as their own round-trip.
   Future<ConcertVolunteerSectionData> fetchSection(String concertId) async {
     final userId = _requireUserId();
-    await client.rpc<int>('expire_volunteer_confirmations');
-    final results = await Future.wait<Object?>([
-      _fetchCounts(concertId),
-      _fetchAccess(concertId),
-      _fetchCurrentAccount(),
-    ]);
+    final result = await client.rpc<Object?>(
+      'get_concert_volunteer_bundle',
+      params: {'requested_concert_id': concertId},
+    );
+    final bundle = Map<String, dynamic>.from(result! as Map);
 
-    final counts = results[0]! as ConcertVolunteerCounts;
-    final access = results[1]! as _ConcertAccess;
-    final account = results[2]! as _CurrentAccount;
-    if (account.profileId != userId ||
-        account.status != UserAccountStatus.active) {
-      throw const AuthException('Compte utilisateur inactif.');
-    }
+    final isAdmin = bundle['is_admin'] as bool;
+    final isPromoter = bundle['is_promoter'] as bool;
+    final canViewApplications = bundle['can_view_applications'] as bool;
+    final canManageConcert = bundle['can_manage_concert'] as bool;
+    final canApply = bundle['can_apply'] as bool;
+    final counts = ConcertVolunteerCounts.fromJson(
+      bundle['counts'] as Map<String, dynamic>,
+    );
 
-    final isAdmin = account.role == AppUserRole.admin;
-    final isPromoter = account.role == AppUserRole.promoter;
-    final isVolunteer = account.role == AppUserRole.volunteer;
-    final canViewApplications =
-        isAdmin || (isPromoter && access.canViewApplications);
-    final canApply = isVolunteer && access.canApply;
-    final details = canViewApplications || canApply
-        ? await _fetchDetails(concertId, isPromoter: isPromoter)
-        : const <ConcertVolunteerApplication>[];
+    final applicationRows = (bundle['applications'] as List)
+        .map((row) => Map<String, dynamic>.from(row as Map))
+        .toList(growable: false);
+    await _resolveApplicationAvatarRows(applicationRows);
+    final details = applicationRows
+        .map(ConcertVolunteerApplication.fromJson)
+        .toList(growable: false);
+
     final ownApplication = canApply
         ? details
               .where((application) => application.userId == userId)
@@ -63,10 +68,10 @@ class ConcertVolunteerRepository {
       counts: counts,
       isAdmin: isAdmin,
       isPromoter: isPromoter,
-      activeRole: account.role,
+      activeRole: AppUserRole.fromJson(bundle['role'] as String),
       currentUserId: userId,
       canViewApplications: canViewApplications,
-      canManageConcert: isAdmin || (isPromoter && access.canManageConcert),
+      canManageConcert: canManageConcert,
       canApply: canApply,
       applications: applications,
     );
@@ -293,109 +298,6 @@ class ConcertVolunteerRepository {
     return userId;
   }
 
-  Future<ConcertVolunteerCounts> _fetchCounts(String concertId) async {
-    final rows = await client.rpc<List<dynamic>>(
-      'get_concert_volunteer_counts',
-      params: {'requested_concert_id': concertId},
-    );
-    if (rows.isEmpty) return const ConcertVolunteerCounts.empty();
-    return ConcertVolunteerCounts.fromJson(rows.first! as Map<String, dynamic>);
-  }
-
-  Future<_ConcertAccess> _fetchAccess(String concertId) async {
-    final rows = await client.rpc<List<dynamic>>(
-      'get_concert_access',
-      params: {'requested_concert_id': concertId},
-    );
-    if (rows.isEmpty) return const _ConcertAccess();
-    return _ConcertAccess.fromJson(rows.first! as Map<String, dynamic>);
-  }
-
-  Future<_CurrentAccount> _fetchCurrentAccount() async {
-    final rows = await client.rpc<List<dynamic>>('get_current_user_context');
-    if (rows.isEmpty) {
-      throw const AuthException('Compte utilisateur introuvable.');
-    }
-    return _CurrentAccount.fromJson(rows.first! as Map<String, dynamic>);
-  }
-
-  Future<List<ConcertVolunteerApplication>> _fetchDetails(
-    String concertId, {
-    required bool isPromoter,
-  }) async {
-    final rows = await client.rpc<List<dynamic>>(
-      isPromoter
-          ? 'get_promoter_concert_applications'
-          : 'get_concert_volunteer_team_details',
-      params: {'requested_concert_id': concertId},
-    );
-
-    final jsonRows = rows
-        .map((row) => Map<String, dynamic>.from(row! as Map))
-        .toList(growable: false);
-    await _resolveApplicationAvatarRows(jsonRows);
-    final applications = jsonRows
-        .map(ConcertVolunteerApplication.fromJson)
-        .toList(growable: false);
-    if (isPromoter || applications.isEmpty) return applications;
-
-    final confirmationRows = await client
-        .from('concert_volunteers')
-        .select(
-          'id, confirmation_status, confirmation_requested_at, '
-          'confirmation_due_at, confirmation_responded_at, '
-          'role_acknowledged_at, attendance_validated_at, '
-          'attendance_validated_by, last_modified_by',
-        )
-        .eq('concert_id', concertId);
-    final confirmations = {
-      for (final row in confirmationRows) row['id'] as String: row,
-    };
-
-    return applications
-        .map((application) {
-          final confirmation = confirmations[application.id];
-          if (confirmation == null) return application;
-          return application.copyWith(
-            confirmationStatus: confirmation['confirmation_status'] == null
-                ? null
-                : VolunteerConfirmationStatus.fromDatabase(
-                    confirmation['confirmation_status'] as String,
-                  ),
-            confirmationRequestedAt:
-                confirmation['confirmation_requested_at'] == null
-                ? null
-                : DateTime.parse(
-                    confirmation['confirmation_requested_at'] as String,
-                  ),
-            confirmationDueAt: confirmation['confirmation_due_at'] == null
-                ? null
-                : DateTime.parse(confirmation['confirmation_due_at'] as String),
-            confirmationRespondedAt:
-                confirmation['confirmation_responded_at'] == null
-                ? null
-                : DateTime.parse(
-                    confirmation['confirmation_responded_at'] as String,
-                  ),
-            roleAcknowledgedAt: confirmation['role_acknowledged_at'] == null
-                ? null
-                : DateTime.parse(
-                    confirmation['role_acknowledged_at'] as String,
-                  ),
-            attendanceValidatedAt:
-                confirmation['attendance_validated_at'] == null
-                ? null
-                : DateTime.parse(
-                    confirmation['attendance_validated_at'] as String,
-                  ),
-            attendanceValidatedBy:
-                confirmation['attendance_validated_by'] as String?,
-            lastModifiedBy: confirmation['last_modified_by'] as String?,
-          );
-        })
-        .toList(growable: false);
-  }
-
   Future<void> _resolveFlatAvatarRows(List<Map<String, dynamic>> rows) async {
     final signedUrls = await resolveAvatarUrls(
       client,
@@ -436,44 +338,4 @@ class ConcertVolunteerRepository {
       }
     }
   }
-}
-
-class _ConcertAccess {
-  const _ConcertAccess({
-    this.canViewApplications = false,
-    this.canManageConcert = false,
-    this.canApply = false,
-  });
-
-  factory _ConcertAccess.fromJson(Map<String, dynamic> json) {
-    return _ConcertAccess(
-      canViewApplications: json['can_view_applications'] as bool? ?? false,
-      canManageConcert: json['can_manage_concert'] as bool? ?? false,
-      canApply: json['can_apply'] as bool? ?? false,
-    );
-  }
-
-  final bool canViewApplications;
-  final bool canManageConcert;
-  final bool canApply;
-}
-
-class _CurrentAccount {
-  const _CurrentAccount({
-    required this.profileId,
-    required this.role,
-    required this.status,
-  });
-
-  factory _CurrentAccount.fromJson(Map<String, dynamic> json) {
-    return _CurrentAccount(
-      profileId: json['profile_id'] as String,
-      role: AppUserRole.fromJson(json['role'] as String),
-      status: UserAccountStatus.fromJson(json['status'] as String),
-    );
-  }
-
-  final String profileId;
-  final AppUserRole role;
-  final UserAccountStatus status;
 }

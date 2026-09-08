@@ -721,11 +721,26 @@ class _NextActionCard extends StatelessWidget {
     }
     if (ownApplication?.status == ConcertVolunteerStatus.selected &&
         ownApplication?.confirmationStatus ==
+            VolunteerConfirmationStatus.pending &&
+        !(ownApplication?.teamRoleLocked ?? false)) {
+      // Selected, but the admin hasn't locked a role yet - there is
+      // nothing to confirm, so don't invite the action (same fix as the
+      // "Équipe" tab card and its confirm button - see 27f7dc8).
+      return (
+        'En attente de l’attribution de votre rôle',
+        'L’équipe organisatrice doit encore vous attribuer et verrouiller '
+            'un rôle avant que vous puissiez confirmer.',
+        _MaraudeWorkspace.team,
+        'Consulter',
+        null,
+      );
+    }
+    if (ownApplication?.status == ConcertVolunteerStatus.selected &&
+        ownApplication?.confirmationStatus ==
             VolunteerConfirmationStatus.pending) {
       return (
         'Confirmer votre participation',
-        ownApplication?.confirmationDueAt == null ||
-                !(ownApplication?.teamRoleLocked ?? false)
+        ownApplication?.confirmationDueAt == null
             ? 'Consultez votre rôle et votre fiche de mission.'
             : 'Confirmation attendue avant le '
                   '${formatFrenchDateTime(ownApplication!.confirmationDueAt!)}.',

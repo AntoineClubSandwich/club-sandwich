@@ -262,86 +262,45 @@ void main() {
         final client = await _authenticatedClient((request) async {
           requests.add(request);
           final path = request.url.path;
-          if (path.endsWith('/expire_volunteer_confirmations')) {
-            return Response('0', 200, headers: _jsonHeaders, request: request);
-          }
-          if (path.endsWith('/get_concert_volunteer_counts')) {
+          if (path.endsWith('/get_concert_volunteer_bundle')) {
             return Response(
-              jsonEncode([
-                {'application_count': 1, 'selected_count': 0},
-              ]),
-              200,
-              headers: _jsonHeaders,
-              request: request,
-            );
-          }
-          if (path.endsWith('/get_concert_access')) {
-            return Response(
-              jsonEncode([
-                {
-                  'is_admin': true,
-                  'is_promoter': false,
-                  'can_view_applications': false,
-                  'can_manage_concert': false,
-                  'can_apply': true,
-                },
-              ]),
-              200,
-              headers: _jsonHeaders,
-              request: request,
-            );
-          }
-          if (path.endsWith('/get_current_user_context')) {
-            return Response(
-              jsonEncode([
-                {'profile_id': 'user-id', 'role': 'admin', 'status': 'active'},
-              ]),
-              200,
-              headers: _jsonHeaders,
-              request: request,
-            );
-          }
-          if (path.endsWith('/get_concert_volunteer_team_details')) {
-            return Response(
-              jsonEncode([
-                {
-                  ..._applicationJson(),
-                  'first_name': 'Camille',
-                  'last_name': 'Martin',
-                  'phone': '+33 6 00 00 00 00',
-                  'has_driving_license': true,
-                  'total_applications': 12,
-                  'selected_applications': 8,
-                  'not_selected_applications': 2,
-                  'withdrawn_applications': 1,
-                  'attendance_status': 'present',
-                  'last_selected_date': '2026-07-15',
-                  'history': [
-                    {
-                      'concert_id': 'recent-concert',
-                      'concert_date': '2026-07-15',
-                      'artist': 'The Blaze',
-                      'venue_name': 'Olympia',
-                      'status': 'selected',
-                    },
-                  ],
-                },
-              ]),
-              200,
-              headers: _jsonHeaders,
-              request: request,
-            );
-          }
-          if (path.endsWith('/concert_volunteers')) {
-            return Response(
-              jsonEncode([
-                {
-                  'id': 'application-id',
-                  'confirmation_status': 'confirmed',
-                  'confirmation_requested_at': '2026-07-25T10:00:00.000Z',
-                  'confirmation_responded_at': '2026-07-25T10:05:00.000Z',
-                },
-              ]),
+              jsonEncode({
+                'current_user_id': 'user-id',
+                'role': 'admin',
+                'is_admin': true,
+                'is_promoter': false,
+                'can_view_applications': true,
+                'can_manage_concert': false,
+                'can_apply': false,
+                'counts': {'application_count': 1, 'selected_count': 0},
+                'applications': [
+                  {
+                    ..._applicationJson(),
+                    'first_name': 'Camille',
+                    'last_name': 'Martin',
+                    'phone': '+33 6 00 00 00 00',
+                    'has_driving_license': true,
+                    'total_applications': 12,
+                    'selected_applications': 8,
+                    'not_selected_applications': 2,
+                    'withdrawn_applications': 1,
+                    'attendance_status': 'present',
+                    'last_selected_date': '2026-07-15',
+                    'confirmation_status': 'confirmed',
+                    'confirmation_requested_at': '2026-07-25T10:00:00.000Z',
+                    'confirmation_responded_at': '2026-07-25T10:05:00.000Z',
+                    'history': [
+                      {
+                        'concert_id': 'recent-concert',
+                        'concert_date': '2026-07-15',
+                        'artist': 'The Blaze',
+                        'venue_name': 'Olympia',
+                        'status': 'selected',
+                      },
+                    ],
+                  },
+                ],
+              }),
               200,
               headers: _jsonHeaders,
               request: request,
@@ -366,17 +325,9 @@ void main() {
           section.applications.single.attendanceStatus,
           VolunteerAttendanceStatus.present,
         );
-        expect(requests, hasLength(6));
-        expect(
-          requests
-              .where(
-                (request) => request.url.path.endsWith(
-                  '/get_concert_volunteer_team_details',
-                ),
-              )
-              .length,
-          1,
-        );
+        // The whole point of this fix: one round-trip instead of six.
+        expect(requests, hasLength(1));
+        expect(requests.single.url.path, endsWith('/get_concert_volunteer_bundle'));
       },
     );
 
@@ -387,69 +338,36 @@ void main() {
         final client = await _authenticatedClient((request) async {
           requests.add(request);
           final path = request.url.path;
-          if (path.endsWith('/expire_volunteer_confirmations')) {
-            return Response('0', 200, headers: _jsonHeaders, request: request);
-          }
-          if (path.endsWith('/get_concert_volunteer_counts')) {
+          if (path.endsWith('/get_concert_volunteer_bundle')) {
             return Response(
-              jsonEncode([
-                {
+              jsonEncode({
+                'current_user_id': 'user-id',
+                'role': 'promoter',
+                'is_admin': false,
+                'is_promoter': true,
+                'can_view_applications': true,
+                'can_manage_concert': true,
+                'can_apply': false,
+                'counts': {
                   'application_count': 1,
                   'selected_count': 0,
                   'present_count': 0,
                   'absent_count': 0,
                 },
-              ]),
-              200,
-              headers: _jsonHeaders,
-              request: request,
-            );
-          }
-          if (path.endsWith('/get_concert_access')) {
-            return Response(
-              jsonEncode([
-                {
-                  'is_admin': false,
-                  'is_promoter': true,
-                  'can_view_applications': true,
-                  'can_manage_concert': true,
-                  'can_apply': false,
-                },
-              ]),
-              200,
-              headers: _jsonHeaders,
-              request: request,
-            );
-          }
-          if (path.endsWith('/get_current_user_context')) {
-            return Response(
-              jsonEncode([
-                {
-                  'profile_id': 'user-id',
-                  'role': 'promoter',
-                  'status': 'active',
-                },
-              ]),
-              200,
-              headers: _jsonHeaders,
-              request: request,
-            );
-          }
-          if (path.endsWith('/get_promoter_concert_applications')) {
-            return Response(
-              jsonEncode([
-                {
-                  ..._applicationJson(),
-                  'first_name': 'Camille',
-                  'last_name': 'Martin',
-                  'avatar_url': null,
-                  'total_applications': 0,
-                  'selected_applications': 0,
-                  'not_selected_applications': 0,
-                  'withdrawn_applications': 0,
-                  'history': const [],
-                },
-              ]),
+                'applications': [
+                  {
+                    ..._applicationJson(),
+                    'first_name': 'Camille',
+                    'last_name': 'Martin',
+                    'avatar_url': null,
+                    'total_applications': 0,
+                    'selected_applications': 0,
+                    'not_selected_applications': 0,
+                    'withdrawn_applications': 0,
+                    'history': const [],
+                  },
+                ],
+              }),
               200,
               headers: _jsonHeaders,
               request: request,
@@ -469,13 +387,8 @@ void main() {
         expect(section.ownApplication, isNull);
         expect(section.applications.single.displayName, 'Camille Martin');
         expect(section.applications.single.profile?.phone, isNull);
-        expect(
-          requests.where(
-            (request) =>
-                request.url.path.endsWith('/get_promoter_concert_applications'),
-          ),
-          hasLength(1),
-        );
+        expect(requests, hasLength(1));
+        expect(requests.single.url.path, endsWith('/get_concert_volunteer_bundle'));
       },
     );
 
@@ -884,6 +797,15 @@ void main() {
 
       expect(find.text('Confirmation demandée'), findsOneWidget);
       expect(find.text('Je confirme ma participation'), findsNothing);
+      // Same fix, applied to the "Prochaine action" banner: it must not
+      // invite a confirmation that isn't possible yet either (reported
+      // live - the banner still said "Confirmer" after the card itself
+      // was fixed).
+      expect(find.text('Confirmer votre participation'), findsNothing);
+      expect(
+        find.text('En attente de l’attribution de votre rôle'),
+        findsOneWidget,
+      );
     },
   );
 
