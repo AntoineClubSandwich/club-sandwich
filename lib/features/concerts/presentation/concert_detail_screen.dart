@@ -2495,7 +2495,8 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
                       ownApplication.status ==
                           ConcertVolunteerStatus.selected &&
                       ownApplication.confirmationStatus ==
-                          VolunteerConfirmationStatus.pending
+                          VolunteerConfirmationStatus.pending &&
+                      ownApplication.teamRoleLocked
                   ? _confirmParticipation
                   : null,
               onReapply:
@@ -2905,7 +2906,8 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
         application.userId != section.currentUserId ||
         application.status != ConcertVolunteerStatus.selected ||
         application.confirmationStatus != VolunteerConfirmationStatus.pending ||
-        application.teamRole == null) {
+        application.teamRole == null ||
+        !application.teamRoleLocked) {
       return;
     }
 

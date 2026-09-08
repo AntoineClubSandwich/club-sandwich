@@ -869,6 +869,24 @@ void main() {
     expect(repository.ownApplication!.status, ConcertVolunteerStatus.withdrawn);
   });
 
+  testWidgets(
+    'un bénévole sélectionné ne peut pas confirmer avant que son rôle soit verrouillé',
+    (tester) async {
+      final repository = _FakeConcertVolunteerRepository(
+        ownApplication: _application(
+          status: ConcertVolunteerStatus.selected,
+          confirmationStatus: VolunteerConfirmationStatus.pending,
+          teamRole: MaraudeRole.collectionDistribution,
+          teamRoleLocked: false,
+        ),
+      );
+      await _pumpDetail(tester, repository);
+
+      expect(find.text('Confirmation demandée'), findsOneWidget);
+      expect(find.text('Je confirme ma participation'), findsNothing);
+    },
+  );
+
   testWidgets('un bénévole sélectionné confirme sa participation', (
     tester,
   ) async {
@@ -877,6 +895,7 @@ void main() {
         status: ConcertVolunteerStatus.selected,
         confirmationStatus: VolunteerConfirmationStatus.pending,
         teamRole: MaraudeRole.collectionDistribution,
+        teamRoleLocked: true,
       ),
     );
     await _pumpDetail(tester, repository);
