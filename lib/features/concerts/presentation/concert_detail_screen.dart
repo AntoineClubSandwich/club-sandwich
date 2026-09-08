@@ -2589,9 +2589,7 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
           for (final application in visibleApplications)
             _TeamCandidateCard(
               application: application,
-              selectedRole: application.status == ConcertVolunteerStatus.selected
-                  ? application.teamRole
-                  : null,
+              selectedRole: application.teamRole,
               isUpdating: _updatingApplications.contains(application.id),
               isRoleAvailable: (role) =>
                   _isRoleAvailable(role, application.id, data.applications),
@@ -3581,12 +3579,16 @@ class _TeamCandidateCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final profile = application.profile;
     final statistics = application.statistics;
-    final isSelected = selectedRole != null;
-    final effectiveStatus = isSelected
-        ? ConcertVolunteerStatus.selected
-        : application.status == ConcertVolunteerStatus.selected
-        ? ConcertVolunteerStatus.notSelected
-        : application.status;
+    // A volunteer is "selected" the moment status says so - team_role can
+    // still be null at that point (assigning a role is now a separate,
+    // later step, since e609149 made it immediate rather than part of a
+    // single batch save). Deriving isSelected from the role instead used
+    // to be correct back when a role was assigned in the same save, but
+    // it left a freshly-selected, roleless volunteer looking unselected
+    // here - showing "Sélectionner" again instead of the role picker,
+    // with no way to actually assign them a role from this card.
+    final isSelected = application.status == ConcertVolunteerStatus.selected;
+    final effectiveStatus = application.status;
 
     return Card(
       key: ValueKey('volunteer-card-${application.id}'),

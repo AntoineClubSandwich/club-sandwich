@@ -1202,8 +1202,21 @@ void main() {
     await tester.tap(find.text('Équipe').last);
     await tester.pump();
     expect(find.text('2 / 3 bénévoles'), findsOneWidget);
-    expect(find.text('Camille Martin'), findsWidgets);
-    expect(find.text('Récolte & distribution'), findsWidgets);
+    // Camille has no role yet (selecting no longer defaults one, see
+    // e52fdaf), so she isn't listed under any role heading here - but she
+    // must still be reachable to give her one, which is the point of this
+    // test: back on "Volontaires", her card now offers the role picker
+    // instead of showing "Sélectionner" again.
+    await tester.tap(find.text('Volontaires').last);
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('select-volunteer-pending-id')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('team-role-pending-id-teamLeader')),
+      findsOneWidget,
+    );
     expect(
       repository.applications
           .firstWhere((application) => application.id == 'pending-id')
@@ -2345,10 +2358,11 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
       final index = applications.indexWhere(
         (application) => application.id == applicationId,
       );
+      // Mirrors select_concert_volunteers: selection never assigns a
+      // default role (see e52fdaf) - that's a separate, later admin step.
       applications[index] = applications[index].copyWith(
         status: ConcertVolunteerStatus.selected,
-        teamRole:
-            applications[index].teamRole ?? MaraudeRole.collectionDistribution,
+        teamRole: applications[index].teamRole,
         attendanceStatus:
             applications[index].attendanceStatus ??
             VolunteerAttendanceStatus.pending,
