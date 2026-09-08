@@ -115,15 +115,23 @@ async function sendEmail(
       subject: message.subject,
       textContent: `${message.body}\n\nOuvrir Club Sandwich : ${actionUrl}`,
       htmlContent: `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto">
-          <h2 style="color:#303b91">Club Sandwich</h2>
-          <p>${escapeHtml(message.body)}</p>
-          <p style="margin-top:28px">
-            <a href="${actionUrl}" style="background:#303b91;color:white;
-              padding:12px 18px;border-radius:8px;text-decoration:none">
-              Ouvrir Club Sandwich
-            </a>
-          </p>
+        <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;
+          margin:auto;color:#1a1a2e">
+          <div style="background:#303b91;padding:20px 28px;border-radius:
+            12px 12px 0 0">
+            <h1 style="color:#fff;margin:0;font-size:18px">Club Sandwich</h1>
+          </div>
+          <div style="border:1px solid #e5e5ea;border-top:none;padding:
+            24px 28px;border-radius:0 0 12px 12px">
+            ${renderBodyHtml(message.body)}
+            <p style="margin:28px 0 0">
+              <a href="${actionUrl}" style="background:#303b91;color:#fff;
+                padding:12px 20px;border-radius:8px;text-decoration:none;
+                display:inline-block;font-weight:bold">
+                Ouvrir Club Sandwich
+              </a>
+            </p>
+          </div>
         </div>
       `,
       tags: ["workflow"],
@@ -134,6 +142,49 @@ async function sendEmail(
     throw new Error(payload.message ?? `Brevo HTTP ${result.status}`);
   }
   return payload.messageId ?? null;
+}
+
+// Notification bodies (private.maraude_role_mission_email_body and
+// friends) are plain text: blank-line-separated sections, each optionally
+// starting with a heading line followed by "- " bullet lines (mission
+// sheets), or just plain sentences (simpler notifications). Dumping that
+// straight into a single <p> collapsed every newline and bullet into one
+// unreadable run-on paragraph - this rebuilds real headings/lists/
+// paragraphs from the same plain-text convention instead.
+function renderBodyHtml(body: string): string {
+  const blocks = body
+    .split(/\n\s*\n/)
+    .map((block) => block.split("\n").filter((line) => line.trim().length > 0))
+    .filter((lines) => lines.length > 0);
+
+  return blocks.map((lines) => {
+    const isBullet = (line: string) => line.trimStart().startsWith("- ");
+    const bulletCount = lines.filter(isBullet).length;
+
+    if (bulletCount === lines.length) {
+      return renderList(lines);
+    }
+    if (lines.length > 1 && bulletCount === lines.length - 1 && !isBullet(lines[0])) {
+      return renderHeading(lines[0]) + renderList(lines.slice(1));
+    }
+    return `<p style="margin:0 0 16px;line-height:1.5">${
+      lines.map(escapeHtml).join("<br>")
+    }</p>`;
+  }).join("");
+}
+
+function renderHeading(text: string): string {
+  return `<h3 style="margin:20px 0 8px;color:#303b91;font-size:15px">${
+    escapeHtml(text)
+  }</h3>`;
+}
+
+function renderList(lines: string[]): string {
+  const items = lines.map((line) => line.trimStart().replace(/^- /, ""));
+  return `<ul style="margin:0 0 16px;padding-left:20px;line-height:1.5">${
+    items.map((item) => `<li style="margin-bottom:4px">${escapeHtml(item)}</li>`)
+      .join("")
+  }</ul>`;
 }
 
 function escapeHtml(value: string): string {
