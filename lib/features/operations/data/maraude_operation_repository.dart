@@ -107,11 +107,15 @@ class MaraudeOperationRepository {
     );
   }
 
+  /// [averageWeightKg] is the weight of one box, estimated on the ground
+  /// (nobody weighs every box) - the total is computed server-side by
+  /// multiplying by [boxCount], never the other way around. See
+  /// 20260908004000_fix_operation_collection_weight_direction.sql.
   Future<MaraudeCollection> saveCollection({
     required String concertId,
     required String description,
     required int boxCount,
-    required double weightKg,
+    required double averageWeightKg,
     String? collectionId,
     String? comment,
   }) async {
@@ -123,7 +127,7 @@ class MaraudeOperationRepository {
             'requested_collection_id': collectionId,
             'requested_description': description,
             'requested_box_count': boxCount,
-            'requested_weight_kg': weightKg,
+            'requested_average_weight_kg': averageWeightKg,
             'requested_comment': comment,
           },
         )

@@ -414,7 +414,7 @@ class _MaraudeOperationScreenState
             collectionId: line?.id,
             description: result.description,
             boxCount: result.boxes,
-            weightKg: result.weightKg,
+            averageWeightKg: result.averageWeightKg,
           ),
       line == null ? 'Plat ajouté.' : 'Plat modifié.',
     );
@@ -1232,10 +1232,10 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _CollectionInput {
-  const _CollectionInput(this.description, this.boxes, this.weightKg);
+  const _CollectionInput(this.description, this.boxes, this.averageWeightKg);
   final String description;
   final int boxes;
-  final double weightKg;
+  final double averageWeightKg;
 }
 
 class _CollectionDialog extends StatefulWidget {
@@ -1255,7 +1255,9 @@ class _CollectionDialogState extends State<_CollectionDialog> {
     text: widget.line == null ? '' : '${widget.line!.quantity.round()}',
   );
   late final _weight = TextEditingController(
-    text: widget.line == null ? '' : _number(widget.line!.weightKg ?? 0),
+    text: widget.line == null
+        ? ''
+        : _number(widget.line!.averageWeightKg ?? 0),
   );
 
   @override
@@ -1264,6 +1266,15 @@ class _CollectionDialogState extends State<_CollectionDialog> {
     _boxes.dispose();
     _weight.dispose();
     super.dispose();
+  }
+
+  String _calculatedTotalLabel() {
+    final boxes = int.tryParse(_boxes.text.trim());
+    final average = double.tryParse(
+      _weight.text.trim().replaceAll(',', '.'),
+    );
+    if (boxes == null || average == null) return '-';
+    return '${_number(boxes * average)} kg';
   }
 
   @override
@@ -1291,6 +1302,7 @@ class _CollectionDialogState extends State<_CollectionDialog> {
               controller: _boxes,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Nombre de boîtes'),
+              onChanged: (_) => setState(() {}),
               validator: (value) => (int.tryParse(value ?? '') ?? 0) <= 0
                   ? 'Saisissez au moins une boîte'
                   : null,
@@ -1301,10 +1313,19 @@ class _CollectionDialogState extends State<_CollectionDialog> {
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
-              decoration: const InputDecoration(labelText: 'Poids total (kg)'),
+              decoration: const InputDecoration(
+                labelText: 'Poids moyen d’une boîte (kg)',
+                hintText: 'Ex. : 0,45',
+              ),
+              onChanged: (_) => setState(() {}),
               validator: (value) => _tryDouble(value ?? '') <= 0
                   ? 'Saisissez un poids supérieur à zéro'
                   : null,
+            ),
+            const SizedBox(height: DsSpacing.sm),
+            Text(
+              'Poids total calculé : ${_calculatedTotalLabel()}',
+              style: Theme.of(context).textTheme.titleSmall,
             ),
           ],
         ),

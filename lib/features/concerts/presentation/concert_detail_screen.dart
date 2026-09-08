@@ -1763,15 +1763,12 @@ class _CollectionItem extends StatelessWidget {
                         '${formatCollectionNumber(collection.quantity)} '
                         'plats',
                       ),
-                      if (collection.averageWeightKg != null)
-                        Text(
-                          'Poids moyen : '
-                          '${formatCollectionNumber(collection.averageWeightKg!)} kg',
-                        ),
-                      if (collection.weightKg != null)
+                      // Total only, never the average - a report showing
+                      // "poids moyen" reads as more precise than it is.
+                      if (_totalWeightKg(collection) != null)
                         Text(
                           'Poids total : '
-                          '${formatCollectionNumber(collection.weightKg!)} kg',
+                          '${formatCollectionNumber(_totalWeightKg(collection)!)} kg',
                         ),
                     ],
                   ),
@@ -1823,6 +1820,12 @@ class _CollectionItem extends StatelessWidget {
 }
 
 enum _CollectionAction { edit, delete }
+
+double? _totalWeightKg(MaraudeCollection collection) {
+  if (collection.weightKg != null) return collection.weightKg;
+  if (collection.averageWeightKg == null) return null;
+  return collection.quantity * collection.averageWeightKg!;
+}
 
 String _valueOrDash(String? value) {
   final trimmed = value?.trim();
