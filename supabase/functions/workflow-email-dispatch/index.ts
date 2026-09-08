@@ -24,7 +24,10 @@ Deno.serve(async (request) => {
     .lt("claimed_at", new Date(Date.now() - 10 * 60_000).toISOString());
   const { data: deliveries, error } = await supabase
     .from("workflow_email_deliveries")
-    .select("id, user_id, concert_id, subject, body, attempts")
+    .select(
+      "id, user_id, concert_id, subject, body, attempts, " +
+        "concert_artist, concert_date, concert_time, venue_name, venue_address",
+    )
     .eq("status", "pending")
     .lte("next_attempt_at", new Date().toISOString())
     .order("created_at")
@@ -54,7 +57,7 @@ Deno.serve(async (request) => {
 
       const messageId = await sendEmail(apiKey, {
         email,
-        subject: delivery.subject,
+        subject: buildSubject(delivery),
         body: delivery.body,
         concertId: delivery.concert_id,
       });
@@ -83,6 +86,26 @@ Deno.serve(async (request) => {
 
   return response({ processed: deliveries?.length ?? 0, sent, failed });
 });
+
+// "[Club Sandwich] — {date} — {lieu} — {titre}" for a concert-scoped
+// delivery (French day + month name - Intl, not Postgres' locale-
+// dependent to_char, which is why this is built here and not in SQL),
+// "[Club Sandwich] — {titre}" otherwise (documents, conventions,
+// invitations - nothing concert-scoped to anchor a date/lieu to).
+function buildSubject(delivery: {
+  subject: string;
+  concert_date: string | null;
+  venue_name: string | null;
+}): string {
+  if (delivery.concert_date && delivery.venue_name) {
+    const formattedDate = new Intl.DateTimeFormat("fr-FR", {
+      day: "numeric",
+      month: "long",
+    }).format(new Date(`${delivery.concert_date}T00:00:00`));
+    return `[Club Sandwich] — ${formattedDate} — ${delivery.venue_name} — ${delivery.subject}`;
+  }
+  return `[Club Sandwich] — ${delivery.subject}`;
+}
 
 async function sendEmail(
   apiKey: string,
