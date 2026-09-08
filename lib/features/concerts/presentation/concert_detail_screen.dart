@@ -724,7 +724,8 @@ class _NextActionCard extends StatelessWidget {
             VolunteerConfirmationStatus.pending) {
       return (
         'Confirmer votre participation',
-        ownApplication?.confirmationDueAt == null
+        ownApplication?.confirmationDueAt == null ||
+                !(ownApplication?.teamRoleLocked ?? false)
             ? 'Consultez votre rôle et votre fiche de mission.'
             : 'Confirmation attendue avant le '
                   '${formatFrenchDateTime(ownApplication!.confirmationDueAt!)}.',
@@ -3165,7 +3166,8 @@ class _OwnApplication extends StatelessWidget {
             Text('Rôle : ${application.teamRole!.label}'),
           if (application.confirmationStatus ==
                   VolunteerConfirmationStatus.pending &&
-              application.confirmationDueAt != null)
+              application.confirmationDueAt != null &&
+              application.teamRoleLocked)
             Text(
               'À confirmer avant le '
               '${formatFrenchDateTime(application.confirmationDueAt!)}',
