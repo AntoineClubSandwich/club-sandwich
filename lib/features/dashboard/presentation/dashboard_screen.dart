@@ -760,6 +760,14 @@ class _AdminDashboard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: DsSpacing.xxl),
+          // Ce qui se passe aujourd'hui doit être vu sans avoir à scroller
+          // au-delà des KPI/actions rapides/activité - c'est ce qui presse
+          // le plus, donc ça passe avant même le backlog d'actions.
+          _PremiumMaraudeSection(
+            title: 'Aujourd’hui',
+            items: todayMaraudes,
+            actionLabelFor: _adminTodayAction,
+          ),
           if (totalActionsCount > 0) ...[
             DsSectionHeader(
               title: 'Actions à effectuer',
@@ -830,11 +838,6 @@ class _AdminDashboard extends ConsumerWidget {
           const SizedBox(height: DsSpacing.xxl),
           _FadeIn(child: _ActivityTimeline(history: history)),
           const SizedBox(height: DsSpacing.xxl),
-          _PremiumMaraudeSection(
-            title: 'Aujourd’hui',
-            items: todayMaraudes,
-            actionLabelFor: _adminTodayAction,
-          ),
           _PremiumMaraudeSection(
             title: 'Prochaines maraudes',
             items: upcoming.take(5).toList(),

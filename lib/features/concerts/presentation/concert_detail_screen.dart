@@ -793,7 +793,8 @@ class _NextActionCard extends StatelessWidget {
     if (isAdmin) {
       return (
         'Constituer et confirmer l’équipe',
-        'Un chef d’équipe confirmé est obligatoire avant le démarrage.',
+        'Trois bénévoles confirmés, dont un chef d’équipe, sont requis '
+            'avant le démarrage.',
         _MaraudeWorkspace.team,
         'Gérer l’équipe',
         null,
