@@ -25,8 +25,9 @@ Deno.serve(async (request) => {
   const { data: deliveries, error } = await supabase
     .from("workflow_email_deliveries")
     .select(
-      "id, user_id, concert_id, subject, body, attempts, " +
-        "concert_artist, concert_date, concert_time, venue_name, venue_address",
+      "id, user_id, concert_id, subject, body, attempts, notification_type, " +
+        "concert_artist, concert_date, concert_time, venue_name, venue_address, " +
+        "recipient_first_name, role_label",
     )
     .eq("status", "pending")
     .lte("next_attempt_at", new Date().toISOString())
@@ -60,6 +61,14 @@ Deno.serve(async (request) => {
         subject: buildSubject(delivery),
         body: delivery.body,
         concertId: delivery.concert_id,
+        notificationType: delivery.notification_type,
+        concertArtist: delivery.concert_artist,
+        concertDate: delivery.concert_date,
+        concertTime: delivery.concert_time,
+        venueName: delivery.venue_name,
+        venueAddress: delivery.venue_address,
+        recipientFirstName: delivery.recipient_first_name,
+        roleLabel: delivery.role_label,
       });
       await supabase.from("workflow_email_deliveries").update({
         status: "sent",
@@ -107,14 +116,24 @@ function buildSubject(delivery: {
   return `[Club Sandwich] — ${delivery.subject}`;
 }
 
+interface EmailMessage {
+  email: string;
+  subject: string;
+  body: string;
+  concertId: string | null;
+  notificationType: string | null;
+  concertArtist: string | null;
+  concertDate: string | null;
+  concertTime: string | null;
+  venueName: string | null;
+  venueAddress: string | null;
+  recipientFirstName: string | null;
+  roleLabel: string | null;
+}
+
 async function sendEmail(
   apiKey: string,
-  message: {
-    email: string;
-    subject: string;
-    body: string;
-    concertId: string | null;
-  },
+  message: EmailMessage,
 ): Promise<string | null> {
   const appUrl = Deno.env.get("APP_BASE_URL") ??
     "https://club-sandwich-preprod.netlify.app";
@@ -137,26 +156,7 @@ async function sendEmail(
       to: [{ email: message.email }],
       subject: message.subject,
       textContent: `${message.body}\n\nOuvrir Club Sandwich : ${actionUrl}`,
-      htmlContent: `
-        <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;
-          margin:auto;color:#1a1a2e">
-          <div style="background:#303b91;padding:20px 28px;border-radius:
-            12px 12px 0 0">
-            <h1 style="color:#fff;margin:0;font-size:18px">Club Sandwich</h1>
-          </div>
-          <div style="border:1px solid #e5e5ea;border-top:none;padding:
-            24px 28px;border-radius:0 0 12px 12px">
-            ${renderBodyHtml(message.body)}
-            <p style="margin:28px 0 0">
-              <a href="${actionUrl}" style="background:#303b91;color:#fff;
-                padding:12px 20px;border-radius:8px;text-decoration:none;
-                display:inline-block;font-weight:bold">
-                Ouvrir Club Sandwich
-              </a>
-            </p>
-          </div>
-        </div>
-      `,
+      htmlContent: buildEmailHtml(message, actionUrl),
       tags: ["workflow"],
     }),
   });
@@ -165,6 +165,106 @@ async function sendEmail(
     throw new Error(payload.message ?? `Brevo HTTP ${result.status}`);
   }
   return payload.messageId ?? null;
+}
+
+const CARD_STYLE =
+  "border:1px solid #e5e5ea;border-top:none;padding:24px 28px;" +
+  "border-radius:0 0 12px 12px";
+
+// Every email shares the same header/card/button shell. Mission-sheet
+// emails (the 4 role emails, spec section 5) additionally get the fixed
+// 9-block structure - salutation, role confirmation, a practical-info
+// block, then the mission content, then a signature - built from the
+// structured facts enqueue_workflow_email() now captures. Every other
+// notification keeps the plain single-body rendering: that structure is
+// scoped to the role emails specifically, not a general template change.
+function buildEmailHtml(message: EmailMessage, actionUrl: string): string {
+  const content = message.notificationType === "mission_sheet"
+    ? buildMissionSheetContent(message)
+    : renderBodyHtml(message.body);
+
+  return `
+    <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;
+      margin:auto;color:#1a1a2e">
+      <div style="background:#303b91;padding:20px 28px;border-radius:
+        12px 12px 0 0">
+        <h1 style="color:#fff;margin:0;font-size:18px">Club Sandwich</h1>
+      </div>
+      <div style="${CARD_STYLE}">
+        ${content}
+        <p style="margin:28px 0 0">
+          <a href="${actionUrl}" style="background:#303b91;color:#fff;
+            padding:12px 20px;border-radius:8px;text-decoration:none;
+            display:inline-block;font-weight:bold">
+            Ouvrir Club Sandwich
+          </a>
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+function buildMissionSheetContent(message: EmailMessage): string {
+  const salutation = message.recipientFirstName
+    ? `Bonjour ${escapeHtml(message.recipientFirstName)},`
+    : "Bonjour,";
+
+  const confirmation = message.concertArtist && message.roleLabel
+    ? `Votre participation à la maraude ${
+      escapeHtml(message.concertArtist)
+    } est confirmée en tant que <strong>${
+      escapeHtml(message.roleLabel)
+    }</strong>.`
+    : "Votre participation est confirmée.";
+
+  return `
+    <p style="margin:0 0 4px;line-height:1.5">${salutation}</p>
+    <p style="margin:0 0 20px;line-height:1.5">${confirmation}</p>
+    ${buildPracticalInfoBlock(message)}
+    ${renderBodyHtml(message.body)}
+    <p style="margin:24px 0 0;line-height:1.5">L’équipe Club Sandwich</p>
+  `;
+}
+
+function buildPracticalInfoBlock(message: EmailMessage): string {
+  const rows: Array<[string, string]> = [];
+  if (message.concertDate) {
+    const formatted = new Intl.DateTimeFormat("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(new Date(`${message.concertDate}T00:00:00`));
+    rows.push(["Date", formatted]);
+  }
+  if (message.concertTime) {
+    rows.push(["Heure de rendez-vous", message.concertTime.slice(0, 5)]);
+  }
+  if (message.venueName) rows.push(["Lieu", message.venueName]);
+  if (message.venueAddress) rows.push(["Adresse", message.venueAddress]);
+
+  if (rows.length === 0) return "";
+
+  const rowsHtml = rows.map(([label, value]) =>
+    `<tr>
+      <td style="padding:4px 12px 4px 0;color:#5a5a6e;white-space:nowrap;
+        vertical-align:top">${escapeHtml(label)}</td>
+      <td style="padding:4px 0;font-weight:600">${escapeHtml(value)}</td>
+    </tr>`
+  ).join("");
+
+  return `
+    <div style="background:#f4f4f8;border-radius:10px;padding:14px 18px;
+      margin:0 0 20px">
+      <p style="margin:0 0 8px;font-weight:700;color:#303b91;
+        font-size:13px;text-transform:uppercase;letter-spacing:.03em">
+        Informations pratiques
+      </p>
+      <table style="border-collapse:collapse;font-size:14px">
+        ${rowsHtml}
+      </table>
+    </div>
+  `;
 }
 
 // Notification bodies (private.maraude_role_mission_email_body and
