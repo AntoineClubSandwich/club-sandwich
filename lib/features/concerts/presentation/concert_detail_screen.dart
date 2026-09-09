@@ -838,6 +838,20 @@ class _MaraudeSection extends ConsumerStatefulWidget {
 
 class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
   bool _isSubmitting = false;
+  // Status picked from the dropdown but not yet applied - a deliberate
+  // "select then validate" step so a mis-click doesn't fire a status
+  // change (and its notifications) straight away. The Form lets us
+  // revert an abandoned pick back to its initialValue on cancel.
+  MaraudeStatus? _pendingStatus;
+  final _statusFormKey = GlobalKey<FormState>();
+
+  @override
+  void didUpdateWidget(covariant _MaraudeSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.concert.maraudeStatus != widget.concert.maraudeStatus) {
+      _pendingStatus = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -868,26 +882,54 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
           if (widget.canManage &&
               concert.maraudeStatus != MaraudeStatus.completed &&
               concert.maraudeStatus != MaraudeStatus.cancelled) ...[
-            DropdownButtonFormField<MaraudeStatus>(
-              key: const ValueKey('maraude-status-selector'),
-              initialValue: concert.maraudeStatus,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Modifier l’état'),
-              items: [
-                // L'annulation passe par son propre bouton (confirmation +
-                // motif + notifications) - jamais par ce sélecteur générique.
-                for (final status in MaraudeStatus.values)
-                  if (status != MaraudeStatus.cancelled)
-                    DropdownMenuItem(value: status, child: Text(status.label)),
-              ],
-              onChanged: _isSubmitting
-                  ? null
-                  : (status) {
-                      if (status != null && status != concert.maraudeStatus) {
-                        _setStatus(status);
-                      }
-                    },
+            Form(
+              key: _statusFormKey,
+              child: DropdownButtonFormField<MaraudeStatus>(
+                key: const ValueKey('maraude-status-selector'),
+                initialValue: concert.maraudeStatus,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Modifier l’état',
+                ),
+                items: [
+                  // L'annulation passe par son propre bouton (confirmation +
+                  // motif + notifications) - jamais par ce sélecteur
+                  // générique.
+                  for (final status in MaraudeStatus.values)
+                    if (status != MaraudeStatus.cancelled)
+                      DropdownMenuItem(
+                        value: status,
+                        child: Text(status.label),
+                      ),
+                ],
+                onChanged: _isSubmitting
+                    ? null
+                    : (status) => setState(() => _pendingStatus = status),
+              ),
             ),
+            if (_pendingStatus != null &&
+                _pendingStatus != concert.maraudeStatus) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      key: const ValueKey('confirm-maraude-status'),
+                      onPressed: _isSubmitting
+                          ? null
+                          : _confirmPendingStatus,
+                      icon: const Icon(Icons.check),
+                      label: const Text('Valider le statut'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: _isSubmitting ? null : _cancelPendingStatus,
+                    child: const Text('Annuler'),
+                  ),
+                ],
+              ),
+            ],
             if (_isSubmitting) ...[
               const SizedBox(height: 12),
               const LinearProgressIndicator(),
@@ -1048,6 +1090,18 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
       successMessage: 'État de la maraude mis à jour.',
       errorMessage: 'Impossible de modifier l’état de la maraude.',
     );
+  }
+
+  Future<void> _confirmPendingStatus() async {
+    final status = _pendingStatus;
+    if (status == null) return;
+    final changed = await _setStatus(status);
+    if (changed && mounted) setState(() => _pendingStatus = null);
+  }
+
+  void _cancelPendingStatus() {
+    setState(() => _pendingStatus = null);
+    _statusFormKey.currentState?.reset();
   }
 
   Future<bool> _changeStatus({

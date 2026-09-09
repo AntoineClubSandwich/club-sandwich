@@ -674,6 +674,8 @@ void main() {
     );
     await tester.tap(find.text('En cours').last);
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('confirm-maraude-status')));
+    await tester.pumpAndSettle();
 
     expect(find.text('En cours'), findsWidgets);
     expect(find.text('27 juillet 2026\n21:12'), findsOneWidget);
@@ -683,6 +685,8 @@ void main() {
     await tester.tap(selector);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Terminée').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('confirm-maraude-status')));
     await tester.pumpAndSettle();
 
     expect(find.text('Terminée'), findsWidgets);
@@ -695,6 +699,60 @@ void main() {
     expect(repository.startCount, 1);
     expect(repository.completeCount, 1);
   });
+
+  testWidgets(
+    'sélectionner un état dans le sélecteur ne l’applique pas sans validation',
+    (tester) async {
+      final repository = _FakeLifecycleConcertRepository();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            concertRepositoryProvider.overrideWithValue(repository),
+            concertDetailsProvider.overrideWith(
+              (ref, concertId) async => repository.concert,
+            ),
+            concertVolunteerSectionProvider.overrideWith(
+              (ref, concertId) async => const ConcertVolunteerSectionData(
+                counts: ConcertVolunteerCounts.empty(),
+                isAdmin: true,
+                applications: [],
+              ),
+            ),
+          ],
+          child: const MaterialApp(
+            home: ConcertDetailScreen(concertId: 'concert-id'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('maraude-workspace-operations')),
+      );
+      await tester.pumpAndSettle();
+
+      final selector = find.byKey(const ValueKey('maraude-status-selector'));
+      await tester.ensureVisible(selector);
+      await tester.tap(selector);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('En cours').last);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('confirm-maraude-status')),
+        findsOneWidget,
+      );
+      expect(repository.startCount, 0);
+
+      await tester.tap(find.text('Annuler'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('confirm-maraude-status')),
+        findsNothing,
+      );
+      expect(repository.startCount, 0);
+    },
+  );
 
   testWidgets('un administrateur annule une maraude avec un motif', (
     tester,
