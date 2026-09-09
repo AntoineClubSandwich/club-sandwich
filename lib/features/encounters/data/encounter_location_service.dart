@@ -36,7 +36,17 @@ class EncounterLocationService {
 
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      await Geolocator.requestPermission();
+      // On web, requestPermission() triggers the browser prompt by firing
+      // a real getCurrentPosition() probe and maps ANY failure of that
+      // probe - not just an actual browser denial, but also a plain
+      // POSITION_UNAVAILABLE (no GPS/WiFi fix yet, common indoors on a
+      // laptop) - to deniedForever. Re-check via checkPermission(), which
+      // reads the browser's real permission state (navigator.permissions
+      // .query) instead of trusting that probe's conflated result -
+      // otherwise a slow first fix reads as "permission denied" and sends
+      // the user to check a browser setting that was never the problem.
+      permission = await Geolocator.checkPermission();
     }
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
