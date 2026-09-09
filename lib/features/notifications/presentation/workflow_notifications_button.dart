@@ -26,7 +26,7 @@ class WorkflowNotificationsButton extends ConsumerWidget {
     final unreadCount = ref
         .watch(workflowNotificationsProvider)
         .value
-        ?.where((item) => !item.isRead)
+        ?.where((item) => item.needsAttention)
         .length;
     return DsNotificationBadge(
       count: unreadCount ?? 0,
@@ -142,9 +142,9 @@ class _NotificationTile extends ConsumerWidget {
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: notification.isRead
-                      ? Colors.transparent
-                      : colors.primary,
+                  color: notification.needsAttention
+                      ? colors.primary
+                      : Colors.transparent,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -158,9 +158,9 @@ class _NotificationTile extends ConsumerWidget {
                     notification.title,
                     style: DsTypography.body.copyWith(
                       color: colors.textPrimary,
-                      fontWeight: notification.isRead
-                          ? FontWeight.w600
-                          : FontWeight.w800,
+                      fontWeight: notification.needsAttention
+                          ? FontWeight.w800
+                          : FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 2),

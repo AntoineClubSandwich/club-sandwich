@@ -7,6 +7,7 @@ class WorkflowNotification {
     required this.createdAt,
     this.concertId,
     this.readAt,
+    this.resolvedAt,
   });
 
   factory WorkflowNotification.fromJson(Map<String, dynamic> json) {
@@ -19,6 +20,9 @@ class WorkflowNotification {
       readAt: json['read_at'] == null
           ? null
           : DateTime.parse(json['read_at'] as String),
+      resolvedAt: json['resolved_at'] == null
+          ? null
+          : DateTime.parse(json['resolved_at'] as String),
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
@@ -29,7 +33,15 @@ class WorkflowNotification {
   final String title;
   final String body;
   final DateTime? readAt;
+  final DateTime? resolvedAt;
   final DateTime createdAt;
 
   bool get isRead => readAt != null;
+
+  /// The action this notification asked for was completed (e.g. the
+  /// volunteer confirmed, or the ask became moot) before it was ever
+  /// opened - it shouldn't keep demanding attention either way.
+  bool get isResolved => resolvedAt != null;
+
+  bool get needsAttention => !isRead && !isResolved;
 }

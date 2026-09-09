@@ -20,6 +20,27 @@ void main() {
     expect(read.isRead, isTrue);
   });
 
+  test(
+    'une notification résolue automatiquement n’exige plus d’attention',
+    () {
+      final pending = WorkflowNotification.fromJson(_notificationJson());
+      final resolved = WorkflowNotification.fromJson(
+        _notificationJson(
+          resolvedAt: '2026-07-29T13:00:00.000Z',
+        ),
+      );
+      final read = WorkflowNotification.fromJson(
+        _notificationJson(readAt: '2026-07-29T12:30:00.000Z'),
+      );
+
+      expect(pending.needsAttention, isTrue);
+      expect(resolved.isRead, isFalse);
+      expect(resolved.isResolved, isTrue);
+      expect(resolved.needsAttention, isFalse);
+      expect(read.needsAttention, isFalse);
+    },
+  );
+
   test('charge les notifications et marque une ligne comme lue', () async {
     final requests = <Request>[];
     final httpClient = MockClient((request) async {
@@ -57,12 +78,13 @@ void main() {
   });
 }
 
-Map<String, dynamic> _notificationJson({String? readAt}) => {
+Map<String, dynamic> _notificationJson({String? readAt, String? resolvedAt}) => {
   'id': 'notification-id',
   'concert_id': 'concert-id',
   'notification_type': 'role_changed',
   'title': 'Votre rôle a changé',
   'body': 'Consultez votre nouvelle fiche de mission.',
   'read_at': readAt,
+  'resolved_at': resolvedAt,
   'created_at': '2026-07-29T12:00:00.000Z',
 };
