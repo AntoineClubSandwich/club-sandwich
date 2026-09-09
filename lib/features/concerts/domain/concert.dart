@@ -22,9 +22,9 @@ enum ConcertStatus {
 }
 
 enum MaraudeStatus {
-  draft('draft', 'Brouillon'),
-  open('open', 'Planifiée'),
-  teamReady('team_ready', 'Équipe validée'),
+  draft('draft', 'À confirmer'),
+  open('open', 'Inscriptions ouvertes'),
+  teamReady('team_ready', 'Confirmée'),
   inProgress('in_progress', 'En cours'),
   completed('completed', 'Terminée'),
   cancelled('cancelled', 'Annulée');
@@ -38,6 +38,25 @@ enum MaraudeStatus {
     return MaraudeStatus.values.firstWhere(
       (status) => status.jsonValue == value,
       orElse: () => throw FormatException('État de maraude inconnu : $value'),
+    );
+  }
+}
+
+enum CancellationOrigin {
+  automatic('automatic', 'Automatique (J-3)'),
+  admin('admin', 'Administrateur'),
+  promoter('promoter', 'Tourneur');
+
+  const CancellationOrigin(this.jsonValue, this.label);
+
+  final String jsonValue;
+  final String label;
+
+  factory CancellationOrigin.fromJson(String value) {
+    return CancellationOrigin.values.firstWhere(
+      (origin) => origin.jsonValue == value,
+      orElse: () =>
+          throw FormatException('Origine d’annulation inconnue : $value'),
     );
   }
 }
@@ -57,6 +76,9 @@ class Concert {
     this.actualEndAt,
     this.closingComment,
     this.cancellationReason,
+    this.cancelledAt,
+    this.cancelledBy,
+    this.cancellationOrigin,
     this.operationalReport,
     this.collections = const [],
     this.distribution,
@@ -87,6 +109,9 @@ class Concert {
   final DateTime? actualEndAt;
   final String? closingComment;
   final String? cancellationReason;
+  final DateTime? cancelledAt;
+  final String? cancelledBy;
+  final CancellationOrigin? cancellationOrigin;
   final MaraudeOperationalReport? operationalReport;
   final List<MaraudeCollection> collections;
   final MaraudeDistribution? distribution;
@@ -123,6 +148,11 @@ class Concert {
       actualEndAt: _optionalDateTime(json['actual_end_at']),
       closingComment: _nullIfBlank(json['closing_comment'] as String?),
       cancellationReason: _nullIfBlank(json['cancellation_reason'] as String?),
+      cancelledAt: _optionalDateTime(json['cancelled_at']),
+      cancelledBy: json['cancelled_by'] as String?,
+      cancellationOrigin: json['cancellation_origin'] == null
+          ? null
+          : CancellationOrigin.fromJson(json['cancellation_origin'] as String),
       operationalReport: _relatedOperationalReport(json['operational_report']),
       collections: List<MaraudeCollection>.unmodifiable(
         (json['collections'] as List<dynamic>? ?? const []).map(

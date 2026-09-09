@@ -183,7 +183,7 @@ void main() {
           home: Scaffold(
             body: ConcertForm(
               initialConcert: concert,
-              onSubmit: (_, {required asDraft}) async {},
+              onSubmit: (_) async {},
             ),
           ),
         ),
@@ -234,7 +234,7 @@ void main() {
       find.text('Ex. : Accès, code porte, consignes particulières, etc.'),
       findsOneWidget,
     );
-    await tester.tap(find.text('Ouvrir la maraude'));
+    await tester.tap(find.text('Créer la maraude'));
     await tester.pump();
 
     expect(find.text('Ce champ est requis.'), findsNWidgets(2));
@@ -293,7 +293,7 @@ void main() {
           home: Scaffold(
             body: ConcertForm(
               initialConcert: buildConcert(venue: testVenue),
-              onSubmit: (_, {required asDraft}) => completer.future,
+              onSubmit: (_) => completer.future,
             ),
           ),
         ),
@@ -347,8 +347,8 @@ void main() {
       find.byKey(const ValueKey('promoter-contact-phone')),
       '06 00 00 00 00',
     );
-    await tester.ensureVisible(find.text('Ouvrir la maraude'));
-    await tester.tap(find.text('Ouvrir la maraude'));
+    await tester.ensureVisible(find.text('Créer la maraude'));
+    await tester.tap(find.text('Créer la maraude'));
     await tester.pumpAndSettle();
 
     expect(repository.createdDraft?.artist, 'Nouvel artiste');
@@ -401,8 +401,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Salle Pleyel'));
-      await tester.ensureVisible(find.text('Ouvrir la maraude'));
-      await tester.tap(find.text('Ouvrir la maraude'));
+      await tester.ensureVisible(find.text('Créer la maraude'));
+      await tester.tap(find.text('Créer la maraude'));
       await tester.pumpAndSettle();
 
       expect(
@@ -689,7 +689,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('concert-filter-maraude')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Planifiée').last);
+    await tester.tap(find.text('Inscriptions ouvertes').last);
     await tester.pumpAndSettle();
 
     expect(find.text('Artiste correspondant'), findsOneWidget);
@@ -839,15 +839,13 @@ class _FakeConcertRepository extends ConcertRepository {
   _FakeConcertRepository() : super(_testClient());
 
   ConcertDraft? createdDraft;
-  bool? createdAsDraft;
   String? updatedConcertId;
   ConcertDraft? updatedDraft;
   String? deletedConcertId;
 
   @override
-  Future<Concert> createConcert(ConcertDraft draft, {bool asDraft = false}) async {
+  Future<Concert> createConcert(ConcertDraft draft) async {
     createdDraft = draft;
-    createdAsDraft = asDraft;
     return buildConcert(
       artist: draft.artist,
       date: draft.date,

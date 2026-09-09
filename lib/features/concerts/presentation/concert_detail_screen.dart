@@ -279,7 +279,7 @@ class _ConcertDetailsState extends ConsumerState<_ConcertDetails> {
                             canManage: canManageMaraude,
                             canComplete: canCompleteMaraude,
                             canOperate: canManageMaraude || isSelectedVolunteer,
-                            canPublishDraft: canManageConcert,
+                            canManageConcert: canManageConcert,
                           ),
                         ),
                       if (selectedWorkspace == _MaraudeWorkspace.operations &&
@@ -367,7 +367,7 @@ class _ConcertDetailsState extends ConsumerState<_ConcertDetails> {
       context: context,
       builder: (context) => ConcertForm(
         initialConcert: concert,
-        onSubmit: (draft, {required asDraft}) => ref
+        onSubmit: (draft) => ref
             .read(concertRepositoryProvider)
             .updateConcert(concert.id, draft),
       ),
@@ -819,14 +819,17 @@ class _MaraudeSection extends ConsumerStatefulWidget {
     required this.canManage,
     required this.canComplete,
     required this.canOperate,
-    required this.canPublishDraft,
+    required this.canManageConcert,
   });
 
   final Concert concert;
   final bool canManage;
   final bool canComplete;
   final bool canOperate;
-  final bool canPublishDraft;
+  // Admin OR the promoter organization responsible for this maraude.
+  // Wider than [canManage] (admin-only) - used for the one action a
+  // promoter is allowed: cancelling.
+  final bool canManageConcert;
 
   @override
   ConsumerState<_MaraudeSection> createState() => _MaraudeSectionState();
@@ -870,8 +873,11 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Modifier l’état'),
               items: [
+                // L'annulation passe par son propre bouton (confirmation +
+                // motif + notifications) - jamais par ce sélecteur générique.
                 for (final status in MaraudeStatus.values)
-                  DropdownMenuItem(value: status, child: Text(status.label)),
+                  if (status != MaraudeStatus.cancelled)
+                    DropdownMenuItem(value: status, child: Text(status.label)),
               ],
               onChanged: _isSubmitting
                   ? null
@@ -893,41 +899,50 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
               label: const Text('Corriger les horaires'),
             ),
           ],
-          if (!widget.canManage &&
-              widget.canPublishDraft &&
-              concert.maraudeStatus == MaraudeStatus.draft) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Cette maraude est en brouillon : elle n’est pas visible des '
-              'bénévoles.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 8),
-            FilledButton.icon(
-              key: const ValueKey('publish-draft-maraude'),
-              onPressed: _isSubmitting ? null : _publishDraft,
-              icon: const Icon(Icons.publish_outlined),
-              label: const Text('Publier la maraude'),
-            ),
-          ],
           if (widget.canManage &&
-              (concert.maraudeStatus == MaraudeStatus.completed ||
-                  concert.maraudeStatus == MaraudeStatus.cancelled)) ...[
+              concert.maraudeStatus == MaraudeStatus.completed) ...[
             const Text(
               'L’état est archivé et ne peut plus être modifié.',
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
-            if (concert.maraudeStatus == MaraudeStatus.cancelled &&
-                concert.cancellationReason != null) ...[
-              const SizedBox(height: 8),
-              Text('Motif : ${concert.cancellationReason}'),
-            ],
             const SizedBox(height: 12),
             OutlinedButton.icon(
               key: const ValueKey('correct-maraude-timing'),
               onPressed: _isSubmitting ? null : _correctTiming,
               icon: const Icon(Icons.schedule_outlined),
               label: const Text('Corriger les horaires'),
+            ),
+          ],
+          if (concert.maraudeStatus == MaraudeStatus.cancelled) ...[
+            const Text(
+              'Cette maraude est annulée et ne peut plus être modifiée.',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            if (concert.cancellationReason != null)
+              Text('Motif : ${concert.cancellationReason}'),
+            if (concert.cancelledAt != null)
+              Text(
+                'Annulée le ${formatFrenchDateTime(concert.cancelledAt!)}',
+              ),
+            if (concert.cancellationOrigin != null)
+              Text('Origine : ${concert.cancellationOrigin!.label}'),
+          ],
+          if (widget.canManageConcert &&
+              concert.maraudeStatus != MaraudeStatus.completed &&
+              concert.maraudeStatus != MaraudeStatus.cancelled) ...[
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              key: const ValueKey('cancel-maraude'),
+              onPressed: _isSubmitting ? null : _cancelMaraude,
+              icon: Icon(
+                Icons.cancel_outlined,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              label: Text(
+                'Annuler la maraude',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ),
           ],
           if (widget.canManage &&
@@ -982,7 +997,25 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
     }
   }
 
-  Future<void> _publishDraft() => _setStatus(MaraudeStatus.open);
+  Future<void> _cancelMaraude() async {
+    // The reason is optional, so a confirmed-with-no-reason submit
+    // returns '' (not null) to stay distinguishable from "dialog
+    // dismissed without confirming" (null) - the repository/RPC already
+    // treats a blank string the same as no reason at all.
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => const _CancelMaraudeDialog(),
+    );
+    if (reason == null || !mounted) return;
+
+    await _changeStatus(
+      action: () => ref
+          .read(concertRepositoryProvider)
+          .cancelMaraude(widget.concert.id, reason: reason),
+      successMessage: 'Maraude annulée.',
+      errorMessage: 'Impossible d’annuler la maraude.',
+    );
+  }
 
   Future<void> _correctTiming() async {
     final correction = await showDialog<_MaraudeTimingCorrection>(
@@ -1296,6 +1329,63 @@ class _AttendanceMemberRow extends StatelessWidget {
             ' · ${formatFrenchDateTime(member.lastModifiedAt)}',
             style: Theme.of(context).textTheme.bodySmall,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CancelMaraudeDialog extends StatefulWidget {
+  const _CancelMaraudeDialog();
+
+  @override
+  State<_CancelMaraudeDialog> createState() => _CancelMaraudeDialogState();
+}
+
+class _CancelMaraudeDialogState extends State<_CancelMaraudeDialog> {
+  final _reasonController = TextEditingController();
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Annuler cette maraude ?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Les inscriptions seront immédiatement fermées et tous les '
+            'bénévoles inscrits ou positionnés seront prévenus. Cette '
+            'action est irréversible.',
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            key: const ValueKey('cancel-maraude-reason'),
+            controller: _reasonController,
+            decoration: const InputDecoration(
+              labelText: 'Motif (optionnel)',
+            ),
+            minLines: 2,
+            maxLines: 3,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Revenir en arrière'),
+        ),
+        FilledButton(
+          key: const ValueKey('confirm-cancel-maraude'),
+          onPressed: () =>
+              Navigator.of(context).pop(_reasonController.text.trim()),
+          child: const Text('Annuler la maraude'),
         ),
       ],
     );

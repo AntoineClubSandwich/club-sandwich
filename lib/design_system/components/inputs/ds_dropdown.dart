@@ -83,10 +83,13 @@ class DsDropdown<T> extends StatelessWidget {
                       Icon(item.icon, size: 16, color: colors.textSecondary),
                       const SizedBox(width: DsSpacing.sm),
                     ],
-                    Text(
-                      item.label,
-                      style: DsTypography.body.copyWith(
-                        color: colors.textPrimary,
+                    Expanded(
+                      child: Text(
+                        item.label,
+                        overflow: TextOverflow.ellipsis,
+                        style: DsTypography.body.copyWith(
+                          color: colors.textPrimary,
+                        ),
                       ),
                     ),
                   ],
@@ -113,6 +116,8 @@ class DsDropdown<T> extends StatelessWidget {
                 Expanded(
                   child: Text(
                     selected?.label ?? hintText,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                     style: DsTypography.body.copyWith(
                       color: selected != null
                           ? colors.textPrimary

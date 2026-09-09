@@ -51,10 +51,12 @@ class ConcertRepository {
     return row == null ? null : Concert.fromJson(row);
   }
 
-  Future<Concert> createConcert(
-    ConcertDraft draft, {
-    bool asDraft = false,
-  }) async {
+  /// A new maraude is always created "À confirmer" (draft) - the
+  /// concerts.maraude_status column defaults to it, so it's left out of
+  /// this insert entirely rather than set explicitly. Opening it to
+  /// volunteers is a deliberate, separate admin action afterward
+  /// (public.set_maraude_status), never automatic on creation.
+  Future<Concert> createConcert(ConcertDraft draft) async {
     final context = await _currentContext();
     final promoterOrganizationId =
         context.promoterOrganizationId ?? draft.promoterOrganizationId;
@@ -63,7 +65,6 @@ class ConcertRepository {
         .insert({
           ...draft.toJson(),
           'status': ConcertStatus.planned.jsonValue,
-          if (asDraft) 'maraude_status': MaraudeStatus.draft.jsonValue,
           'organization_id': context.organizationId,
           'created_by': context.userId,
           'promoter_organization_id': ?promoterOrganizationId,
@@ -124,6 +125,20 @@ class ConcertRepository {
         'requested_concert_id': concertId,
         'requested_status': status.jsonValue,
         'requested_cancellation_reason': cancellationReason,
+      },
+    );
+  }
+
+  /// Admin, or the promoter responsible for this maraude - the only two
+  /// roles allowed to cancel (private.cancel_maraude enforces this
+  /// server-side too). [reason] is optional; recorded verbatim as
+  /// concerts.cancellation_reason.
+  Future<void> cancelMaraude(String concertId, {String? reason}) async {
+    await _client.rpc<void>(
+      'cancel_maraude',
+      params: {
+        'requested_concert_id': concertId,
+        'requested_reason': reason,
       },
     );
   }

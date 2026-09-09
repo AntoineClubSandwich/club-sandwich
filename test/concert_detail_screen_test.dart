@@ -647,7 +647,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Planifiée'), findsWidgets);
+    expect(find.text('Inscriptions ouvertes'), findsWidgets);
     expect(find.text('Planifié'), findsNothing);
 
     final timingButton = find.byKey(const ValueKey('correct-maraude-timing'));
@@ -667,6 +667,11 @@ void main() {
     await tester.ensureVisible(selector);
     await tester.tap(selector);
     await tester.pumpAndSettle();
+    expect(
+      find.text('Annulée'),
+      findsNothing,
+      reason: 'l’annulation passe par son propre bouton, pas ce sélecteur',
+    );
     await tester.tap(find.text('En cours').last);
     await tester.pumpAndSettle();
 
@@ -690,6 +695,148 @@ void main() {
     expect(repository.startCount, 1);
     expect(repository.completeCount, 1);
   });
+
+  testWidgets('un administrateur annule une maraude avec un motif', (
+    tester,
+  ) async {
+    final repository = _FakeLifecycleConcertRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          concertRepositoryProvider.overrideWithValue(repository),
+          concertDetailsProvider.overrideWith(
+            (ref, concertId) async => repository.concert,
+          ),
+          concertVolunteerSectionProvider.overrideWith(
+            (ref, concertId) async => const ConcertVolunteerSectionData(
+              counts: ConcertVolunteerCounts.empty(),
+              isAdmin: true,
+              applications: [],
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          home: ConcertDetailScreen(concertId: 'concert-id'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('maraude-workspace-operations')),
+    );
+    await tester.pumpAndSettle();
+
+    final cancelButton = find.byKey(const ValueKey('cancel-maraude'));
+    await tester.ensureVisible(cancelButton);
+    await tester.tap(cancelButton);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('cancel-maraude-reason')),
+      'Trop peu de bénévoles',
+    );
+    await tester.tap(find.byKey(const ValueKey('confirm-cancel-maraude')));
+    await tester.pumpAndSettle();
+
+    expect(repository.cancelCount, 1);
+    expect(repository.lastCancelReason, 'Trop peu de bénévoles');
+    expect(find.text('Annulée'), findsWidgets);
+    expect(
+      find.text('Cette maraude est annulée et ne peut plus être modifiée.'),
+      findsOneWidget,
+    );
+    expect(find.text('Motif : Trop peu de bénévoles'), findsOneWidget);
+    expect(find.text('Origine : Administrateur'), findsOneWidget);
+    expect(find.byKey(const ValueKey('maraude-status-selector')), findsNothing);
+    expect(find.byKey(const ValueKey('cancel-maraude')), findsNothing);
+  });
+
+  testWidgets(
+    'annuler la maraude peut être abandonné sans rien envoyer',
+    (tester) async {
+      final repository = _FakeLifecycleConcertRepository();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            concertRepositoryProvider.overrideWithValue(repository),
+            concertDetailsProvider.overrideWith(
+              (ref, concertId) async => repository.concert,
+            ),
+            concertVolunteerSectionProvider.overrideWith(
+              (ref, concertId) async => const ConcertVolunteerSectionData(
+                counts: ConcertVolunteerCounts.empty(),
+                isAdmin: true,
+                applications: [],
+              ),
+            ),
+          ],
+          child: const MaterialApp(
+            home: ConcertDetailScreen(concertId: 'concert-id'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('maraude-workspace-operations')),
+      );
+      await tester.pumpAndSettle();
+
+      final cancelButton = find.byKey(const ValueKey('cancel-maraude'));
+      await tester.ensureVisible(cancelButton);
+      await tester.tap(cancelButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Revenir en arrière'));
+      await tester.pumpAndSettle();
+
+      expect(repository.cancelCount, 0);
+      expect(find.byKey(const ValueKey('cancel-maraude')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'le tourneur ne voit que le bouton d’annulation, pas les autres actions',
+    (tester) async {
+      final repository = _FakeLifecycleConcertRepository();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            concertRepositoryProvider.overrideWithValue(repository),
+            concertDetailsProvider.overrideWith(
+              (ref, concertId) async => repository.concert,
+            ),
+            concertVolunteerSectionProvider.overrideWith(
+              (ref, concertId) async => const ConcertVolunteerSectionData(
+                counts: ConcertVolunteerCounts.empty(),
+                isAdmin: false,
+                isPromoter: true,
+                canManageConcert: true,
+                applications: [],
+              ),
+            ),
+          ],
+          child: const MaterialApp(
+            home: ConcertDetailScreen(concertId: 'concert-id'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('maraude-workspace-operations')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('cancel-maraude')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('maraude-status-selector')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('validate-maraude-team')),
+        findsNothing,
+      );
+      expect(find.text('Publier la maraude'), findsNothing);
+    },
+  );
 
   testWidgets('le bénévole voit le cycle sans pouvoir le modifier', (
     tester,
@@ -744,6 +891,20 @@ class _FakeLifecycleConcertRepository extends ConcertRepository {
   Concert concert;
   int startCount = 0;
   int completeCount = 0;
+  int cancelCount = 0;
+  String? lastCancelReason;
+
+  @override
+  Future<void> cancelMaraude(String concertId, {String? reason}) async {
+    cancelCount++;
+    lastCancelReason = reason;
+    concert = buildConcert(
+      maraudeStatus: MaraudeStatus.cancelled,
+      cancellationReason: reason?.isEmpty ?? true ? null : reason,
+      cancelledAt: DateTime(2026, 8, 1, 10),
+      cancellationOrigin: CancellationOrigin.admin,
+    );
+  }
 
   @override
   Future<void> setMaraudeStatus(

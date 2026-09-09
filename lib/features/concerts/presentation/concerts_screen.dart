@@ -282,9 +282,8 @@ class _ConcertsScreenState extends ConsumerState<ConcertsScreen> {
       context: context,
       builder: (context) => ConcertForm(
         promoterOrganizations: promoterOrganizations,
-        onSubmit: (draft, {required asDraft}) => ref
-            .read(concertRepositoryProvider)
-            .createConcert(draft, asDraft: asDraft),
+        onSubmit: (draft) =>
+            ref.read(concertRepositoryProvider).createConcert(draft),
       ),
     );
     if (created != true || !context.mounted) return;
@@ -778,7 +777,7 @@ class _ConcertCard extends ConsumerWidget {
       context: context,
       builder: (context) => ConcertForm(
         initialConcert: concert,
-        onSubmit: (draft, {required asDraft}) => ref
+        onSubmit: (draft) => ref
             .read(concertRepositoryProvider)
             .updateConcert(concert.id, draft),
       ),
@@ -1003,20 +1002,27 @@ MaraudeCalendarItem _concertCalendarItem(Concert concert) {
 }
 
 (String, MaraudeCalendarTone) _concertCalendarStatus(Concert concert) {
-  if (concert.status == ConcertStatus.cancelled) {
-    return ('Annulé', MaraudeCalendarTone.error);
+  // Le statut de la maraude (opérationnel) prime sur celui du concert
+  // (la prestation elle-même) pour ce badge - avant ce correctif,
+  // "Annulé" ne se basait que sur concert.status et ne s'affichait donc
+  // jamais pour une maraude annulée via maraude_status.
+  if (concert.maraudeStatus == MaraudeStatus.cancelled) {
+    return (MaraudeStatus.cancelled.label, MaraudeCalendarTone.error);
   }
   if (concert.maraudeStatus == MaraudeStatus.completed ||
       concert.status == ConcertStatus.completed) {
-    return ('Terminé', MaraudeCalendarTone.neutral);
+    return (MaraudeStatus.completed.label, MaraudeCalendarTone.neutral);
   }
   if (concert.maraudeStatus == MaraudeStatus.inProgress) {
-    return ('En cours', MaraudeCalendarTone.primary);
+    return (MaraudeStatus.inProgress.label, MaraudeCalendarTone.primary);
   }
   if (concert.maraudeStatus == MaraudeStatus.teamReady) {
-    return ('Préparation · Équipe validée', MaraudeCalendarTone.green);
+    return (MaraudeStatus.teamReady.label, MaraudeCalendarTone.green);
   }
-  return ('Préparation · Équipe incomplète', MaraudeCalendarTone.tertiary);
+  if (concert.maraudeStatus == MaraudeStatus.draft) {
+    return (MaraudeStatus.draft.label, MaraudeCalendarTone.tertiary);
+  }
+  return (MaraudeStatus.open.label, MaraudeCalendarTone.tertiary);
 }
 
 DsChipStatus _chipStatusFor(MaraudeCalendarTone tone) => switch (tone) {

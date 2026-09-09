@@ -351,7 +351,7 @@ void main() {
         child: MaterialApp(
           theme: DsTheme.light,
           home: Scaffold(
-            body: ConcertForm(onSubmit: (_, {required asDraft}) async {}),
+            body: ConcertForm(onSubmit: (_) async {}),
           ),
         ),
       ),

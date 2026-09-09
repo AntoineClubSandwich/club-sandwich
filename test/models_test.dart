@@ -272,9 +272,9 @@ void main() {
   });
 
   test('MaraudeStatus sérialise les six états et rejette l’inconnu', () {
-    expect(MaraudeStatus.draft.label, 'Brouillon');
-    expect(MaraudeStatus.open.label, 'Planifiée');
-    expect(MaraudeStatus.teamReady.label, 'Équipe validée');
+    expect(MaraudeStatus.draft.label, 'À confirmer');
+    expect(MaraudeStatus.open.label, 'Inscriptions ouvertes');
+    expect(MaraudeStatus.teamReady.label, 'Confirmée');
     expect(MaraudeStatus.inProgress.label, 'En cours');
     expect(MaraudeStatus.completed.label, 'Terminée');
     expect(MaraudeStatus.cancelled.label, 'Annulée');
