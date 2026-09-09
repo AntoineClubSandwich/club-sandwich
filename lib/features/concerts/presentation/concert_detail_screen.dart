@@ -2762,6 +2762,8 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
               onRoleChanged: (role) => _assignRole(application.id, role),
               onToggleLock: (locked) =>
                   _toggleRoleLock(application.id, locked),
+              onRemindConfirmation: () =>
+                  _remindConfirmation(application.id),
             ),
       ],
     );
@@ -2939,6 +2941,27 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       _showError(
         describeError(error, 'Impossible de modifier le verrouillage.'),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _updatingApplications.remove(applicationId));
+      }
+    }
+  }
+
+  Future<void> _remindConfirmation(String applicationId) async {
+    setState(() => _updatingApplications.add(applicationId));
+    try {
+      await ref
+          .read(concertVolunteerRepositoryProvider)
+          .remindVolunteerConfirmation(applicationId);
+      ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Rappel envoyé au bénévole.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showError(describeError(error, 'Impossible d’envoyer le rappel.'));
     } finally {
       if (mounted) {
         setState(() => _updatingApplications.remove(applicationId));
@@ -3726,6 +3749,7 @@ class _TeamCandidateCard extends StatelessWidget {
     required this.onRemove,
     required this.onRoleChanged,
     required this.onToggleLock,
+    required this.onRemindConfirmation,
   });
 
   final ConcertVolunteerApplication application;
@@ -3737,6 +3761,7 @@ class _TeamCandidateCard extends StatelessWidget {
   final VoidCallback onRemove;
   final ValueChanged<MaraudeRole> onRoleChanged;
   final ValueChanged<bool> onToggleLock;
+  final VoidCallback onRemindConfirmation;
 
   @override
   Widget build(BuildContext context) {
@@ -3907,6 +3932,20 @@ class _TeamCandidateCard extends StatelessWidget {
                   'Rôle verrouillé : il ne peut pas être changé ni retiré '
                   'par erreur.',
                   style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+              if (application.teamRoleLocked &&
+                  application.confirmationStatus ==
+                      VolunteerConfirmationStatus.pending) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    key: ValueKey('remind-confirmation-${application.id}'),
+                    onPressed: isUpdating ? null : onRemindConfirmation,
+                    icon: const Icon(Icons.notifications_active_outlined),
+                    label: const Text('Relancer la confirmation'),
+                  ),
                 ),
               ],
               const SizedBox(height: 6),

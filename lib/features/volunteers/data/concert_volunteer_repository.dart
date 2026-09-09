@@ -230,6 +230,17 @@ class ConcertVolunteerRepository {
     );
   }
 
+  /// Re-notifies a volunteer whose role is locked but who still hasn't
+  /// confirmed their participation - an explicit, admin-triggered nudge
+  /// rather than a passive wait, gated server-side to only the applications
+  /// actually awaiting confirmation.
+  Future<void> remindVolunteerConfirmation(String applicationId) async {
+    await client.rpc<void>(
+      'remind_volunteer_confirmation',
+      params: {'requested_application_id': applicationId},
+    );
+  }
+
   Future<void> setAttendanceStatus(
     String applicationId,
     VolunteerAttendanceStatus status,

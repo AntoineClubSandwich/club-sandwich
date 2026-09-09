@@ -1235,6 +1235,67 @@ void main() {
     },
   );
 
+  testWidgets(
+    'permet de relancer un bénévole verrouillé qui n’a pas confirmé',
+    (tester) async {
+      final repository = _FakeConcertVolunteerRepository(
+        isAdmin: true,
+        applications: [
+          _application(
+            status: ConcertVolunteerStatus.selected,
+            teamRole: MaraudeRole.teamLeader,
+            teamRoleLocked: true,
+            confirmationStatus: VolunteerConfirmationStatus.pending,
+            profile: const VolunteerProfile(
+              userId: 'user-id',
+              firstName: 'Macéo',
+              lastName: 'Texeira',
+            ),
+          ),
+        ],
+      );
+      await _pumpDetail(tester, repository);
+
+      final remindButton = find.byKey(
+        const ValueKey('remind-confirmation-application-id'),
+      );
+      await tester.ensureVisible(remindButton);
+      await tester.tap(remindButton);
+      await tester.pumpAndSettle();
+
+      expect(repository.remindConfirmationCount, 1);
+      expect(find.text('Rappel envoyé au bénévole.'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'ne propose pas de relance une fois la participation confirmée',
+    (tester) async {
+      final repository = _FakeConcertVolunteerRepository(
+        isAdmin: true,
+        applications: [
+          _application(
+            status: ConcertVolunteerStatus.selected,
+            teamRole: MaraudeRole.teamLeader,
+            teamRoleLocked: true,
+            confirmationStatus: VolunteerConfirmationStatus.confirmed,
+            profile: const VolunteerProfile(
+              userId: 'user-id',
+              firstName: 'Macéo',
+              lastName: 'Texeira',
+            ),
+          ),
+        ],
+      );
+      await _pumpDetail(tester, repository);
+
+      expect(
+        find.byKey(const ValueKey('remind-confirmation-application-id')),
+        findsNothing,
+      );
+    },
+  );
+
   testWidgets('verrouille la composition de l’équipe après le démarrage', (
     tester,
   ) async {
@@ -2367,6 +2428,13 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
     applications[index] = applications[index].copyWith(
       teamRoleLocked: locked,
     );
+  }
+
+  int remindConfirmationCount = 0;
+
+  @override
+  Future<void> remindVolunteerConfirmation(String applicationId) async {
+    remindConfirmationCount++;
   }
 
   @override
