@@ -1,0 +1,37 @@
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;
+  margin:auto;color:#1a1a2e">
+  <div style="background:#303b91;padding:20px 28px;border-radius:
+    12px 12px 0 0">
+    <h1 style="color:#fff;margin:0;font-size:18px">Club Sandwich</h1>
+  </div>
+  <div style="border:1px solid #e5e5ea;border-top:none;padding:24px 28px;
+    border-radius:0 0 12px 12px">
+    <p style="margin:0 0 20px;line-height:1.5">Bonjour,</p>
+    <p style="margin:0 0 20px;line-height:1.5">
+      Cliquez sur le bouton ci-dessous pour choisir un nouveau mot de
+      passe.
+    </p>
+    <p style="margin:28px 0 0">
+      <a href="{{ .ConfirmationURL }}" style="background:#303b91;color:#fff;
+        padding:12px 20px;border-radius:8px;text-decoration:none;
+        display:inline-block;font-weight:bold">
+        Choisir mon mot de passe
+      </a>
+    </p>
+    <p style="margin:24px 0 0;line-height:1.5;color:#5a5a6e;font-size:13px">
+      Ce lien est à usage unique et n’est valable qu’un temps limité.
+    </p>
+    <div style="margin:20px 0 0;background:#f4f4f8;border-radius:10px;
+      padding:14px 18px">
+      <p style="margin:0 0 6px;font-weight:700;color:#303b91;font-size:13px">
+        Le bouton ne fonctionne pas ?
+      </p>
+      <p style="margin:0;line-height:1.5;font-size:13px">
+        Ouvrez l’application, choisissez « J’ai reçu un code par e-mail »
+        et saisissez ce code avec votre adresse e-mail :
+        <strong style="font-size:18px;letter-spacing:2px">{{ .Token }}</strong>
+      </p>
+    </div>
+    <p style="margin:24px 0 0;line-height:1.5">L’équipe Club Sandwich</p>
+  </div>
+</div>

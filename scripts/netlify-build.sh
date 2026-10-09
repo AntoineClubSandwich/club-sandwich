@@ -86,7 +86,7 @@ fi
 printf '{"commit_ref":"%s","app_env":"%s"}\n' \
   "${build_commit_ref}" "${resolved_app_env}" >build/web/build-info.json
 
-if [[ "${resolved_app_env}" == "preprod" ]]; then
-  printf 'User-agent: *\nDisallow: /\n' >build/web/robots.txt
-  printf '/*\n  X-Robots-Tag: noindex, nofollow\n' >build/web/_headers
-fi
+# Outil interne accessible uniquement sur invitation : on bloque
+# l'indexation quel que soit APP_ENV (le badge, lui, dépend d'APP_ENV).
+printf 'User-agent: *\nDisallow: /\n' >build/web/robots.txt
+printf '/*\n  X-Robots-Tag: noindex, nofollow\n' >build/web/_headers

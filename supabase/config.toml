@@ -156,11 +156,14 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://127.0.0.1:3000"
+site_url = "https://club-sandwich-preprod.netlify.app"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
 additional_redirect_urls = [
+  "https://club-sandwich-preprod.netlify.app",
+  "https://club-sandwich-preprod.netlify.app/**",
+  "https://*.netlify.app/**",
   "http://127.0.0.1:3000",
   "http://localhost:3000",
 ]
@@ -176,7 +179,7 @@ enable_refresh_token_rotation = true
 # Requires enable_refresh_token_rotation = true.
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
-enable_signup = false
+enable_signup = true
 # Allow/disallow anonymous sign-ins to your project.
 enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
@@ -199,7 +202,7 @@ password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-email_sent = 2
+email_sent = 30
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
@@ -221,12 +224,12 @@ web3 = 30
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
-enable_signup = false
+enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -234,22 +237,32 @@ max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
+otp_expiry = 86400
 
-# Use a production-ready SMTP server
+# SMTP (Brevo) is configured directly in the Supabase Dashboard
+# (Authentication → Emails → SMTP Settings), not here. A `supabase config
+# push` incident on 2026-09-16 sent the literal unresolved string
+# "env(BREVO_SMTP_KEY)" as the password because that env var was never
+# actually set locally, silently breaking a working SMTP connection with
+# no error. Keeping this block commented out means a future `config
+# push` can never touch it again - see the memory note on this project
+# ("supabase config push danger") before ever re-enabling it.
 # [auth.email.smtp]
 # enabled = true
-# host = "smtp.sendgrid.net"
+# host = "smtp-relay.brevo.com"
 # port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# user = "env(BREVO_SMTP_LOGIN)"
+# pass = "env(BREVO_SMTP_KEY)"
+# admin_email = "maraudes@clubsandwich-records.com"
+# sender_name = "Club Sandwich"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+[auth.email.template.invite]
+subject = "Votre invitation à rejoindre Club Sandwich"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.recovery]
+subject = "Réinitialisation de votre mot de passe Club Sandwich"
+content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
@@ -303,8 +316,8 @@ max_enrolled_factors = 10
 
 # Control MFA via App Authenticator (TOTP)
 [auth.mfa.totp]
-enroll_enabled = false
-verify_enabled = false
+enroll_enabled = true
+verify_enabled = true
 
 # Configure MFA via Phone Messaging
 [auth.mfa.phone]
