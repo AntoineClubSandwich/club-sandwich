@@ -10,6 +10,7 @@ import 'package:club_sandwich/features/volunteers/data/concert_volunteer_reposit
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
 import 'package:club_sandwich/features/volunteers/domain/volunteer_profile.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart';
@@ -327,7 +328,10 @@ void main() {
         );
         // The whole point of this fix: one round-trip instead of six.
         expect(requests, hasLength(1));
-        expect(requests.single.url.path, endsWith('/get_concert_volunteer_bundle'));
+        expect(
+          requests.single.url.path,
+          endsWith('/get_concert_volunteer_bundle'),
+        );
       },
     );
 
@@ -388,7 +392,10 @@ void main() {
         expect(section.applications.single.displayName, 'Camille Martin');
         expect(section.applications.single.profile?.phone, isNull);
         expect(requests, hasLength(1));
-        expect(requests.single.url.path, endsWith('/get_concert_volunteer_bundle'));
+        expect(
+          requests.single.url.path,
+          endsWith('/get_concert_volunteer_bundle'),
+        );
       },
     );
 
@@ -904,11 +911,9 @@ void main() {
     expect(find.text('Rôle : Chef.fe d’équipe'), findsOneWidget);
     expect(find.textContaining('Présence :'), findsOneWidget);
     expect(find.text('Je me désiste'), findsOneWidget);
-    final operations = find.byKey(
-      const ValueKey('maraude-workspace-operations'),
-    );
-    await tester.ensureVisible(operations);
-    await tester.tap(operations);
+    final summary = find.byKey(const ValueKey('maraude-workspace-summary'));
+    await tester.ensureVisible(summary);
+    await tester.tap(summary);
     await tester.pumpAndSettle();
     expect(find.text('Démarrer la maraude'), findsOneWidget);
   });
@@ -1019,6 +1024,67 @@ void main() {
       expect(find.text('Je me désiste'), findsNothing);
       expect(find.text('Voir mon profil'), findsNothing);
       expect(find.text('Je me propose'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'l’admin voit les e-mails et copie uniquement ceux de l’équipe retenue',
+    (tester) async {
+      tester.view.physicalSize = const Size(1400, 2000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      String? clipboard;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboard = (call.arguments as Map)['text'] as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      final repository = _FakeConcertVolunteerRepository(
+        isAdmin: true,
+        applications: [
+          _application(
+            id: 'team-member',
+            userId: 'team-member',
+            status: ConcertVolunteerStatus.selected,
+            teamRole: MaraudeRole.teamLeader,
+            profile: const VolunteerProfile(
+              userId: 'team-member',
+              firstName: 'Alex',
+              email: 'alex@example.com',
+            ),
+          ),
+          _application(
+            id: 'candidate',
+            userId: 'candidate',
+            profile: const VolunteerProfile(
+              userId: 'candidate',
+              firstName: 'Camille',
+              email: 'camille@example.com',
+            ),
+          ),
+        ],
+      );
+      await _pumpDetail(tester, repository);
+
+      expect(find.text('alex@example.com'), findsWidgets);
+      expect(find.text('camille@example.com'), findsOneWidget);
+
+      final copyAll = find.byKey(const ValueKey('copy-team-emails'));
+      await tester.ensureVisible(copyAll);
+      await tester.tap(copyAll);
+      await tester.pumpAndSettle();
+
+      expect(clipboard, 'alex@example.com');
     },
   );
 
@@ -1213,9 +1279,7 @@ void main() {
       );
 
       final communicationRole = tester.widget<RadioListTile<MaraudeRole>>(
-        find.byKey(
-          const ValueKey('team-role-application-id-communication'),
-        ),
+        find.byKey(const ValueKey('team-role-application-id-communication')),
       );
       expect(communicationRole.enabled, isFalse);
       final removeButton = tester.widget<TextButton>(
@@ -1268,33 +1332,32 @@ void main() {
     },
   );
 
-  testWidgets(
-    'ne propose pas de relance une fois la participation confirmée',
-    (tester) async {
-      final repository = _FakeConcertVolunteerRepository(
-        isAdmin: true,
-        applications: [
-          _application(
-            status: ConcertVolunteerStatus.selected,
-            teamRole: MaraudeRole.teamLeader,
-            teamRoleLocked: true,
-            confirmationStatus: VolunteerConfirmationStatus.confirmed,
-            profile: const VolunteerProfile(
-              userId: 'user-id',
-              firstName: 'Macéo',
-              lastName: 'Texeira',
-            ),
+  testWidgets('ne propose pas de relance une fois la participation confirmée', (
+    tester,
+  ) async {
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      applications: [
+        _application(
+          status: ConcertVolunteerStatus.selected,
+          teamRole: MaraudeRole.teamLeader,
+          teamRoleLocked: true,
+          confirmationStatus: VolunteerConfirmationStatus.confirmed,
+          profile: const VolunteerProfile(
+            userId: 'user-id',
+            firstName: 'Macéo',
+            lastName: 'Texeira',
           ),
-        ],
-      );
-      await _pumpDetail(tester, repository);
+        ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
 
-      expect(
-        find.byKey(const ValueKey('remind-confirmation-application-id')),
-        findsNothing,
-      );
-    },
-  );
+    expect(
+      find.byKey(const ValueKey('remind-confirmation-application-id')),
+      findsNothing,
+    );
+  });
 
   testWidgets('verrouille la composition de l’équipe après le démarrage', (
     tester,
@@ -1394,36 +1457,37 @@ void main() {
     },
   );
 
-  testWidgets('signale une équipe incomplète tant que le minimum n’est pas atteint', (
-    tester,
-  ) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(1440, 900);
-    addTearDown(() {
-      tester.view.resetDevicePixelRatio();
-      tester.view.resetPhysicalSize();
-    });
-    final repository = _FakeConcertVolunteerRepository(
-      isAdmin: true,
-      applications: [
-        _application(
-          profile: const VolunteerProfile(
-            userId: 'user-id',
-            firstName: 'Camille',
+  testWidgets(
+    'signale une équipe incomplète tant que le minimum n’est pas atteint',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1440, 900);
+      addTearDown(() {
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPhysicalSize();
+      });
+      final repository = _FakeConcertVolunteerRepository(
+        isAdmin: true,
+        applications: [
+          _application(
+            profile: const VolunteerProfile(
+              userId: 'user-id',
+              firstName: 'Camille',
+            ),
           ),
-        ),
-      ],
-    );
-    await _pumpDetail(tester, repository);
+        ],
+      );
+      await _pumpDetail(tester, repository);
 
-    final select = find.byKey(
-      const ValueKey('select-volunteer-application-id'),
-    );
-    await tester.ensureVisible(select);
-    await tester.tap(select);
-    await tester.pumpAndSettle();
-    expect(find.text('Ajoutez au moins 3 bénévoles.'), findsOneWidget);
-  });
+      final select = find.byKey(
+        const ValueKey('select-volunteer-application-id'),
+      );
+      await tester.ensureVisible(select);
+      await tester.tap(select);
+      await tester.pumpAndSettle();
+      expect(find.text('Ajoutez au moins 3 bénévoles.'), findsOneWidget);
+    },
+  );
 
   testWidgets('retire immédiatement le dernier membre de l’équipe', (
     tester,
@@ -1463,9 +1527,7 @@ void main() {
     expect(find.text('Ajoutez au moins 3 bénévoles.'), findsOneWidget);
   });
 
-  testWidgets('empêche plusieurs chefs d’équipe', (
-    tester,
-  ) async {
+  testWidgets('empêche plusieurs chefs d’équipe', (tester) async {
     final repository = _FakeConcertVolunteerRepository(
       isAdmin: true,
       applications: [
@@ -1556,7 +1618,10 @@ void main() {
             .length,
         4,
       );
-      expect(find.text('Attribuez le rôle de chef d’équipe à une personne.'), findsOneWidget);
+      expect(
+        find.text('Attribuez le rôle de chef d’équipe à une personne.'),
+        findsOneWidget,
+      );
 
       final leaderRole = find.byKey(
         const ValueKey('team-role-candidate-1-teamLeader'),
@@ -2425,9 +2490,7 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
     final index = applications.indexWhere(
       (application) => application.id == applicationId,
     );
-    applications[index] = applications[index].copyWith(
-      teamRoleLocked: locked,
-    );
+    applications[index] = applications[index].copyWith(teamRoleLocked: locked);
   }
 
   int remindConfirmationCount = 0;

@@ -113,7 +113,11 @@ class AdministrationScreen extends ConsumerWidget {
       if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
       if (context.mounted) {
         if (!delivery.emailSent && delivery.activationUrl != null) {
-          await _showActivationLink(context, delivery.activationUrl!);
+          await _showActivationLink(
+            context,
+            delivery.activationUrl!,
+            emailSent: false,
+          );
           return;
         }
         ScaffoldMessenger.of(
@@ -137,46 +141,51 @@ class AdministrationScreen extends ConsumerWidget {
       }
     }
   }
+}
 
-  Future<void> _showActivationLink(
-    BuildContext context,
-    String activationUrl,
-  ) async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Compte créé'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'La limite temporaire d’envoi d’e-mails est atteinte. '
-              'Transmettez ce lien d’activation au bénévole :',
-            ),
-            const SizedBox(height: 12),
-            SelectableText(activationUrl),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Fermer'),
+Future<void> _showActivationLink(
+  BuildContext context,
+  String activationUrl, {
+  required bool emailSent,
+}) async {
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Compte créé'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            emailSent
+                ? 'L’e-mail a été renvoyé. Si la personne ne le reçoit '
+                      'jamais (filtre de sécurité de sa messagerie, par '
+                      'exemple), transmettez-lui directement ce lien :'
+                : 'La limite temporaire d’envoi d’e-mails est atteinte. '
+                      'Transmettez ce lien d’activation au bénévole :',
           ),
-          FilledButton.icon(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: activationUrl));
-              if (dialogContext.mounted) {
-                Navigator.of(dialogContext).pop();
-              }
-            },
-            icon: const Icon(Icons.copy),
-            label: const Text('Copier le lien'),
-          ),
+          const SizedBox(height: 12),
+          SelectableText(activationUrl),
         ],
       ),
-    );
-  }
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Fermer'),
+        ),
+        FilledButton.icon(
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: activationUrl));
+            if (dialogContext.mounted) {
+              Navigator.of(dialogContext).pop();
+            }
+          },
+          icon: const Icon(Icons.copy),
+          label: const Text('Copier le lien'),
+        ),
+      ],
+    ),
+  );
 }
 
 class _SendingInvitationDialog extends StatelessWidget {
@@ -522,10 +531,17 @@ class _UserActionsState extends ConsumerState<_UserActions> {
       final repository = ref.read(userAccountRepositoryProvider);
       switch (action) {
         case 'resend':
-          await repository.resendInvitation(
+          final delivery = await repository.resendInvitation(
             widget.user.profileId,
             redirectTo: authRedirectUrl(),
           );
+          if (mounted && delivery.activationUrl != null) {
+            await _showActivationLink(
+              context,
+              delivery.activationUrl!,
+              emailSent: true,
+            );
+          }
         case 'disable':
           await repository.setDisabled(widget.user.profileId, disabled: true);
         case 'reactivate':

@@ -26,6 +26,7 @@ import 'package:club_sandwich/features/volunteers/presentation/volunteer_documen
 import 'package:club_sandwich/shared/utils/error_messages.dart';
 import 'package:club_sandwich/shared/widgets/app_state_panel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
@@ -233,6 +234,16 @@ class _ConcertDetailsState extends ConsumerState<_ConcertDetails> {
                       if (selectedWorkspace == _MaraudeWorkspace.summary) ...[
                         SizedBox(
                           width: sectionWidth,
+                          child: _MaraudeSection(
+                            concert: concert,
+                            canManage: canManageMaraude,
+                            canComplete: canCompleteMaraude,
+                            canOperate: canManageMaraude || isSelectedVolunteer,
+                            canManageConcert: canManageConcert,
+                          ),
+                        ),
+                        SizedBox(
+                          width: sectionWidth,
                           child: _InformationSection(concert: concert),
                         ),
                         SizedBox(
@@ -269,17 +280,6 @@ class _ConcertDetailsState extends ConsumerState<_ConcertDetails> {
                             title: 'Documents',
                             icon: Icons.folder_outlined,
                             message: 'Aucun document disponible.',
-                          ),
-                        ),
-                      if (selectedWorkspace == _MaraudeWorkspace.operations)
-                        SizedBox(
-                          width: sectionWidth,
-                          child: _MaraudeSection(
-                            concert: concert,
-                            canManage: canManageMaraude,
-                            canComplete: canCompleteMaraude,
-                            canOperate: canManageMaraude || isSelectedVolunteer,
-                            canManageConcert: canManageConcert,
                           ),
                         ),
                       if (selectedWorkspace == _MaraudeWorkspace.operations &&
@@ -888,9 +888,7 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
                 key: const ValueKey('maraude-status-selector'),
                 initialValue: concert.maraudeStatus,
                 isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Modifier l’état',
-                ),
+                decoration: const InputDecoration(labelText: 'Modifier l’état'),
                 items: [
                   // L'annulation passe par son propre bouton (confirmation +
                   // motif + notifications) - jamais par ce sélecteur
@@ -915,9 +913,7 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
                   Expanded(
                     child: FilledButton.icon(
                       key: const ValueKey('confirm-maraude-status'),
-                      onPressed: _isSubmitting
-                          ? null
-                          : _confirmPendingStatus,
+                      onPressed: _isSubmitting ? null : _confirmPendingStatus,
                       icon: const Icon(Icons.check),
                       label: const Text('Valider le statut'),
                     ),
@@ -965,9 +961,7 @@ class _MaraudeSectionState extends ConsumerState<_MaraudeSection> {
             if (concert.cancellationReason != null)
               Text('Motif : ${concert.cancellationReason}'),
             if (concert.cancelledAt != null)
-              Text(
-                'Annulée le ${formatFrenchDateTime(concert.cancelledAt!)}',
-              ),
+              Text('Annulée le ${formatFrenchDateTime(concert.cancelledAt!)}'),
             if (concert.cancellationOrigin != null)
               Text('Origine : ${concert.cancellationOrigin!.label}'),
           ],
@@ -1423,9 +1417,7 @@ class _CancelMaraudeDialogState extends State<_CancelMaraudeDialog> {
           TextField(
             key: const ValueKey('cancel-maraude-reason'),
             controller: _reasonController,
-            decoration: const InputDecoration(
-              labelText: 'Motif (optionnel)',
-            ),
+            decoration: const InputDecoration(labelText: 'Motif (optionnel)'),
             minLines: 2,
             maxLines: 3,
           ),
@@ -2760,10 +2752,8 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
               onReject: () => _rejectApplication(application.id),
               onRemove: () => _removeVolunteer(application.id),
               onRoleChanged: (role) => _assignRole(application.id, role),
-              onToggleLock: (locked) =>
-                  _toggleRoleLock(application.id, locked),
-              onRemindConfirmation: () =>
-                  _remindConfirmation(application.id),
+              onToggleLock: (locked) => _toggleRoleLock(application.id, locked),
+              onRemindConfirmation: () => _remindConfirmation(application.id),
             ),
       ],
     );
@@ -2832,10 +2822,8 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
           );
           return searchableValue.contains(query);
         }).toList()..sort((left, right) {
-          final leftSelected =
-              left.status == ConcertVolunteerStatus.selected;
-          final rightSelected =
-              right.status == ConcertVolunteerStatus.selected;
+          final leftSelected = left.status == ConcertVolunteerStatus.selected;
+          final rightSelected = right.status == ConcertVolunteerStatus.selected;
           if (leftSelected != rightSelected) return leftSelected ? -1 : 1;
           return _compareApplications(left, right);
         });
@@ -2859,9 +2847,10 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
   Future<void> _selectVolunteer(String applicationId) async {
     setState(() => _updatingApplications.add(applicationId));
     try {
-      await ref
-          .read(concertVolunteerRepositoryProvider)
-          .selectVolunteers(widget.concertId, [applicationId]);
+      await ref.read(concertVolunteerRepositoryProvider).selectVolunteers(
+        widget.concertId,
+        [applicationId],
+      );
       ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2869,7 +2858,9 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       );
     } catch (error) {
       if (!mounted) return;
-      _showError(describeError(error, 'Impossible de sélectionner ce bénévole.'));
+      _showError(
+        describeError(error, 'Impossible de sélectionner ce bénévole.'),
+      );
     } finally {
       if (mounted) {
         setState(() => _updatingApplications.remove(applicationId));
@@ -2979,9 +2970,9 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
       ref.invalidate(concertDetailsProvider(widget.concertId));
       ref.invalidate(concertsProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Équipe validée.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Équipe validée.')));
     } catch (error) {
       if (!mounted) return;
       _showError(describeError(error, 'Impossible de valider l’équipe.'));
@@ -3248,11 +3239,20 @@ class _PromoterApplications extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Volontaires',
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          alignment: WrapAlignment.spaceBetween,
+          children: [
+            Text(
+              'Volontaires',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            _CopyTeamEmailsButton(applications: applications),
+          ],
         ),
         const SizedBox(height: 12),
         for (final application in applications)
@@ -3265,7 +3265,16 @@ class _PromoterApplications extends StatelessWidget {
                 size: DsAvatarSize.lg,
               ),
               title: Text(application.displayName),
-              subtitle: Text(application.status.label),
+              subtitle: switch (_nonEmptyEmail(application)) {
+                final email? => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(application.status.label),
+                    _VolunteerEmailLine(email: email),
+                  ],
+                ),
+                null => Text(application.status.label),
+              },
               trailing: application.teamRole == null
                   ? null
                   : Chip(
@@ -3274,6 +3283,78 @@ class _PromoterApplications extends StatelessWidget {
                     ),
             ),
           ),
+      ],
+    );
+  }
+}
+
+String? _nonEmptyEmail(ConcertVolunteerApplication application) {
+  final trimmed = application.profile?.email?.trim();
+  return trimmed == null || trimmed.isEmpty ? null : trimmed;
+}
+
+Future<void> _copyToClipboard(
+  BuildContext context,
+  String text,
+  String confirmation,
+) async {
+  await Clipboard.setData(ClipboardData(text: text));
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(confirmation)));
+}
+
+/// Copies the e-mails of the selected team so the tourneur or an admin can
+/// paste them as recipients when sending QR codes / venue access. Only
+/// selected volunteers count: tourneurs only receive those e-mails anyway
+/// (see get_promoter_concert_applications), and admins see every candidate.
+class _CopyTeamEmailsButton extends StatelessWidget {
+  const _CopyTeamEmailsButton({required this.applications});
+
+  final List<ConcertVolunteerApplication> applications;
+
+  @override
+  Widget build(BuildContext context) {
+    final emails = [
+      for (final application in applications)
+        if (application.status == ConcertVolunteerStatus.selected)
+          ?_nonEmptyEmail(application),
+    ];
+    if (emails.isEmpty) return const SizedBox.shrink();
+
+    return OutlinedButton.icon(
+      key: const ValueKey('copy-team-emails'),
+      onPressed: () => _copyToClipboard(
+        context,
+        emails.join(', '),
+        emails.length == 1
+            ? 'E-mail de l’équipe copié'
+            : '${emails.length} e-mails de l’équipe copiés',
+      ),
+      icon: const Icon(Icons.copy_all_outlined),
+      label: const Text('Copier les e-mails de l’équipe'),
+    );
+  }
+}
+
+class _VolunteerEmailLine extends StatelessWidget {
+  const _VolunteerEmailLine({required this.email});
+
+  final String email;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Flexible(child: SelectableText(email)),
+        IconButton(
+          tooltip: 'Copier l’e-mail',
+          visualDensity: VisualDensity.compact,
+          iconSize: 18,
+          onPressed: () => _copyToClipboard(context, email, 'E-mail copié'),
+          icon: const Icon(Icons.copy_outlined),
+        ),
       ],
     );
   }
@@ -3521,7 +3602,9 @@ class _TeamBuilderSummary extends StatelessWidget {
   final VoidCallback onValidate;
 
   List<ConcertVolunteerApplication> get _team => applications
-      .where((application) => application.status == ConcertVolunteerStatus.selected)
+      .where(
+        (application) => application.status == ConcertVolunteerStatus.selected,
+      )
       .toList(growable: false);
 
   @override
@@ -3639,6 +3722,10 @@ class _TeamBuilderSummary extends StatelessWidget {
                 icon: const Icon(Icons.verified_outlined),
                 label: const Text('Valider l’équipe'),
               ),
+            ],
+            if (team.any((member) => _nonEmptyEmail(member) != null)) ...[
+              const SizedBox(height: 12),
+              _CopyTeamEmailsButton(applications: team),
             ],
           ],
         ),
@@ -3806,6 +3893,8 @@ class _TeamCandidateCard extends StatelessWidget {
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
+                          if (_nonEmptyEmail(application) case final email?)
+                            _VolunteerEmailLine(email: email),
                           const SizedBox(height: 6),
                           Wrap(
                             spacing: 6,
@@ -3921,7 +4010,9 @@ class _TeamCandidateCard extends StatelessWidget {
                       size: 18,
                     ),
                     label: Text(
-                      application.teamRoleLocked ? 'Déverrouiller' : 'Verrouiller',
+                      application.teamRoleLocked
+                          ? 'Déverrouiller'
+                          : 'Verrouiller',
                     ),
                   ),
                 ],

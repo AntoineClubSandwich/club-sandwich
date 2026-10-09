@@ -284,10 +284,13 @@ class ConcertDraft {
     required this.venueId,
     this.promoterOrganizationId,
     this.cateringContactName,
+    this.cateringContactPhone,
+    this.cateringContactEmail,
     this.cateringClosesAt,
     this.notes,
     this.promoterContactName,
     this.promoterContactPhone,
+    this.promoterContactEmail,
   });
 
   final String artist;
@@ -295,10 +298,13 @@ class ConcertDraft {
   final String venueId;
   final String? promoterOrganizationId;
   final String? cateringContactName;
+  final String? cateringContactPhone;
+  final String? cateringContactEmail;
   final String? cateringClosesAt;
   final String? notes;
   final String? promoterContactName;
   final String? promoterContactPhone;
+  final String? promoterContactEmail;
 
   Map<String, dynamic> toJson() {
     return {
@@ -306,10 +312,13 @@ class ConcertDraft {
       'concert_date': _dateToJson(date),
       'venue_id': venueId,
       'catering_contact_name': _nullIfBlank(cateringContactName),
+      'catering_contact_phone': _nullIfBlank(cateringContactPhone),
+      'catering_contact_email': _nullIfBlank(cateringContactEmail),
       'catering_closes_at': cateringClosesAt,
       'notes': notes,
       'promoter_contact_name': _nullIfBlank(promoterContactName),
       'promoter_contact_phone': _nullIfBlank(promoterContactPhone),
+      'promoter_contact_email': _nullIfBlank(promoterContactEmail),
     };
   }
 }

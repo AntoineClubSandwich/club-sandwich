@@ -138,23 +138,25 @@ class MaraudeOperationRepository {
   Future<void> deleteCollection(String id) =>
       client.from('maraude_collections').delete().eq('id', id);
 
+  /// [returnedBoxesByAllocation] is what went back from the bags to the
+  /// stock at the end of the distribution, per box reference - the boxes
+  /// distributed are deduced server-side (taken - returned), which also
+  /// credits the stock. See
+  /// 20260921000000_return_unused_boxes_to_stock_at_distribution_end.sql.
   Future<MaraudeDistribution> saveDistribution({
     required String concertId,
-    required Map<String, int> distributedBoxesByAllocation,
+    required Map<String, int> returnedBoxesByAllocation,
     required int beneficiaries,
     String? comment,
   }) async {
     final row = await client
         .rpc(
-          'save_maraude_distribution_v4',
+          'save_maraude_distribution_v5',
           params: {
             'requested_concert_id': concertId,
-            'requested_box_distributions': [
-              for (final entry in distributedBoxesByAllocation.entries)
-                {
-                  'allocation_id': entry.key,
-                  'distributed_quantity': entry.value,
-                },
+            'requested_box_returns': [
+              for (final entry in returnedBoxesByAllocation.entries)
+                {'allocation_id': entry.key, 'returned_quantity': entry.value},
             ],
             'requested_beneficiaries': beneficiaries,
             'requested_comment': comment,

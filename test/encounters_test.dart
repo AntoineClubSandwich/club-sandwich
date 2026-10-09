@@ -3,12 +3,14 @@ import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/consumables/domain/consumable.dart';
+import 'package:club_sandwich/features/distributions/domain/maraude_distribution.dart';
 import 'package:club_sandwich/features/encounters/data/encounter_location_service.dart';
 import 'package:club_sandwich/features/encounters/data/encounter_providers.dart';
 import 'package:club_sandwich/features/encounters/data/encounter_repository.dart';
 import 'package:club_sandwich/features/encounters/domain/encounter_cluster.dart';
 import 'package:club_sandwich/features/encounters/domain/maraude_encounter.dart';
 import 'package:club_sandwich/features/encounters/presentation/encounter_map_screen.dart';
+import 'package:club_sandwich/features/equipment/domain/equipment_asset.dart';
 import 'package:club_sandwich/features/operations/data/maraude_operation_providers.dart';
 import 'package:club_sandwich/features/operations/data/maraude_operation_repository.dart';
 import 'package:club_sandwich/features/operations/domain/maraude_workflow.dart';
@@ -155,7 +157,7 @@ void main() {
     });
 
     testWidgets(
-      'Distribution calcule les boîtes restantes depuis le stock emporté',
+      'Distribution déduit les boîtes distribuées des boîtes remises au stock',
       (tester) async {
         await tester.pumpWidget(
           ProviderScope(
@@ -191,23 +193,256 @@ void main() {
         expect(find.text('50 boîtes emportées · 2 références'), findsOneWidget);
         expect(find.text('Boîtes alimentaires'), findsOneWidget);
         expect(find.text('Petites barquettes'), findsOneWidget);
-        expect(find.text('38 boîtes restantes'), findsOneWidget);
-        expect(find.text('12 boîtes restantes'), findsOneWidget);
+        // Rien n'a encore été remis au stock : tout est à distribuer.
+        expect(find.text('38 boîtes distribuées'), findsOneWidget);
+        expect(find.text('12 boîtes distribuées'), findsOneWidget);
+        expect(find.text('Boîtes remises au stock'), findsNWidgets(2));
 
         await tester.enterText(
-          find.byKey(const ValueKey('distributed-allocation-1')),
-          '25',
+          find.byKey(const ValueKey('returned-allocation-1')),
+          '13',
         );
         await tester.enterText(
-          find.byKey(const ValueKey('distributed-allocation-2')),
-          '5',
+          find.byKey(const ValueKey('returned-allocation-2')),
+          '11',
         );
         await tester.pump();
 
-        expect(find.text('13 boîtes restantes'), findsOneWidget);
-        expect(find.text('7 boîtes restantes'), findsOneWidget);
+        expect(find.text('25 boîtes distribuées'), findsOneWidget);
+        expect(find.text('1 boîte distribuée'), findsOneWidget);
       },
     );
+
+    testWidgets('la distribution envoie les boîtes remises au stock', (
+      tester,
+    ) async {
+      final repository = _FakeOperationRepository();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserContextProvider.overrideWith(
+              (ref) async => const CurrentUserContext(
+                profileId: 'admin-1',
+                role: AppUserRole.admin,
+                status: UserAccountStatus.active,
+              ),
+            ),
+            concertDetailsProvider(
+              'maraude-1',
+            ).overrideWith((ref) async => _concert),
+            concertVolunteerSectionProvider('maraude-1').overrideWith(
+              (ref) async => const ConcertVolunteerSectionData(
+                counts: ConcertVolunteerCounts.empty(),
+                isAdmin: true,
+                applications: [],
+              ),
+            ),
+            maraudeOperationRepositoryProvider.overrideWithValue(repository),
+            maraudeOperationBundleProvider(
+              'maraude-1',
+            ).overrideWith((ref) async => _bundle),
+          ],
+          child: const MaterialApp(
+            home: MaraudeOperationScreen(concertId: 'maraude-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('returned-allocation-1')),
+        '13',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('returned-allocation-2')),
+        '2',
+      );
+      final finish = find.text('Terminer la distribution');
+      await tester.ensureVisible(finish);
+      await tester.pumpAndSettle();
+      await tester.tap(finish);
+      await tester.pumpAndSettle();
+
+      expect(repository.lastReturnedBoxes, {
+        'allocation-1': 13,
+        'allocation-2': 2,
+      });
+    });
+
+    testWidgets('on ne peut pas remettre plus de boîtes que celles emportées', (
+      tester,
+    ) async {
+      final repository = _FakeOperationRepository();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserContextProvider.overrideWith(
+              (ref) async => const CurrentUserContext(
+                profileId: 'admin-1',
+                role: AppUserRole.admin,
+                status: UserAccountStatus.active,
+              ),
+            ),
+            concertDetailsProvider(
+              'maraude-1',
+            ).overrideWith((ref) async => _concert),
+            concertVolunteerSectionProvider('maraude-1').overrideWith(
+              (ref) async => const ConcertVolunteerSectionData(
+                counts: ConcertVolunteerCounts.empty(),
+                isAdmin: true,
+                applications: [],
+              ),
+            ),
+            maraudeOperationRepositoryProvider.overrideWithValue(repository),
+            maraudeOperationBundleProvider(
+              'maraude-1',
+            ).overrideWith((ref) async => _bundle),
+          ],
+          child: const MaterialApp(
+            home: MaraudeOperationScreen(concertId: 'maraude-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('returned-allocation-2')),
+        '13',
+      );
+      final finish = find.text('Terminer la distribution');
+      await tester.ensureVisible(finish);
+      await tester.pumpAndSettle();
+      await tester.tap(finish);
+      await tester.pumpAndSettle();
+
+      expect(repository.lastReturnedBoxes, isNull);
+      expect(
+        find.textContaining('ne peuvent pas dépasser les 12 emportées'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('le retour matériel se valide d’un seul OUI', (tester) async {
+      final repository = _FakeOperationRepository();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserContextProvider.overrideWith(
+              (ref) async => const CurrentUserContext(
+                profileId: 'admin-1',
+                role: AppUserRole.admin,
+                status: UserAccountStatus.active,
+              ),
+            ),
+            concertDetailsProvider(
+              'maraude-1',
+            ).overrideWith((ref) async => _concert),
+            concertVolunteerSectionProvider('maraude-1').overrideWith(
+              (ref) async => const ConcertVolunteerSectionData(
+                counts: ConcertVolunteerCounts.empty(),
+                isAdmin: true,
+                applications: [],
+              ),
+            ),
+            maraudeOperationRepositoryProvider.overrideWithValue(repository),
+            maraudeOperationBundleProvider(
+              'maraude-1',
+            ).overrideWith((ref) async => _equipmentReturnBundle),
+          ],
+          child: const MaterialApp(
+            home: MaraudeOperationScreen(concertId: 'maraude-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('4. Retour matériel'), findsOneWidget);
+      expect(
+        find.text('Le matériel est-il restitué et propre ?'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('les sacs, les cabas et le pack logistique'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('OUI'));
+      await tester.pumpAndSettle();
+
+      expect(repository.equipmentReturnCount, 1);
+      expect(repository.lastEquipmentReturns, hasLength(1));
+      expect(repository.lastEquipmentReturns!.single.allocationId, 'equip-1');
+      expect(repository.lastEquipmentReturns!.single.returnedQuantity, 3);
+      expect(repository.lastEquipmentReturns!.single.incidentType, isNull);
+      expect(repository.stepValidationCount, 1);
+      expect(find.text('Retour matériel validé.'), findsOneWidget);
+    });
+
+    testWidgets('on peut signaler un problème matériel au retour', (
+      tester,
+    ) async {
+      final repository = _FakeOperationRepository();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUserContextProvider.overrideWith(
+              (ref) async => const CurrentUserContext(
+                profileId: 'admin-1',
+                role: AppUserRole.admin,
+                status: UserAccountStatus.active,
+              ),
+            ),
+            concertDetailsProvider(
+              'maraude-1',
+            ).overrideWith((ref) async => _concert),
+            concertVolunteerSectionProvider('maraude-1').overrideWith(
+              (ref) async => const ConcertVolunteerSectionData(
+                counts: ConcertVolunteerCounts.empty(),
+                isAdmin: true,
+                applications: [],
+              ),
+            ),
+            maraudeOperationRepositoryProvider.overrideWithValue(repository),
+            maraudeOperationBundleProvider(
+              'maraude-1',
+            ).overrideWith((ref) async => _equipmentReturnBundle),
+          ],
+          child: const MaterialApp(
+            home: MaraudeOperationScreen(concertId: 'maraude-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Signaler un problème'));
+      await tester.pumpAndSettle();
+      // Sans problème choisi, on ne peut pas valider par ce chemin.
+      final validate = find.text('Valider le retour avec ces problèmes');
+      await tester.ensureVisible(validate);
+      await tester.pumpAndSettle();
+      await tester.tap(validate);
+      await tester.pumpAndSettle();
+      expect(repository.equipmentReturnCount, 0);
+
+      await tester.tap(find.text('Aucun problème'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('À nettoyer').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Précisions (quantité, état…)'),
+        'Sale',
+      );
+      await tester.ensureVisible(validate);
+      await tester.pumpAndSettle();
+      await tester.tap(validate);
+      await tester.pumpAndSettle();
+
+      expect(repository.equipmentReturnCount, 1);
+      final sent = repository.lastEquipmentReturns!.single;
+      expect(sent.allocationId, 'equip-1');
+      expect(sent.incidentType, EquipmentIncidentType.needsCleaning);
+      expect(sent.incidentNote, 'Sale');
+      expect(repository.stepValidationCount, 1);
+    });
 
     testWidgets('une validation ouvre automatiquement l’étape suivante', (
       tester,
@@ -246,7 +481,27 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('1. Préparation'), findsOneWidget);
-      await tester.tap(find.text('Valider et continuer'));
+      expect(
+        find.text('Avez-vous bien tout le matériel nécessaire ?'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('les sacs, les cabas et le pack logistique'),
+        findsOneWidget,
+      );
+      // Tant que le matériel n'est pas confirmé, on ne peut pas continuer.
+      final validate = find.text('Valider et continuer');
+      await tester.ensureVisible(validate);
+      await tester.pumpAndSettle();
+      await tester.tap(validate);
+      await tester.pumpAndSettle();
+      expect(repository.preparationValidationCount, 0);
+
+      await tester.tap(find.text('OUI'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(validate);
+      await tester.pumpAndSettle();
+      await tester.tap(validate);
       await tester.pumpAndSettle();
 
       expect(repository.preparationValidationCount, 1);
@@ -331,6 +586,30 @@ final _preparationBundle = MaraudeOperationBundle(
   history: const [],
 );
 
+final _equipmentReturnBundle = MaraudeOperationBundle(
+  operation: MaraudeOperation(
+    concertId: 'maraude-1',
+    currentStep: MaraudeOperationalStep.equipmentReturn,
+    createdAt: DateTime(2026, 8, 25),
+    updatedAt: DateTime(2026, 8, 25),
+  ),
+  consumables: const [],
+  equipment: const [
+    MaraudeEquipmentAllocation(
+      id: 'equip-1',
+      concertId: 'maraude-1',
+      equipmentId: 'asset-1',
+      name: 'Glacières',
+      status: EquipmentStatus.inUse,
+      quantityTotal: 4,
+      plannedQuantity: 3,
+      takenQuantity: 3,
+    ),
+  ],
+  collections: const [],
+  history: const [],
+);
+
 class _FakeLocationService extends EncounterLocationService {
   const _FakeLocationService();
 
@@ -387,6 +666,9 @@ class _FakeOperationRepository extends MaraudeOperationRepository {
       );
 
   int preparationValidationCount = 0;
+  Map<String, int>? lastReturnedBoxes;
+  int equipmentReturnCount = 0;
+  int stepValidationCount = 0;
 
   @override
   Future<void> validatePreparation({
@@ -396,4 +678,40 @@ class _FakeOperationRepository extends MaraudeOperationRepository {
   }) async {
     preparationValidationCount++;
   }
+
+  @override
+  Future<MaraudeDistribution> saveDistribution({
+    required String concertId,
+    required Map<String, int> returnedBoxesByAllocation,
+    required int beneficiaries,
+    String? comment,
+  }) async {
+    lastReturnedBoxes = returnedBoxesByAllocation;
+    return MaraudeDistribution(
+      id: 'distribution-1',
+      concertId: concertId,
+      estimatedBeneficiaries: beneficiaries,
+      createdAt: DateTime(2026, 8, 25),
+      updatedAt: DateTime(2026, 8, 25),
+    );
+  }
+
+  @override
+  Future<void> recordEquipmentReturn({
+    required String concertId,
+    required List<EquipmentReturnDraft> returns,
+  }) async {
+    equipmentReturnCount++;
+    lastEquipmentReturns = returns;
+  }
+
+  @override
+  Future<void> validateStep(
+    String concertId,
+    MaraudeOperationalStep step,
+  ) async {
+    stepValidationCount++;
+  }
+
+  List<EquipmentReturnDraft>? lastEquipmentReturns;
 }

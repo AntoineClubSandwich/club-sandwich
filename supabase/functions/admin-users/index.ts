@@ -155,7 +155,8 @@ async function resendInvitation(
   // alors sur un e-mail de réinitialisation, qui redonne un lien valide pour
   // définir un mot de passe — que le compte soit encore "invited" (termine
   // l'activation) ou déjà "active" (a juste oublié son mot de passe).
-  if (userResult.user.email_confirmed_at) {
+  const isRecovery = Boolean(userResult.user.email_confirmed_at);
+  if (isRecovery) {
     const { error: recoveryError } = await client.auth.resetPasswordForEmail(
       userResult.user.email,
       { redirectTo },
@@ -172,6 +173,28 @@ async function resendInvitation(
     if (error) throw error;
   }
 
+  // A one-time link is only ever good for whichever click reaches GoTrue
+  // first — a corporate mail gateway that prefetches links (common with
+  // Microsoft Defender "Safe Links") can silently burn it before the real
+  // recipient ever sees the email, with no visible error on their end. This
+  // second link, generated fresh right now, isn't the one just emailed
+  // above (each call mints its own token) - it exists so an admin can hand
+  // it to the person directly (WhatsApp, Slack...) over a channel that
+  // never goes through their mail security.
+  const { data: generated, error: generationError } = await client.auth.admin
+    .generateLink(
+      isRecovery
+        ? { type: "recovery", email: userResult.user.email, options: { redirectTo } }
+        : {
+          type: "invite",
+          email: userResult.user.email,
+          options: { redirectTo, data: userResult.user.user_metadata },
+        },
+    );
+  const activationUrl = generationError
+    ? null
+    : generated.properties.action_link;
+
   // Un compte déjà actif qui redemande juste un lien (mot de passe oublié)
   // ne doit jamais être rétrogradé en "invited" : ça le renverrait à tort
   // vers l'écran d'activation au prochain lien cliqué.
@@ -183,7 +206,7 @@ async function resendInvitation(
       disabled_at: null,
     }).eq("profile_id", profileId);
   }
-  return json({ ok: true });
+  return json({ ok: true, activationUrl });
 }
 
 async function updateUser(client: ReturnType<typeof createClient>, body: any) {

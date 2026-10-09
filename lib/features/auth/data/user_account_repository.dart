@@ -68,15 +68,19 @@ class UserAccountRepository {
     );
   }
 
-  Future<void> resendInvitation(
+  Future<UserInvitationDelivery> resendInvitation(
     String profileId, {
     required String redirectTo,
   }) async {
-    await _invokeAdminUsers({
+    final data = await _invokeAdminUsers({
       'action': 'resend',
       'profileId': profileId,
       'redirectTo': redirectTo,
     });
+    return UserInvitationDelivery(
+      emailSent: true,
+      activationUrl: data['activationUrl'] as String?,
+    );
   }
 
   Future<void> updateUser({

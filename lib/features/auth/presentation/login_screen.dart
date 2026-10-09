@@ -137,6 +137,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: const Text('Mot de passe oublié ?'),
                   ),
                 ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _isLoading
+                        ? null
+                        : () => context.go('/enter-code'),
+                    child: const Text('J’ai reçu un code par e-mail'),
+                  ),
+                ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 4),
                   Semantics(

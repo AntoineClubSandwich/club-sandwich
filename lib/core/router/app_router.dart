@@ -4,6 +4,7 @@ import 'package:club_sandwich/features/administration/presentation/administratio
 import 'package:club_sandwich/features/auth/application/auth_providers.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/auth/presentation/activation_screen.dart';
+import 'package:club_sandwich/features/auth/presentation/enter_code_screen.dart';
 import 'package:club_sandwich/features/auth/presentation/forgot_password_screen.dart';
 import 'package:club_sandwich/features/auth/presentation/login_screen.dart';
 import 'package:club_sandwich/features/auth/presentation/reset_password_screen.dart';
@@ -27,6 +28,7 @@ abstract final class AppRoutes {
   static const login = '/login';
   static const forgotPassword = '/forgot-password';
   static const resetPassword = '/reset-password';
+  static const enterCode = '/enter-code';
   static const activate = '/activate';
   static const dashboard = '/dashboard';
   static const maraudes = '/maraudes';
@@ -67,6 +69,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           state.matchedLocation == AppRoutes.forgotPassword;
       final isOnResetPassword =
           state.matchedLocation == AppRoutes.resetPassword;
+      final isOnEnterCode = state.matchedLocation == AppRoutes.enterCode;
       final isOnActivation = state.matchedLocation == AppRoutes.activate;
 
       // Supabase opens a real authenticated session as soon as the
@@ -77,7 +80,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return isOnResetPassword ? null : AppRoutes.resetPassword;
       }
 
-      if (!isAuthenticated && !isOnLogin && !isOnForgotPassword) {
+      if (!isAuthenticated &&
+          !isOnLogin &&
+          !isOnForgotPassword &&
+          !isOnEnterCode) {
         return AppRoutes.login;
       }
       if (!isAuthenticated) return null;
@@ -93,7 +99,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (accountContext.status == UserAccountStatus.invited) {
         return isOnActivation ? null : AppRoutes.activate;
       }
-      if (isOnLogin || isOnActivation) return AppRoutes.dashboard;
+      if (isOnLogin || isOnActivation || isOnEnterCode) {
+        return AppRoutes.dashboard;
+      }
 
       final location = state.matchedLocation;
       if (!_isAllowed(accountContext.role, location)) {
@@ -113,6 +121,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.resetPassword,
         builder: (context, state) => const ResetPasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.enterCode,
+        builder: (context, state) => const EnterCodeScreen(),
       ),
       GoRoute(
         path: AppRoutes.activate,

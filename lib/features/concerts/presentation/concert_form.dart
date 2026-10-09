@@ -29,8 +29,11 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
   late final TextEditingController _artistController;
   late final TextEditingController _notesController;
   late final TextEditingController _cateringContactNameController;
+  late final TextEditingController _cateringContactPhoneController;
+  late final TextEditingController _cateringContactEmailController;
   late final TextEditingController _promoterContactNameController;
   late final TextEditingController _promoterContactPhoneController;
+  late final TextEditingController _promoterContactEmailController;
   late DateTime _date;
   TimeOfDay? _cateringClosesAt;
   Venue? _selectedVenue;
@@ -46,11 +49,20 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
     _cateringContactNameController = TextEditingController(
       text: concert?.cateringContactName,
     );
+    _cateringContactPhoneController = TextEditingController(
+      text: concert?.cateringContactPhone,
+    );
+    _cateringContactEmailController = TextEditingController(
+      text: concert?.cateringContactEmail,
+    );
     _promoterContactNameController = TextEditingController(
       text: concert?.promoterContactName,
     );
     _promoterContactPhoneController = TextEditingController(
       text: concert?.promoterContactPhone,
+    );
+    _promoterContactEmailController = TextEditingController(
+      text: concert?.promoterContactEmail,
     );
     _date = concert?.date ?? DateTime.now();
     _cateringClosesAt = _optionalTimeFromDatabase(concert?.cateringClosesAt);
@@ -63,8 +75,11 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
     _artistController.dispose();
     _notesController.dispose();
     _cateringContactNameController.dispose();
+    _cateringContactPhoneController.dispose();
+    _cateringContactEmailController.dispose();
     _promoterContactNameController.dispose();
     _promoterContactPhoneController.dispose();
+    _promoterContactEmailController.dispose();
     super.dispose();
   }
 
@@ -158,15 +173,17 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
                     child: Text(_formatDate(_date)),
                   ),
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  key: const ValueKey('concert-catering-name-field'),
-                  controller: _cateringContactNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nom du catering (optionnel)',
+                if (widget.isEditing) ...[
+                  const SizedBox(height: 16),
+                  _ContactFields(
+                    fieldKeyPrefix: 'catering-contact',
+                    title: 'Contact catering',
+                    nameLabel: 'Nom du catering',
+                    nameController: _cateringContactNameController,
+                    phoneController: _cateringContactPhoneController,
+                    emailController: _cateringContactEmailController,
                   ),
-                  textInputAction: TextInputAction.next,
-                ),
+                ],
                 const SizedBox(height: 16),
                 Text(
                   'Fermeture du catering '
@@ -211,6 +228,7 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
                   nameLabel: 'Nom et prénom',
                   nameController: _promoterContactNameController,
                   phoneController: _promoterContactPhoneController,
+                  emailController: _promoterContactEmailController,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -311,6 +329,12 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
           cateringContactName: _optionalValue(
             _cateringContactNameController.text,
           ),
+          cateringContactPhone: _optionalValue(
+            _cateringContactPhoneController.text,
+          ),
+          cateringContactEmail: _optionalValue(
+            _cateringContactEmailController.text,
+          ),
           cateringClosesAt: _cateringClosesAt == null
               ? null
               : _timeToDatabase(_cateringClosesAt!),
@@ -320,6 +344,9 @@ class _ConcertFormState extends ConsumerState<ConcertForm> {
           ),
           promoterContactPhone: _optionalValue(
             _promoterContactPhoneController.text,
+          ),
+          promoterContactEmail: _optionalValue(
+            _promoterContactEmailController.text,
           ),
         ),
       );
@@ -421,6 +448,7 @@ class _ContactFields extends StatelessWidget {
     required this.title,
     required this.nameController,
     required this.phoneController,
+    this.emailController,
     this.helper,
     this.nameLabel = 'Nom',
   });
@@ -431,6 +459,7 @@ class _ContactFields extends StatelessWidget {
   final String nameLabel;
   final TextEditingController nameController;
   final TextEditingController phoneController;
+  final TextEditingController? emailController;
 
   @override
   Widget build(BuildContext context) {
@@ -457,6 +486,16 @@ class _ContactFields extends StatelessWidget {
           keyboardType: TextInputType.phone,
           textInputAction: TextInputAction.next,
         ),
+        if (emailController != null) ...[
+          const SizedBox(height: 12),
+          TextFormField(
+            key: ValueKey('$fieldKeyPrefix-email'),
+            controller: emailController,
+            decoration: const InputDecoration(labelText: 'E-mail'),
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+          ),
+        ],
       ],
     );
   }

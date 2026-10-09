@@ -9,6 +9,7 @@ import 'package:club_sandwich/features/auth/data/auth_repository.dart';
 import 'package:club_sandwich/features/auth/data/user_account_repository.dart';
 import 'package:club_sandwich/features/auth/domain/user_account.dart';
 import 'package:club_sandwich/features/auth/presentation/activation_screen.dart';
+import 'package:club_sandwich/features/auth/presentation/enter_code_screen.dart';
 import 'package:club_sandwich/features/auth/presentation/forgot_password_screen.dart';
 import 'package:club_sandwich/features/auth/presentation/reset_password_screen.dart';
 import 'package:club_sandwich/features/concerts/data/concert_providers.dart';
@@ -322,6 +323,34 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ForgotPasswordScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'le lien code par e-mail ouvre l’écran dédié depuis la connexion',
+    (tester) async {
+      final authRepository = _AuthenticatedAuthRepository();
+      addTearDown(authRepository.dispose);
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(authRepository)],
+      );
+      addTearDown(container.dispose);
+      await authRepository.signOut();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _RouterTestApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Se connecter'), findsOneWidget);
+
+      await tester.tap(find.text('J’ai reçu un code par e-mail'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EnterCodeScreen), findsOneWidget);
     },
   );
 

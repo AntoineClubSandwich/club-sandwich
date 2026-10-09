@@ -39,14 +39,12 @@ class _MaraudeOperationScreenState
     extends ConsumerState<MaraudeOperationScreen> {
   MaraudeOperationalStep? _viewedStep;
   final Map<String, TextEditingController> _preparationControllers = {};
-  final Map<String, TextEditingController> _returnControllers = {};
   final Map<String, TextEditingController> _distributionControllers = {};
-  final Map<String, EquipmentIncidentType?> _incidents = {};
-  final Map<String, TextEditingController> _incidentNotes = {};
   final ScrollController _stepScrollController = ScrollController();
   final _beneficiaries = TextEditingController();
   final _distributionComment = TextEditingController();
   var _distributionInitialized = false;
+  var _equipmentConfirmed = false;
   var _saving = false;
   var _recordingEncounter = false;
 
@@ -54,9 +52,7 @@ class _MaraudeOperationScreenState
   void dispose() {
     for (final controller in [
       ..._preparationControllers.values,
-      ..._returnControllers.values,
       ..._distributionControllers.values,
-      ..._incidentNotes.values,
       _beneficiaries,
       _distributionComment,
     ]) {
@@ -174,39 +170,29 @@ class _MaraudeOperationScreenState
         ),
       );
     }
-    for (final item in data.equipment) {
-      _preparationControllers.putIfAbsent(
-        'e-${item.id}',
-        () => TextEditingController(
-          text: '${item.takenQuantity ?? item.plannedQuantity}',
-        ),
-      );
-      _returnControllers.putIfAbsent(
-        item.id,
-        () => TextEditingController(
-          text: '${item.returnedQuantity ?? item.takenQuantity ?? 0}',
-        ),
-      );
-      _incidentNotes.putIfAbsent(
-        item.id,
-        () => TextEditingController(text: item.incidentNote),
-      );
-      _incidents.putIfAbsent(item.id, () => item.incidentType);
-    }
     if (!_distributionInitialized) {
       final boxAllocations = data.consumables
           .where((item) => item.unit == InventoryUnit.box)
           .toList(growable: false);
       for (final item in boxAllocations) {
-        var distributed = item.distributedBoxes;
-        if (item.distributedQuantity == null && boxAllocations.length == 1) {
-          final legacyTotal = data.distribution?.distributedBoxes ?? 0;
-          distributed = legacyTotal > item.preparedBoxes
-              ? item.preparedBoxes
-              : legacyTotal;
+        // What went back to the stock: nothing until the distribution has
+        // been saved once, so the field starts at 0 and the volunteers
+        // count the boxes left in the bags.
+        var returned = 0;
+        if (item.distributedQuantity != null) {
+          returned = item.remainingBoxes;
+        } else if (boxAllocations.length == 1) {
+          final legacyTotal = data.distribution?.distributedBoxes;
+          if (legacyTotal != null) {
+            returned =
+                item.preparedBoxes -
+                (legacyTotal > item.preparedBoxes
+                    ? item.preparedBoxes
+                    : legacyTotal);
+          }
         }
         _distributionControllers[item.id] = TextEditingController(
-          text: '$distributed',
+          text: '$returned',
         );
       }
       _beneficiaries.text = '${data.distribution?.estimatedBeneficiaries ?? 0}';
@@ -227,9 +213,10 @@ class _MaraudeOperationScreenState
       controllers: _preparationControllers,
       saving: _saving,
       active: current == viewed,
+      equipmentConfirmed: _equipmentConfirmed,
+      onConfirmEquipment: () => setState(() => _equipmentConfirmed = true),
       onValidate: () => _validatePreparation(data),
       onAddConsumable: () => _addConsumable(data),
-      onAddEquipment: () => _addEquipment(data),
     ),
     MaraudeOperationalStep.collection => _CollectionStep(
       data: data,
@@ -248,19 +235,15 @@ class _MaraudeOperationScreenState
       saving: _saving,
       recordingEncounter: _recordingEncounter,
       active: current == viewed,
-      onDistributedChanged: () => setState(() {}),
+      onReturnedChanged: () => setState(() {}),
       onRecordEncounter: _recordEncounter,
       onSave: () => _saveDistribution(data, validate: current == viewed),
     ),
     MaraudeOperationalStep.equipmentReturn => _EquipmentReturnStep(
       data: data,
-      returnControllers: _returnControllers,
-      incidents: _incidents,
-      incidentNotes: _incidentNotes,
       saving: _saving,
       active: current == viewed,
-      onIncidentChanged: (id, value) => setState(() => _incidents[id] = value),
-      onSave: () => _saveReturns(data, validate: current == viewed),
+      onConfirm: (problems) => _confirmEquipmentReturn(data, problems),
     ),
     MaraudeOperationalStep.summary => _SummaryStep(
       data: data,
@@ -282,9 +265,13 @@ class _MaraudeOperationScreenState
                 _preparationControllers['c-${item.id}']!.text,
               ),
           },
+          // Confirming "tout le matériel" means the planned equipment was
+          // taken - the quantities are no longer typed in by hand.
           equipmentQuantities: {
             for (final item in data.equipment)
-              item.id: _parseInt(_preparationControllers['e-${item.id}']!.text),
+              item.id: item.plannedQuantity > item.quantityTotal
+                  ? item.quantityTotal
+                  : item.plannedQuantity,
           },
         ),
     'Préparation validée.',
@@ -314,16 +301,17 @@ class _MaraudeOperationScreenState
       );
       return;
     }
-    final picked = await showDialog<_PickedResource<MaraudeResourceCatalogConsumable>>(
-      context: context,
-      builder: (_) => _AddResourceDialog<MaraudeResourceCatalogConsumable>(
-        title: 'Ajouter un consommable',
-        items: available,
-        labelFor: (item) =>
-            '${item.name} · ${_number(item.currentQuantity)} ${item.unit.label} en stock',
-        integer: false,
-      ),
-    );
+    final picked =
+        await showDialog<_PickedResource<MaraudeResourceCatalogConsumable>>(
+          context: context,
+          builder: (_) => _AddResourceDialog<MaraudeResourceCatalogConsumable>(
+            title: 'Ajouter un consommable',
+            items: available,
+            labelFor: (item) =>
+                '${item.name} · ${_number(item.currentQuantity)} ${item.unit.label} en stock',
+            integer: false,
+          ),
+        );
     if (picked == null) return;
     await _run(
       () => ref
@@ -331,51 +319,6 @@ class _MaraudeOperationScreenState
           .addResourceAllocation(
             concertId: widget.concertId,
             consumableId: picked.item.id,
-            quantity: picked.quantity,
-          ),
-      '${picked.item.name} ajouté.',
-    );
-  }
-
-  Future<void> _addEquipment(MaraudeOperationBundle data) async {
-    final catalog = await ref
-        .read(maraudeOperationRepositoryProvider)
-        .fetchEquipmentCatalog(widget.concertId);
-    if (!mounted) return;
-    final existingIds = data.equipment
-        .map((item) => item.equipmentId)
-        .toSet();
-    final available = catalog
-        .where((item) => !existingIds.contains(item.id))
-        .toList(growable: false);
-    if (available.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            catalog.isEmpty
-                ? 'Aucun matériel disponible dans le stock.'
-                : 'Tout le matériel du stock est déjà listé.',
-          ),
-        ),
-      );
-      return;
-    }
-    final picked = await showDialog<_PickedResource<MaraudeResourceCatalogEquipment>>(
-      context: context,
-      builder: (_) => _AddResourceDialog<MaraudeResourceCatalogEquipment>(
-        title: 'Ajouter du matériel',
-        items: available,
-        labelFor: (item) => '${item.name} · ${item.quantityTotal} disponible(s)',
-        integer: true,
-      ),
-    );
-    if (picked == null) return;
-    await _run(
-      () => ref
-          .read(maraudeOperationRepositoryProvider)
-          .addResourceAllocation(
-            concertId: widget.concertId,
-            equipmentId: picked.item.id,
             quantity: picked.quantity,
           ),
       '${picked.item.name} ajouté.',
@@ -456,21 +399,21 @@ class _MaraudeOperationScreenState
     final boxAllocations = data.consumables.where(
       (item) => item.unit == InventoryUnit.box,
     );
-    final distributedByAllocation = <String, int>{};
+    final returnedByAllocation = <String, int>{};
     for (final item in boxAllocations) {
-      final distributed = _parseInt(_distributionControllers[item.id]!.text);
-      if (distributed > item.preparedBoxes) {
+      final returned = _parseInt(_distributionControllers[item.id]!.text);
+      if (returned > item.preparedBoxes) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${item.name} : la quantité écoulée ne peut pas dépasser les '
-              '${item.preparedBoxes} emportées.',
+              '${item.name} : les boîtes remises au stock ne peuvent pas '
+              'dépasser les ${item.preparedBoxes} emportées.',
             ),
           ),
         );
         return;
       }
-      distributedByAllocation[item.id] = distributed;
+      returnedByAllocation[item.id] = returned;
     }
     await _run(
       () async {
@@ -478,7 +421,7 @@ class _MaraudeOperationScreenState
             .read(maraudeOperationRepositoryProvider)
             .saveDistribution(
               concertId: widget.concertId,
-              distributedBoxesByAllocation: distributedByAllocation,
+              returnedBoxesByAllocation: returnedByAllocation,
               beneficiaries: _parseInt(_beneficiaries.text),
               comment: _distributionComment.text,
             );
@@ -546,10 +489,13 @@ class _MaraudeOperationScreenState
     }
   }
 
-  Future<void> _saveReturns(
-    MaraudeOperationBundle data, {
-    required bool validate,
-  }) => _run(
+  /// "Le matériel est-il restitué et propre ?" - answering OUI records
+  /// everything taken as returned, with no incident, then closes the step.
+  /// [problems] holds the incidents reported instead (by allocation id).
+  Future<void> _confirmEquipmentReturn(
+    MaraudeOperationBundle data,
+    Map<String, _EquipmentProblem> problems,
+  ) => _run(
     () async {
       await ref
           .read(maraudeOperationRepositoryProvider)
@@ -559,25 +505,21 @@ class _MaraudeOperationScreenState
               for (final item in data.equipment)
                 EquipmentReturnDraft(
                   allocationId: item.id,
-                  returnedQuantity: _parseInt(
-                    _returnControllers[item.id]!.text,
-                  ),
-                  incidentType: _incidents[item.id],
-                  incidentNote: _incidentNotes[item.id]!.text,
+                  returnedQuantity: item.takenQuantity ?? 0,
+                  incidentType: problems[item.id]?.type,
+                  incidentNote: problems[item.id]?.note,
                 ),
             ],
           );
-      if (validate) {
-        await ref
-            .read(maraudeOperationRepositoryProvider)
-            .validateStep(
-              widget.concertId,
-              MaraudeOperationalStep.equipmentReturn,
-            );
-      }
+      await ref
+          .read(maraudeOperationRepositoryProvider)
+          .validateStep(
+            widget.concertId,
+            MaraudeOperationalStep.equipmentReturn,
+          );
     },
-    validate ? 'Retour matériel validé.' : 'Corrections enregistrées.',
-    nextStep: validate ? MaraudeOperationalStep.summary : null,
+    'Retour matériel validé.',
+    nextStep: MaraudeOperationalStep.summary,
   );
 
   Future<void> _complete() async {
@@ -758,17 +700,19 @@ class _PreparationStep extends StatelessWidget {
     required this.controllers,
     required this.saving,
     required this.active,
+    required this.equipmentConfirmed,
+    required this.onConfirmEquipment,
     required this.onValidate,
     required this.onAddConsumable,
-    required this.onAddEquipment,
   });
   final MaraudeOperationBundle data;
   final Map<String, TextEditingController> controllers;
   final bool saving;
   final bool active;
+  final bool equipmentConfirmed;
+  final VoidCallback onConfirmEquipment;
   final VoidCallback onValidate;
   final VoidCallback onAddConsumable;
-  final VoidCallback onAddEquipment;
 
   @override
   Widget build(BuildContext context) => _StepCard(
@@ -794,29 +738,21 @@ class _PreparationStep extends StatelessWidget {
       ],
       const SizedBox(height: DsSpacing.lg),
       Text('Matériel', style: DsTypography.h3),
-      if (data.equipment.isEmpty) const Text('Aucun matériel prévu.'),
-      for (final item in data.equipment)
-        _QuantityRow(
-          label: '${item.name} · ${item.quantityTotal} disponibles',
-          controller: controllers['e-${item.id}']!,
-          enabled: active,
-          integer: true,
-        ),
-      if (active) ...[
-        const SizedBox(height: DsSpacing.sm),
-        OutlinedButton.icon(
-          onPressed: onAddEquipment,
-          icon: const Icon(Icons.add),
-          label: const Text('Ajouter du matériel'),
-        ),
-      ],
+      const SizedBox(height: DsSpacing.xs),
+      _YesConfirmation(
+        question: 'Avez-vous bien tout le matériel nécessaire ?',
+        hint: _equipmentDefinition,
+        confirmed: equipmentConfirmed || !active,
+        enabled: active,
+        onConfirm: onConfirmEquipment,
+      ),
       const SizedBox(height: DsSpacing.xl),
       DsPrimaryButton(
         label: active ? 'Valider et continuer' : 'Préparation validée',
         icon: Icons.arrow_forward,
         isLoading: saving,
         isFullWidth: true,
-        onPressed: active ? onValidate : null,
+        onPressed: active && equipmentConfirmed ? onValidate : null,
       ),
     ],
   );
@@ -894,7 +830,7 @@ class _DistributionStep extends StatelessWidget {
     required this.saving,
     required this.recordingEncounter,
     required this.active,
-    required this.onDistributedChanged,
+    required this.onReturnedChanged,
     required this.onRecordEncounter,
     required this.onSave,
   });
@@ -905,7 +841,7 @@ class _DistributionStep extends StatelessWidget {
   final bool saving;
   final bool recordingEncounter;
   final bool active;
-  final VoidCallback onDistributedChanged;
+  final VoidCallback onReturnedChanged;
   final VoidCallback onRecordEncounter;
   final VoidCallback onSave;
 
@@ -920,8 +856,28 @@ class _DistributionStep extends StatelessWidget {
           '${data.totalPreparedBoxes} boîtes emportées · '
           '${boxAllocations.length} ${boxAllocations.length == 1 ? 'référence' : 'références'}',
       children: [
-        Text('Boîtes écoulées par référence', style: DsTypography.h3),
-        const SizedBox(height: DsSpacing.sm),
+        Text('Rencontres', style: DsTypography.h3),
+        const SizedBox(height: DsSpacing.xs),
+        Text(
+          '${data.encounterCount} ${data.encounterCount == 1 ? 'rencontre enregistrée' : 'rencontres enregistrées'}',
+        ),
+        const SizedBox(height: DsSpacing.md),
+        DsPrimaryButton(
+          label: 'Enregistrer une rencontre',
+          icon: Icons.add_location_alt_outlined,
+          isLoading: recordingEncounter,
+          isFullWidth: true,
+          onPressed: active && !recordingEncounter ? onRecordEncounter : null,
+        ),
+        const Divider(height: DsSpacing.xl),
+        Text('Fin de distribution', style: DsTypography.h3),
+        const SizedBox(height: DsSpacing.xs),
+        const Text(
+          'Une fois la distribution terminée, comptez les boîtes qui restent '
+          'dans les sacs et remettez-les au stock. Les boîtes distribuées '
+          'sont calculées automatiquement.',
+        ),
+        const SizedBox(height: DsSpacing.md),
         if (boxAllocations.isEmpty)
           const Padding(
             padding: EdgeInsets.only(bottom: DsSpacing.md),
@@ -930,10 +886,10 @@ class _DistributionStep extends StatelessWidget {
             ),
           ),
         for (final item in boxAllocations)
-          _ConsumableDistributionRow(
+          _ConsumableReturnRow(
             item: item,
             controller: controllers[item.id]!,
-            onChanged: onDistributedChanged,
+            onChanged: onReturnedChanged,
           ),
         const Divider(height: DsSpacing.xl),
         _QuantityRow(
@@ -947,20 +903,6 @@ class _DistributionStep extends StatelessWidget {
           decoration: const InputDecoration(
             labelText: 'Commentaire ou incident (optionnel)',
           ),
-        ),
-        const Divider(height: DsSpacing.xl),
-        Text('Rencontres', style: DsTypography.h3),
-        const SizedBox(height: DsSpacing.xs),
-        Text(
-          '${data.encounterCount} ${data.encounterCount == 1 ? 'rencontre enregistrée' : 'rencontres enregistrées'}',
-        ),
-        const SizedBox(height: DsSpacing.md),
-        DsPrimaryButton(
-          label: 'Enregistrer une rencontre',
-          icon: Icons.add_location_alt_outlined,
-          isLoading: recordingEncounter,
-          isFullWidth: true,
-          onPressed: active && !recordingEncounter ? onRecordEncounter : null,
         ),
         const SizedBox(height: DsSpacing.xl),
         DsPrimaryButton(
@@ -977,8 +919,8 @@ class _DistributionStep extends StatelessWidget {
   }
 }
 
-class _ConsumableDistributionRow extends StatelessWidget {
-  const _ConsumableDistributionRow({
+class _ConsumableReturnRow extends StatelessWidget {
+  const _ConsumableReturnRow({
     required this.item,
     required this.controller,
     required this.onChanged,
@@ -990,8 +932,8 @@ class _ConsumableDistributionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final distributed = int.tryParse(controller.text) ?? 0;
-    final remaining = item.preparedBoxes - distributed;
+    final returned = int.tryParse(controller.text) ?? 0;
+    final distributed = item.preparedBoxes - returned;
     return Padding(
       padding: const EdgeInsets.only(bottom: DsSpacing.md),
       child: DecoratedBox(
@@ -1013,15 +955,15 @@ class _ConsumableDistributionRow extends StatelessWidget {
               ),
               const SizedBox(height: DsSpacing.md),
               _QuantityRow(
-                key: ValueKey('distributed-${item.id}'),
-                label: 'Quantité écoulée',
+                key: ValueKey('returned-${item.id}'),
+                label: 'Boîtes remises au stock',
                 controller: controller,
                 integer: true,
                 onChanged: (_) => onChanged(),
               ),
               Text(
-                '${remaining < 0 ? 0 : remaining} '
-                '${remaining == 1 ? 'boîte restante' : 'boîtes restantes'}',
+                '${distributed < 0 ? 0 : distributed} '
+                '${distributed == 1 ? 'boîte distribuée' : 'boîtes distribuées'}',
               ),
             ],
           ),
@@ -1031,66 +973,182 @@ class _ConsumableDistributionRow extends StatelessWidget {
   }
 }
 
-class _EquipmentReturnStep extends StatelessWidget {
+class _EquipmentProblem {
+  const _EquipmentProblem(this.type, this.note);
+  final EquipmentIncidentType type;
+  final String note;
+}
+
+class _EquipmentReturnStep extends StatefulWidget {
   const _EquipmentReturnStep({
     required this.data,
-    required this.returnControllers,
-    required this.incidents,
-    required this.incidentNotes,
     required this.saving,
     required this.active,
-    required this.onIncidentChanged,
-    required this.onSave,
+    required this.onConfirm,
   });
   final MaraudeOperationBundle data;
-  final Map<String, TextEditingController> returnControllers;
-  final Map<String, EquipmentIncidentType?> incidents;
-  final Map<String, TextEditingController> incidentNotes;
   final bool saving;
   final bool active;
-  final void Function(String, EquipmentIncidentType?) onIncidentChanged;
-  final VoidCallback onSave;
+  final ValueChanged<Map<String, _EquipmentProblem>> onConfirm;
 
   @override
-  Widget build(BuildContext context) => _StepCard(
-    title: '4. Retour matériel',
-    subtitle: 'Confirmez les quantités retournées et signalez les incidents.',
-    children: [
-      if (data.equipment.isEmpty) const Text('Aucun matériel à retourner.'),
-      for (final item in data.equipment) ...[
-        Text(item.name, style: DsTypography.h3),
-        _QuantityRow(
-          label: '${item.takenQuantity ?? 0} emporté(s)',
-          controller: returnControllers[item.id]!,
-          integer: true,
+  State<_EquipmentReturnStep> createState() => _EquipmentReturnStepState();
+}
+
+class _EquipmentReturnStepState extends State<_EquipmentReturnStep> {
+  var _reporting = false;
+  final Map<String, EquipmentIncidentType?> _types = {};
+  final Map<String, TextEditingController> _notes = {};
+
+  @override
+  void dispose() {
+    for (final controller in _notes.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Map<String, _EquipmentProblem> _problems() => {
+    for (final entry in _types.entries)
+      if (entry.value != null)
+        entry.key: _EquipmentProblem(
+          entry.value!,
+          _notes[entry.key]?.text.trim() ?? '',
         ),
-        DropdownButtonFormField<EquipmentIncidentType?>(
-          initialValue: incidents[item.id],
-          decoration: const InputDecoration(labelText: 'Problème éventuel'),
-          items: [
-            const DropdownMenuItem(value: null, child: Text('Aucun problème')),
-            for (final incident in EquipmentIncidentType.values)
-              DropdownMenuItem(value: incident, child: Text(incident.label)),
-          ],
-          onChanged: (value) => onIncidentChanged(item.id, value),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final problems = _problems();
+    final canReport = widget.active && widget.data.equipment.isNotEmpty;
+    return _StepCard(
+      title: '4. Retour matériel',
+      subtitle: 'Vérifiez le matériel avant de clôturer la maraude.',
+      children: [
+        _YesConfirmation(
+          question: 'Le matériel est-il restitué et propre ?',
+          hint: _equipmentDefinition,
+          confirmed: !widget.active,
+          enabled: widget.active && !_reporting,
+          isLoading: widget.saving && !_reporting,
+          onConfirm: () => widget.onConfirm(const {}),
         ),
-        if (incidents[item.id] != null) ...[
-          const SizedBox(height: DsSpacing.sm),
-          TextField(
-            controller: incidentNotes[item.id],
-            maxLines: 2,
-            decoration: const InputDecoration(labelText: 'Note d’incident'),
+        if (canReport && !_reporting) ...[
+          const SizedBox(height: DsSpacing.md),
+          DsSecondaryButton(
+            label: 'Signaler un problème',
+            icon: Icons.report_problem_outlined,
+            isFullWidth: true,
+            onPressed: () => setState(() => _reporting = true),
           ),
         ],
-        const Divider(height: DsSpacing.xl),
+        if (canReport && _reporting) ...[
+          const Divider(height: DsSpacing.xl),
+          Text('Quel matériel pose problème ?', style: DsTypography.h3),
+          const SizedBox(height: DsSpacing.sm),
+          for (final item in widget.data.equipment) ...[
+            Text(item.name, style: DsTypography.h3),
+            const SizedBox(height: DsSpacing.xs),
+            DropdownButtonFormField<EquipmentIncidentType?>(
+              initialValue: _types[item.id],
+              decoration: const InputDecoration(labelText: 'Problème éventuel'),
+              items: [
+                const DropdownMenuItem(
+                  value: null,
+                  child: Text('Aucun problème'),
+                ),
+                for (final incident in EquipmentIncidentType.values)
+                  DropdownMenuItem(
+                    value: incident,
+                    child: Text(incident.label),
+                  ),
+              ],
+              onChanged: (value) => setState(() => _types[item.id] = value),
+            ),
+            if (_types[item.id] != null) ...[
+              const SizedBox(height: DsSpacing.sm),
+              TextField(
+                controller: _notes.putIfAbsent(
+                  item.id,
+                  () => TextEditingController(),
+                ),
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Précisions (quantité, état…)',
+                ),
+              ),
+            ],
+            const SizedBox(height: DsSpacing.lg),
+          ],
+          DsPrimaryButton(
+            label: 'Valider le retour avec ces problèmes',
+            icon: Icons.arrow_forward,
+            isLoading: widget.saving,
+            isFullWidth: true,
+            // Re-read at tap time: typing in a note doesn't rebuild.
+            onPressed: problems.isEmpty
+                ? null
+                : () => widget.onConfirm(_problems()),
+          ),
+          const SizedBox(height: DsSpacing.sm),
+          TextButton(
+            onPressed: widget.saving
+                ? null
+                : () => setState(() => _reporting = false),
+            child: const Text('Annuler'),
+          ),
+        ],
       ],
-      DsPrimaryButton(
-        label: active ? 'Valider le retour' : 'Enregistrer les corrections',
-        icon: active ? Icons.arrow_forward : Icons.save_outlined,
-        isLoading: saving,
-        isFullWidth: true,
-        onPressed: onSave,
-      ),
+    );
+  }
+}
+
+/// A yes/no question where only "OUI" is offered: the volunteers must
+/// actively answer it before moving on.
+/// What "le matériel" means for the volunteers, shown under both equipment
+/// questions so nobody reads it as only the fixed assets of the stock.
+const _equipmentDefinition =
+    'Le matériel, ce sont les sacs, les cabas et le pack logistique de base '
+    '(gants, masques, nettoyant pour les mains, trousse de secours, '
+    'petits sacs…).';
+
+class _YesConfirmation extends StatelessWidget {
+  const _YesConfirmation({
+    required this.question,
+    required this.confirmed,
+    required this.enabled,
+    required this.onConfirm,
+    this.hint,
+    this.isLoading = false,
+  });
+  final String question;
+  final String? hint;
+  final bool confirmed;
+  final bool enabled;
+  final bool isLoading;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(question, style: DsTypography.h3),
+      if (hint != null) ...[const SizedBox(height: DsSpacing.xs), Text(hint!)],
+      const SizedBox(height: DsSpacing.md),
+      if (confirmed)
+        DsPrimaryButton(
+          label: 'OUI ✓',
+          icon: Icons.check_circle_outline,
+          isFullWidth: true,
+          onPressed: null,
+        )
+      else
+        DsPrimaryButton(
+          label: 'OUI',
+          isLoading: isLoading,
+          isFullWidth: true,
+          onPressed: enabled ? onConfirm : null,
+        ),
     ],
   );
 }
@@ -1255,9 +1313,7 @@ class _CollectionDialogState extends State<_CollectionDialog> {
     text: widget.line == null ? '' : '${widget.line!.quantity.round()}',
   );
   late final _weight = TextEditingController(
-    text: widget.line == null
-        ? ''
-        : _number(widget.line!.averageWeightKg ?? 0),
+    text: widget.line == null ? '' : _number(widget.line!.averageWeightKg ?? 0),
   );
 
   @override
@@ -1270,9 +1326,7 @@ class _CollectionDialogState extends State<_CollectionDialog> {
 
   String _calculatedTotalLabel() {
     final boxes = int.tryParse(_boxes.text.trim());
-    final average = double.tryParse(
-      _weight.text.trim().replaceAll(',', '.'),
-    );
+    final average = double.tryParse(_weight.text.trim().replaceAll(',', '.'));
     if (boxes == null || average == null) return '-';
     return '${_number(boxes * average)} kg';
   }

@@ -16,6 +16,7 @@ import 'package:club_sandwich/features/volunteers/data/concert_volunteer_provide
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
 import 'package:club_sandwich/features/volunteers/domain/volunteer_profile.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -230,6 +231,95 @@ void main() {
     expect(find.text('Suivre la constitution de l’équipe'), findsOneWidget);
     expect(find.text('Voir l’équipe'), findsOneWidget);
   });
+
+  testWidgets(
+    'le tourneur voit et copie les e-mails des bénévoles sélectionnés',
+    (tester) async {
+      final concert = buildConcert();
+      final selected = ConcertVolunteerApplication(
+        id: 'selected-id',
+        concertId: 'concert-id',
+        userId: 'selected-user',
+        status: ConcertVolunteerStatus.selected,
+        teamRole: MaraudeRole.teamLeader,
+        createdAt: DateTime.utc(2026, 10, 1),
+        updatedAt: DateTime.utc(2026, 10, 1),
+        profile: const VolunteerProfile(
+          userId: 'selected-user',
+          firstName: 'Camille',
+          lastName: 'Martin',
+          email: 'camille.martin@example.com',
+        ),
+      );
+      final pending = ConcertVolunteerApplication(
+        id: 'pending-id',
+        concertId: 'concert-id',
+        userId: 'pending-user',
+        status: ConcertVolunteerStatus.pending,
+        createdAt: DateTime.utc(2026, 10, 2),
+        updatedAt: DateTime.utc(2026, 10, 2),
+        profile: const VolunteerProfile(
+          userId: 'pending-user',
+          firstName: 'Sacha',
+          lastName: 'Durand',
+        ),
+      );
+      String? clipboard;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboard = (call.arguments as Map)['text'] as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            concertDetailsProvider.overrideWith(
+              (ref, concertId) async => concert,
+            ),
+            concertVolunteerSectionProvider.overrideWith(
+              (ref, concertId) async => ConcertVolunteerSectionData(
+                counts: const ConcertVolunteerCounts.empty(),
+                isAdmin: false,
+                isPromoter: true,
+                canViewApplications: true,
+                activeRole: AppUserRole.promoter,
+                currentUserId: 'promoter-id',
+                applications: [selected, pending],
+              ),
+            ),
+          ],
+          child: const MaterialApp(
+            home: ConcertDetailScreen(concertId: 'concert-id'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Voir l’équipe'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('camille.martin@example.com'), findsOneWidget);
+      expect(find.text('Sacha Durand'), findsOneWidget);
+
+      final copyAll = find.byKey(const ValueKey('copy-team-emails'));
+      await tester.ensureVisible(copyAll);
+      await tester.tap(copyAll);
+      await tester.pumpAndSettle();
+
+      expect(clipboard, 'camille.martin@example.com');
+      expect(find.text('E-mail de l’équipe copié'), findsOneWidget);
+    },
+  );
 
   testWidgets('le tourneur consulte le bilan terminé de sa maraude', (
     tester,
@@ -642,9 +732,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    // Visite l'onglet Opérations une première fois pour amorcer la lecture
+    // du bundle de ressources, avant de revenir à Synthèse où vit l'état.
     await tester.tap(
       find.byKey(const ValueKey('maraude-workspace-operations')),
     );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('maraude-workspace-summary')));
     await tester.pumpAndSettle();
 
     expect(find.text('Inscriptions ouvertes'), findsWidgets);
@@ -679,7 +774,18 @@ void main() {
 
     expect(find.text('En cours'), findsWidgets);
     expect(find.text('27 juillet 2026\n21:12'), findsOneWidget);
+
+    final operationsTab = find.byKey(
+      const ValueKey('maraude-workspace-operations'),
+    );
+    await tester.ensureVisible(operationsTab);
+    await tester.tap(operationsTab);
+    await tester.pumpAndSettle();
     expect(operationBundleReads, greaterThanOrEqualTo(2));
+    final summaryTab = find.byKey(const ValueKey('maraude-workspace-summary'));
+    await tester.ensureVisible(summaryTab);
+    await tester.tap(summaryTab);
+    await tester.pumpAndSettle();
 
     await tester.ensureVisible(selector);
     await tester.tap(selector);
@@ -723,10 +829,6 @@ void main() {
             home: ConcertDetailScreen(concertId: 'concert-id'),
           ),
         ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('maraude-workspace-operations')),
       );
       await tester.pumpAndSettle();
 
@@ -779,10 +881,6 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('maraude-workspace-operations')),
-    );
-    await tester.pumpAndSettle();
 
     final cancelButton = find.byKey(const ValueKey('cancel-maraude'));
     await tester.ensureVisible(cancelButton);
@@ -809,47 +907,42 @@ void main() {
     expect(find.byKey(const ValueKey('cancel-maraude')), findsNothing);
   });
 
-  testWidgets(
-    'annuler la maraude peut être abandonné sans rien envoyer',
-    (tester) async {
-      final repository = _FakeLifecycleConcertRepository();
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            concertRepositoryProvider.overrideWithValue(repository),
-            concertDetailsProvider.overrideWith(
-              (ref, concertId) async => repository.concert,
-            ),
-            concertVolunteerSectionProvider.overrideWith(
-              (ref, concertId) async => const ConcertVolunteerSectionData(
-                counts: ConcertVolunteerCounts.empty(),
-                isAdmin: true,
-                applications: [],
-              ),
-            ),
-          ],
-          child: const MaterialApp(
-            home: ConcertDetailScreen(concertId: 'concert-id'),
+  testWidgets('annuler la maraude peut être abandonné sans rien envoyer', (
+    tester,
+  ) async {
+    final repository = _FakeLifecycleConcertRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          concertRepositoryProvider.overrideWithValue(repository),
+          concertDetailsProvider.overrideWith(
+            (ref, concertId) async => repository.concert,
           ),
+          concertVolunteerSectionProvider.overrideWith(
+            (ref, concertId) async => const ConcertVolunteerSectionData(
+              counts: ConcertVolunteerCounts.empty(),
+              isAdmin: true,
+              applications: [],
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          home: ConcertDetailScreen(concertId: 'concert-id'),
         ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('maraude-workspace-operations')),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      final cancelButton = find.byKey(const ValueKey('cancel-maraude'));
-      await tester.ensureVisible(cancelButton);
-      await tester.tap(cancelButton);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Revenir en arrière'));
-      await tester.pumpAndSettle();
+    final cancelButton = find.byKey(const ValueKey('cancel-maraude'));
+    await tester.ensureVisible(cancelButton);
+    await tester.tap(cancelButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Revenir en arrière'));
+    await tester.pumpAndSettle();
 
-      expect(repository.cancelCount, 0);
-      expect(find.byKey(const ValueKey('cancel-maraude')), findsOneWidget);
-    },
-  );
+    expect(repository.cancelCount, 0);
+    expect(find.byKey(const ValueKey('cancel-maraude')), findsOneWidget);
+  });
 
   testWidgets(
     'le tourneur ne voit que le bouton d’annulation, pas les autres actions',
@@ -878,20 +971,13 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('maraude-workspace-operations')),
-      );
-      await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('cancel-maraude')), findsOneWidget);
       expect(
         find.byKey(const ValueKey('maraude-status-selector')),
         findsNothing,
       );
-      expect(
-        find.byKey(const ValueKey('validate-maraude-team')),
-        findsNothing,
-      );
+      expect(find.byKey(const ValueKey('validate-maraude-team')), findsNothing);
       expect(find.text('Publier la maraude'), findsNothing);
     },
   );
@@ -921,10 +1007,6 @@ void main() {
           home: ConcertDetailScreen(concertId: 'concert-id'),
         ),
       ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('maraude-workspace-operations')),
     );
     await tester.pumpAndSettle();
 

@@ -132,18 +132,18 @@ void main() {
       'concert_date': '2026-07-24',
       'venue_id': 'eb3127ff-a9af-4968-ac67-cba782488eef',
       'catering_contact_name': null,
+      'catering_contact_phone': null,
+      'catering_contact_email': null,
       'catering_closes_at': '23:00:00',
       'notes': null,
       'promoter_contact_name': null,
       'promoter_contact_phone': null,
+      'promoter_contact_email': null,
     });
     expect(draft.toJson(), isNot(contains('title')));
     expect(draft.toJson(), isNot(contains('tour')));
     expect(draft.toJson(), isNot(contains('concert_time')));
     expect(draft.toJson(), isNot(contains('status')));
-    expect(draft.toJson(), isNot(contains('promoter_contact_email')));
-    expect(draft.toJson(), isNot(contains('catering_contact_phone')));
-    expect(draft.toJson(), isNot(contains('catering_contact_email')));
   });
 
   test('ConcertDraft transmet le nom du catering renseigné', () {

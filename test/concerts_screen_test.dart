@@ -181,10 +181,7 @@ void main() {
         child: MaterialApp(
           theme: DsTheme.light,
           home: Scaffold(
-            body: ConcertForm(
-              initialConcert: concert,
-              onSubmit: (_) async {},
-            ),
+            body: ConcertForm(initialConcert: concert, onSubmit: (_) async {}),
           ),
         ),
       ),
@@ -210,17 +207,17 @@ void main() {
     expect(find.text('Récupération côté scène'), findsOneWidget);
     expect(_fieldText(tester, 'promoter-contact-name'), 'Camille');
     expect(_fieldText(tester, 'promoter-contact-phone'), '0600000000');
-    expect(find.byKey(const ValueKey('promoter-contact-email')), findsNothing);
+    expect(_fieldText(tester, 'promoter-contact-email'), 'camille@example.com');
     expect(
       find.text(
         'Personne à contacter pour toute question relative à cette maraude.',
       ),
       findsOneWidget,
     );
-    expect(find.text('Contact catering'), findsNothing);
-    expect(find.byKey(const ValueKey('catering-contact-phone')), findsNothing);
-    expect(find.byKey(const ValueKey('catering-contact-email')), findsNothing);
-    expect(_fieldText(tester, 'concert-catering-name-field'), 'Alex');
+    expect(find.text('Contact catering'), findsOneWidget);
+    expect(_fieldText(tester, 'catering-contact-name'), 'Alex');
+    expect(_fieldText(tester, 'catering-contact-phone'), '0611111111');
+    expect(_fieldText(tester, 'catering-contact-email'), 'alex@example.com');
   });
 
   testWidgets('valide uniquement les champs obligatoires du formulaire', (

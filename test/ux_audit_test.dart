@@ -313,12 +313,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Bilan'), findsWidgets);
-    final operations = find.byKey(
-      const ValueKey('maraude-workspace-operations'),
-    );
-    await tester.ensureVisible(operations);
-    await tester.tap(operations);
-    await tester.pumpAndSettle();
     expect(
       find.text('L’état est archivé et ne peut plus être modifié.'),
       findsOneWidget,
@@ -350,9 +344,7 @@ void main() {
       ProviderScope(
         child: MaterialApp(
           theme: DsTheme.light,
-          home: Scaffold(
-            body: ConcertForm(onSubmit: (_) async {}),
-          ),
+          home: Scaffold(body: ConcertForm(onSubmit: (_) async {})),
         ),
       ),
     );
