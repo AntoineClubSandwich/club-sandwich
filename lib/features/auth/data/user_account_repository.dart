@@ -68,19 +68,29 @@ class UserAccountRepository {
     );
   }
 
-  Future<UserInvitationDelivery> resendInvitation(
+  Future<void> resendInvitation(
     String profileId, {
     required String redirectTo,
   }) async {
-    final data = await _invokeAdminUsers({
+    await _invokeAdminUsers({
       'action': 'resend',
       'profileId': profileId,
       'redirectTo': redirectTo,
     });
-    return UserInvitationDelivery(
-      emailSent: true,
-      activationUrl: data['activationUrl'] as String?,
-    );
+  }
+
+  /// Génère un lien d'activation à transmettre hors e-mail. Invalide le
+  /// lien et le code envoyés précédemment par e-mail.
+  Future<String> createActivationLink(
+    String profileId, {
+    required String redirectTo,
+  }) async {
+    final data = await _invokeAdminUsers({
+      'action': 'activation-link',
+      'profileId': profileId,
+      'redirectTo': redirectTo,
+    });
+    return data['activationUrl'] as String;
   }
 
   Future<void> updateUser({

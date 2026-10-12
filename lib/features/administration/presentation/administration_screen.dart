@@ -116,7 +116,7 @@ class AdministrationScreen extends ConsumerWidget {
           await _showActivationLink(
             context,
             delivery.activationUrl!,
-            emailSent: false,
+            rateLimited: true,
           );
           return;
         }
@@ -146,21 +146,21 @@ class AdministrationScreen extends ConsumerWidget {
 Future<void> _showActivationLink(
   BuildContext context,
   String activationUrl, {
-  required bool emailSent,
+  required bool rateLimited,
 }) async {
   await showDialog<void>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Compte créé'),
+      title: Text(rateLimited ? 'Compte créé' : 'Lien d’activation'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            emailSent
-                ? 'L’e-mail a été renvoyé. Si la personne ne le reçoit '
-                      'jamais (filtre de sécurité de sa messagerie, par '
-                      'exemple), transmettez-lui directement ce lien :'
+            !rateLimited
+                ? 'Transmettez ce lien directement (WhatsApp, SMS...). '
+                      'Le lien et le code envoyés précédemment par e-mail '
+                      'ne fonctionnent plus.'
                 : 'La limite temporaire d’envoi d’e-mails est atteinte. '
                       'Transmettez ce lien d’activation au bénévole :',
           ),
@@ -531,15 +531,27 @@ class _UserActionsState extends ConsumerState<_UserActions> {
       final repository = ref.read(userAccountRepositoryProvider);
       switch (action) {
         case 'resend':
-          final delivery = await repository.resendInvitation(
+          await repository.resendInvitation(
             widget.user.profileId,
             redirectTo: authRedirectUrl(),
           );
-          if (mounted && delivery.activationUrl != null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('L’e-mail d’invitation a été renvoyé.'),
+              ),
+            );
+          }
+        case 'activation-link':
+          final activationUrl = await repository.createActivationLink(
+            widget.user.profileId,
+            redirectTo: authRedirectUrl(),
+          );
+          if (mounted) {
             await _showActivationLink(
               context,
-              delivery.activationUrl!,
-              emailSent: true,
+              activationUrl,
+              rateLimited: false,
             );
           }
         case 'disable':
@@ -589,6 +601,11 @@ class _UserActionsState extends ConsumerState<_UserActions> {
         const PopupMenuItem(
           value: 'resend',
           child: Text('Renvoyer l’invitation'),
+        ),
+      if (widget.user.status == UserAccountStatus.invited)
+        const PopupMenuItem(
+          value: 'activation-link',
+          child: Text('Copier un lien d’activation'),
         ),
       if (widget.user.status != UserAccountStatus.disabled)
         const PopupMenuItem(value: 'disable', child: Text('Désactiver'))

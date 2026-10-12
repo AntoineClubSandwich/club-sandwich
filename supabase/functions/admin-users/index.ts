@@ -52,6 +52,8 @@ Deno.serve(async (request) => {
         return await inviteUser(adminClient, body);
       case "resend":
         return await resendInvitation(adminClient, body);
+      case "activation-link":
+        return await createActivationLink(adminClient, body);
       case "update":
         return await updateUser(adminClient, body);
       case "disable":
@@ -129,7 +131,11 @@ function isEmailRateLimit(message: string): boolean {
   return /rate.?limit|over_email_send_rate_limit/i.test(message);
 }
 
-async function resendInvitation(
+// GoTrue ne garde qu'un seul jeton d'invitation / de réinitialisation par
+// utilisateur : chaque nouvel envoi ou lien généré invalide le précédent
+// (qui apparaît alors comme "expiré"). Renvoyer l'e-mail et générer un lien
+// à copier sont donc deux actions distinctes, jamais enchaînées.
+async function loadInvitationTarget(
   client: ReturnType<typeof createClient>,
   body: any,
 ) {
@@ -147,66 +153,91 @@ async function resendInvitation(
     .eq("profile_id", profileId)
     .single();
   if (accountError) throw accountError;
-  const wasAlreadyActive = account?.status === "active";
 
   // Un compte qui a déjà cliqué son lien une première fois (email confirmé,
   // même si l'activation applicative n'a pas abouti) ne peut plus recevoir
   // d'invitation : GoTrue la refuse pour un e-mail déjà confirmé. On bascule
-  // alors sur un e-mail de réinitialisation, qui redonne un lien valide pour
-  // définir un mot de passe — que le compte soit encore "invited" (termine
+  // alors sur une réinitialisation, qui redonne un lien valide pour définir
+  // un mot de passe — que le compte soit encore "invited" (termine
   // l'activation) ou déjà "active" (a juste oublié son mot de passe).
-  const isRecovery = Boolean(userResult.user.email_confirmed_at);
-  if (isRecovery) {
+  return {
+    profileId,
+    redirectTo,
+    user: userResult.user,
+    wasAlreadyActive: account?.status === "active",
+    isRecovery: Boolean(userResult.user.email_confirmed_at),
+  };
+}
+
+async function markInvited(
+  client: ReturnType<typeof createClient>,
+  target: { profileId: string; wasAlreadyActive: boolean },
+) {
+  // Un compte déjà actif qui redemande juste un lien (mot de passe oublié)
+  // ne doit jamais être rétrogradé en "invited" : ça le renverrait à tort
+  // vers l'écran d'activation au prochain lien cliqué.
+  if (target.wasAlreadyActive) return;
+  await client.from("user_accounts").update({
+    status: "invited",
+    invited_at: new Date().toISOString(),
+    activated_at: null,
+    disabled_at: null,
+  }).eq("profile_id", target.profileId);
+}
+
+async function resendInvitation(
+  client: ReturnType<typeof createClient>,
+  body: any,
+) {
+  const target = await loadInvitationTarget(client, body);
+  if (target.isRecovery) {
     const { error: recoveryError } = await client.auth.resetPasswordForEmail(
-      userResult.user.email,
-      { redirectTo },
+      target.user.email!,
+      { redirectTo: target.redirectTo },
     );
     if (recoveryError) throw recoveryError;
   } else {
     const { error } = await client.auth.admin.inviteUserByEmail(
-      userResult.user.email,
+      target.user.email!,
       {
-        redirectTo,
-        data: userResult.user.user_metadata,
+        redirectTo: target.redirectTo,
+        data: target.user.user_metadata,
       },
     );
     if (error) throw error;
   }
+  await markInvited(client, target);
+  return json({ ok: true });
+}
 
-  // A one-time link is only ever good for whichever click reaches GoTrue
-  // first — a corporate mail gateway that prefetches links (common with
-  // Microsoft Defender "Safe Links") can silently burn it before the real
-  // recipient ever sees the email, with no visible error on their end. This
-  // second link, generated fresh right now, isn't the one just emailed
-  // above (each call mints its own token) - it exists so an admin can hand
-  // it to the person directly (WhatsApp, Slack...) over a channel that
-  // never goes through their mail security.
+// Lien à transmettre hors e-mail (WhatsApp, SMS...) quand une passerelle de
+// sécurité consomme le lien avant la personne. Aucun e-mail n'est envoyé, et
+// le lien ou code envoyé précédemment par e-mail cesse de fonctionner.
+async function createActivationLink(
+  client: ReturnType<typeof createClient>,
+  body: any,
+) {
+  const target = await loadInvitationTarget(client, body);
   const { data: generated, error: generationError } = await client.auth.admin
     .generateLink(
-      isRecovery
-        ? { type: "recovery", email: userResult.user.email, options: { redirectTo } }
+      target.isRecovery
+        ? {
+          type: "recovery",
+          email: target.user.email!,
+          options: { redirectTo: target.redirectTo },
+        }
         : {
           type: "invite",
-          email: userResult.user.email,
-          options: { redirectTo, data: userResult.user.user_metadata },
+          email: target.user.email!,
+          options: {
+            redirectTo: target.redirectTo,
+            data: target.user.user_metadata,
+          },
         },
     );
-  const activationUrl = generationError
-    ? null
-    : generated.properties.action_link;
-
-  // Un compte déjà actif qui redemande juste un lien (mot de passe oublié)
-  // ne doit jamais être rétrogradé en "invited" : ça le renverrait à tort
-  // vers l'écran d'activation au prochain lien cliqué.
-  if (!wasAlreadyActive) {
-    await client.from("user_accounts").update({
-      status: "invited",
-      invited_at: new Date().toISOString(),
-      activated_at: null,
-      disabled_at: null,
-    }).eq("profile_id", profileId);
-  }
-  return json({ ok: true, activationUrl });
+  if (generationError) throw generationError;
+  await markInvited(client, target);
+  return json({ activationUrl: generated.properties.action_link });
 }
 
 async function updateUser(client: ReturnType<typeof createClient>, body: any) {
