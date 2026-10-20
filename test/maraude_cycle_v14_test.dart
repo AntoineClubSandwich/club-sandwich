@@ -13,6 +13,7 @@ import 'package:club_sandwich/features/dashboard/presentation/dashboard_screen.d
 import 'package:club_sandwich/features/invitations/data/invitation_providers.dart';
 import 'package:club_sandwich/features/invitations/domain/invitation_campaign.dart';
 import 'package:club_sandwich/features/volunteers/data/concert_volunteer_providers.dart';
+import 'package:club_sandwich/features/volunteers/data/concert_volunteer_repository.dart';
 import 'package:club_sandwich/features/volunteers/domain/concert_volunteer_application.dart';
 import 'package:club_sandwich/features/volunteers/presentation/volunteers_screen.dart';
 import 'package:flutter/material.dart';
@@ -538,14 +539,65 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Pas dispo'), findsOneWidget);
-    expect(find.text('Changer ma réponse'), findsOneWidget);
-    expect(find.text('Je me propose'), findsOneWidget);
+    expect(find.text('Annuler mon indisponibilité'), findsOneWidget);
+    expect(find.text('Je ne suis pas disponible'), findsOneWidget);
+    expect(find.text('Je me propose'), findsNWidgets(2));
     expect(find.text('1 maraude ouverte au volontariat.'), findsOneWidget);
     // La maraude déclinée passe après celle encore à pourvoir.
     expect(
       tester.getTopLeft(find.text('Artiste open')).dy,
       lessThan(tester.getTopLeft(find.text('Artiste declined')).dy),
     );
+  });
+
+  testWidgets('répond « pas dispo » directement depuis la carte', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 1600);
+    addTearDown(() {
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+    });
+    final repository = _CardAnswerRepository();
+    var overviewFetches = 0;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          concertVolunteerRepositoryProvider.overrideWithValue(repository),
+          maraudeOverviewProvider.overrideWith((ref) async {
+            overviewFetches++;
+            final maraude = _overview(
+              id: 'open',
+              date: DateTime.now().add(const Duration(days: 1)),
+              status: MaraudeStatus.open,
+            );
+            return [
+              repository.unavailableConcertIds.contains('open')
+                  ? maraude.markedOwnUnavailable()
+                  : maraude,
+            ];
+          }),
+        ],
+        child: const MaterialApp(home: DashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Je ne suis pas disponible'));
+    await tester.tap(find.text('Je ne suis pas disponible'));
+    await tester.pumpAndSettle();
+
+    expect(repository.unavailableConcertIds, {'open'});
+    expect(overviewFetches, greaterThanOrEqualTo(2));
+    expect(find.text('Pas dispo'), findsOneWidget);
+    expect(find.text('Indisponibilité enregistrée.'), findsOneWidget);
+
+    await tester.tap(find.text('Je me propose'));
+    await tester.pumpAndSettle();
+
+    expect(repository.appliedConcertIds, ['open']);
   });
 
   testWidgets(
@@ -1000,5 +1052,35 @@ class _FakeMaraudeCycleRepository extends ConcertRepository {
     await pendingSave?.future;
     savedDraft = draft;
     this.complete = complete;
+  }
+}
+
+class _CardAnswerRepository extends ConcertVolunteerRepository {
+  _CardAnswerRepository()
+    : super(
+        SupabaseClient(
+          'http://localhost',
+          'test-key',
+          authOptions: const AuthClientOptions(autoRefreshToken: false),
+        ),
+      );
+
+  final unavailableConcertIds = <String>{};
+  final appliedConcertIds = <String>[];
+
+  @override
+  Future<void> setUnavailable(
+    String concertId, {
+    required bool unavailable,
+  }) async {
+    unavailable
+        ? unavailableConcertIds.add(concertId)
+        : unavailableConcertIds.remove(concertId);
+  }
+
+  @override
+  Future<void> apply(String concertId) async {
+    appliedConcertIds.add(concertId);
+    unavailableConcertIds.remove(concertId);
   }
 }

@@ -9,6 +9,7 @@ import 'package:club_sandwich/design_system/tokens/ds_typography.dart';
 import 'package:club_sandwich/features/concerts/domain/concert.dart';
 import 'package:club_sandwich/features/concerts/domain/maraude_operation.dart';
 import 'package:club_sandwich/features/concerts/presentation/concert_formatters.dart';
+import 'package:club_sandwich/features/concerts/presentation/maraude_answer_actions.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -17,12 +18,17 @@ class MaraudeOverviewCard extends StatelessWidget {
     required this.maraude,
     this.actionLabel,
     this.canOpen = true,
+    this.showAnswerActions = false,
     super.key,
   });
 
   final MaraudeOverview maraude;
   final String? actionLabel;
   final bool canOpen;
+
+  /// Replaces [actionLabel] with real "Je me propose" / "Je ne suis pas
+  /// disponible" buttons, for open maraudes shown to a volunteer.
+  final bool showAnswerActions;
 
   @override
   Widget build(BuildContext context) {
@@ -182,7 +188,10 @@ class MaraudeOverviewCard extends StatelessWidget {
                         ],
                       ),
                     ],
-                    if (actionLabel != null) ...[
+                    if (showAnswerActions) ...[
+                      const SizedBox(height: DsSpacing.sm),
+                      MaraudeAnswerActions(maraude: maraude),
+                    ] else if (actionLabel != null) ...[
                       const SizedBox(height: DsSpacing.sm),
                       Text(
                         actionLabel!,

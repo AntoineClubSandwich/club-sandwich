@@ -326,7 +326,7 @@ class _VolunteerMaraudes extends StatelessWidget {
         MaraudeListSection(
           title: 'Maraudes ouvertes',
           items: open,
-          actionLabelFor: _openMaraudeActionLabel,
+          showAnswerActions: true,
         ),
         MaraudeListSection(
           title: 'À venir',
@@ -360,9 +360,6 @@ int _compareOpenMaraudes(MaraudeOverview a, MaraudeOverview b) {
   }
   return a.date.compareTo(b.date);
 }
-
-String _openMaraudeActionLabel(MaraudeOverview maraude) =>
-    maraude.isOwnUnavailable ? 'Changer ma réponse' : 'Je me propose';
 
 String _availabilityLabel(ConcertVolunteerStatus status) {
   return switch (status) {

@@ -14,6 +14,7 @@ class MaraudeListSection extends StatelessWidget {
     this.actionLabel,
     this.actionLabelFor,
     this.canOpenFor,
+    this.showAnswerActions = false,
     super.key,
   });
 
@@ -22,6 +23,7 @@ class MaraudeListSection extends StatelessWidget {
   final String? actionLabel;
   final String Function(MaraudeOverview)? actionLabelFor;
   final bool Function(MaraudeOverview)? canOpenFor;
+  final bool showAnswerActions;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +51,7 @@ class MaraudeListSection extends StatelessWidget {
                       maraude: item,
                       actionLabel: actionLabelFor?.call(item) ?? actionLabel,
                       canOpen: canOpenFor?.call(item) ?? true,
+                      showAnswerActions: showAnswerActions,
                     ),
                   ),
               ],

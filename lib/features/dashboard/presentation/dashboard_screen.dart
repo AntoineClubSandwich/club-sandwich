@@ -1779,8 +1779,7 @@ class _VolunteerDashboard extends StatelessWidget {
         MaraudeListSection(
           title: 'Maraudes ouvertes',
           items: open,
-          actionLabelFor: (item) =>
-              item.isOwnUnavailable ? 'Changer ma réponse' : 'Je me propose',
+          showAnswerActions: true,
         ),
         MaraudeListSection(
           title: 'Participation à confirmer',
