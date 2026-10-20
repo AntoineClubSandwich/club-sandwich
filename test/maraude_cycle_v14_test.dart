@@ -507,6 +507,47 @@ void main() {
     expect(find.text('VOLONTAIRES À EXAMINER'), findsNothing);
   });
 
+  testWidgets('une maraude déclinée porte le badge « Pas dispo »', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 1600);
+    addTearDown(() {
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+    });
+    final items = [
+      _overview(
+        id: 'declined',
+        date: DateTime.now().add(const Duration(days: 1)),
+        status: MaraudeStatus.open,
+      ).markedOwnUnavailable(),
+      _overview(
+        id: 'open',
+        date: DateTime.now().add(const Duration(days: 2)),
+        status: MaraudeStatus.open,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [maraudeOverviewProvider.overrideWith((ref) async => items)],
+        child: const MaterialApp(home: DashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pas dispo'), findsOneWidget);
+    expect(find.text('Changer ma réponse'), findsOneWidget);
+    expect(find.text('Je me propose'), findsOneWidget);
+    expect(find.text('1 maraude ouverte au volontariat.'), findsOneWidget);
+    // La maraude déclinée passe après celle encore à pourvoir.
+    expect(
+      tester.getTopLeft(find.text('Artiste open')).dy,
+      lessThan(tester.getTopLeft(find.text('Artiste declined')).dy),
+    );
+  });
+
   testWidgets(
     'le dashboard bénévole distingue confirmation et invitation obtenue',
     (tester) async {

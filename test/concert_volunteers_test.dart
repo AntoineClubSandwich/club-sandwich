@@ -710,6 +710,72 @@ void main() {
     expect(repository.fetchCount, greaterThanOrEqualTo(2));
   });
 
+  testWidgets('indique puis retire une indisponibilité', (tester) async {
+    final repository = _FakeConcertVolunteerRepository();
+    await _pumpDetail(tester, repository);
+
+    await tester.ensureVisible(find.text('Je ne suis pas disponible'));
+    await tester.tap(find.text('Je ne suis pas disponible'));
+    await tester.pumpAndSettle();
+
+    expect(repository.isUnavailable, isTrue);
+    expect(
+      find.text('Vous avez indiqué ne pas être disponible pour cette maraude.'),
+      findsOneWidget,
+    );
+    expect(find.text('Je ne suis pas disponible'), findsNothing);
+    expect(find.text('0 volontaires'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Annuler mon indisponibilité'));
+    await tester.tap(find.text('Annuler mon indisponibilité'));
+    await tester.pumpAndSettle();
+
+    expect(repository.isUnavailable, isFalse);
+    expect(find.text('Je ne suis pas disponible'), findsOneWidget);
+  });
+
+  testWidgets('se proposer après une indisponibilité l’efface', (tester) async {
+    final repository = _FakeConcertVolunteerRepository(isUnavailable: true);
+    await _pumpDetail(tester, repository);
+
+    await tester.ensureVisible(find.text('Je me propose'));
+    await tester.tap(find.text('Je me propose'));
+    await tester.pumpAndSettle();
+
+    expect(repository.isUnavailable, isFalse);
+    expect(find.text('En attente'), findsOneWidget);
+    expect(
+      find.text('Vous avez indiqué ne pas être disponible pour cette maraude.'),
+      findsNothing,
+    );
+  });
+
+  testWidgets('l’admin voit la liste des bénévoles indisponibles', (
+    tester,
+  ) async {
+    final repository = _FakeConcertVolunteerRepository(
+      isAdmin: true,
+      unavailableVolunteers: [
+        ConcertVolunteerUnavailability(
+          userId: 'busy-user',
+          firstName: 'Camille',
+          lastName: 'Occupée',
+          createdAt: DateTime.utc(2026, 10, 20, 9),
+        ),
+      ],
+    );
+    await _pumpDetail(tester, repository);
+
+    await tester.ensureVisible(find.text('Indisponibles (1)'));
+    expect(find.text('Indisponibles (1)'), findsOneWidget);
+    expect(find.text('Je ne suis pas disponible'), findsNothing);
+
+    await tester.tap(find.text('Indisponibles (1)'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Camille Occupée'), findsOneWidget);
+  });
+
   testWidgets('masque les détails techniques d’une erreur de candidature', (
     tester,
   ) async {
@@ -2244,6 +2310,8 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
     this.applyError,
     List<ConcertVolunteerApplication> applications = const [],
     this.roster = const [],
+    this.isUnavailable = false,
+    this.unavailableVolunteers = const [],
   }) : applications = [...applications],
        super(
          SupabaseClient(
@@ -2260,6 +2328,8 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
   final Object? applyError;
   final List<ConcertVolunteerApplication> applications;
   final List<ConcertVolunteerRosterEntry> roster;
+  bool isUnavailable;
+  final List<ConcertVolunteerUnavailability> unavailableVolunteers;
   int fetchCount = 0;
   int saveTeamCount = 0;
   List<MaraudeTeamMemberDraft> lastSavedTeam = const [];
@@ -2309,7 +2379,20 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
           activeRole ?? (isAdmin ? AppUserRole.admin : AppUserRole.volunteer),
       currentUserId: currentUserId,
       applications: visibleApplications,
+      isUnavailable: !isAdmin && isUnavailable,
+      unavailableVolunteers: isAdmin ? unavailableVolunteers : const [],
     );
+  }
+
+  @override
+  Future<void> setUnavailable(
+    String concertId, {
+    required bool unavailable,
+  }) async {
+    if (unavailable && ownApplication != null) {
+      throw StateError('Une candidature existe déjà.');
+    }
+    isUnavailable = unavailable;
   }
 
   @override
@@ -2326,6 +2409,7 @@ class _FakeConcertVolunteerRepository extends ConcertVolunteerRepository {
       throw StateError('Une candidature existe déjà.');
     }
     ownApplication = _application();
+    isUnavailable = false;
   }
 
   @override

@@ -178,7 +178,9 @@ class _RoleDashboardHero extends StatelessWidget {
           item.maraudeStatus != MaraudeStatus.completed &&
           item.maraudeStatus != MaraudeStatus.cancelled,
     );
-    final openCount = items.where((item) => item.isOpenForApplication).length;
+    final openCount = items
+        .where((item) => item.isOpenForApplication && !item.isOwnUnavailable)
+        .length;
     final isVolunteer = role == AppUserRole.volunteer;
     final subtitle = isVolunteer
         ? openCount == 0
@@ -746,7 +748,9 @@ class _AdminDashboard extends ConsumerWidget {
         pastNotClosed.length +
         creditsToValidate.length;
     final totalActionsCount =
-        maraudeActionsCount + actionableInvitations.length + pendingDocuments.length;
+        maraudeActionsCount +
+        actionableInvitations.length +
+        pendingDocuments.length;
 
     return Theme(
       data: DsTheme.light,
@@ -1728,7 +1732,13 @@ class _VolunteerDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     final today = _day(DateTime.now());
     final open = items.where((item) => item.isOpenForApplication).toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+      ..sort((a, b) {
+        // Open maraudes the volunteer already said no to go last.
+        if (a.isOwnUnavailable != b.isOwnUnavailable) {
+          return a.isOwnUnavailable ? 1 : -1;
+        }
+        return a.date.compareTo(b.date);
+      });
     final confirmationPending =
         items
             .where(
@@ -1769,7 +1779,8 @@ class _VolunteerDashboard extends StatelessWidget {
         MaraudeListSection(
           title: 'Maraudes ouvertes',
           items: open,
-          actionLabel: 'Je me propose',
+          actionLabelFor: (item) =>
+              item.isOwnUnavailable ? 'Changer ma réponse' : 'Je me propose',
         ),
         MaraudeListSection(
           title: 'Participation à confirmer',

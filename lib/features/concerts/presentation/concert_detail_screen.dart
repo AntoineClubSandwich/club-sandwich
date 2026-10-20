@@ -2626,17 +2626,12 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
           if (ownApplication == null &&
               data.canApply &&
               _applicationWindowIsOpen)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton(
-                onPressed: _isSubmitting ? null : _apply,
-                child: _isSubmitting
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Je me propose'),
-              ),
+            _ApplicationChoice(
+              isUnavailable: data.isUnavailable,
+              isSubmitting: _isSubmitting,
+              onApply: _apply,
+              onSetUnavailable: () => _setUnavailable(true),
+              onClearUnavailable: () => _setUnavailable(false),
             )
           else if (ownApplication != null)
             _OwnApplication(
@@ -2676,6 +2671,11 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
         ] else if (data.isPromoter && data.canViewApplications) ...[
           const Divider(height: 32),
           _PromoterApplications(applications: visibleApplications),
+        ],
+        if (data.canViewApplications &&
+            data.unavailableVolunteers.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _UnavailableVolunteers(volunteers: data.unavailableVolunteers),
         ],
       ],
     );
@@ -3173,6 +3173,35 @@ class _VolunteersSectionState extends ConsumerState<_VolunteersSection> {
     }
   }
 
+  Future<void> _setUnavailable(bool unavailable) async {
+    if (!_applicationWindowIsOpen) return;
+    setState(() => _isSubmitting = true);
+    try {
+      await ref
+          .read(concertVolunteerRepositoryProvider)
+          .setUnavailable(widget.concertId, unavailable: unavailable);
+      ref.invalidate(concertVolunteerSectionProvider(widget.concertId));
+      ref.invalidate(maraudeOverviewProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            unavailable
+                ? 'Indisponibilité enregistrée.'
+                : 'Indisponibilité retirée.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showError(
+        describeError(error, 'Impossible d’enregistrer votre réponse.'),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
   Future<void> _reapply() async {
     if (!_applicationWindowIsOpen) return;
     setState(() => _isSubmitting = true);
@@ -3395,6 +3424,109 @@ bool _canWithdraw(ConcertVolunteerStatus status, MaraudeStatus maraudeStatus) {
   return applicationWindowIsOpen &&
       (status == ConcertVolunteerStatus.pending ||
           status == ConcertVolunteerStatus.selected);
+}
+
+/// What a volunteer without a candidacy sees: apply, or say up front that
+/// they won't come — and, once said, a way to take it back.
+class _ApplicationChoice extends StatelessWidget {
+  const _ApplicationChoice({
+    required this.isUnavailable,
+    required this.isSubmitting,
+    required this.onApply,
+    required this.onSetUnavailable,
+    required this.onClearUnavailable,
+  });
+
+  final bool isUnavailable;
+  final bool isSubmitting;
+  final VoidCallback onApply;
+  final VoidCallback onSetUnavailable;
+  final VoidCallback onClearUnavailable;
+
+  @override
+  Widget build(BuildContext context) {
+    final applyButton = FilledButton(
+      onPressed: isSubmitting ? null : onApply,
+      child: isSubmitting
+          ? const SizedBox.square(
+              dimension: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Text('Je me propose'),
+    );
+
+    if (!isUnavailable) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          applyButton,
+          OutlinedButton(
+            key: const ValueKey('set-concert-unavailable'),
+            onPressed: isSubmitting ? null : onSetUnavailable,
+            child: const Text('Je ne suis pas disponible'),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Non disponible', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        const Text(
+          'Vous avez indiqué ne pas être disponible pour cette maraude.',
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            applyButton,
+            TextButton(
+              key: const ValueKey('clear-concert-unavailable'),
+              onPressed: isSubmitting ? null : onClearUnavailable,
+              child: const Text('Annuler mon indisponibilité'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Admin / tourneur view of volunteers who said they won't come, so
+/// "pas répondu" and "pas dispo" stop looking the same.
+class _UnavailableVolunteers extends StatelessWidget {
+  const _UnavailableVolunteers({required this.volunteers});
+
+  final List<ConcertVolunteerUnavailability> volunteers;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: ExpansionTile(
+        key: const ValueKey('unavailable-volunteers'),
+        shape: const Border(),
+        title: Text('Indisponibles (${volunteers.length})'),
+        children: [
+          for (final volunteer in volunteers)
+            ListTile(
+              leading: DsAvatar(
+                initials: _initialsForName(volunteer.displayName),
+                imageUrl: volunteer.avatarUrl,
+              ),
+              title: Text(volunteer.displayName),
+              subtitle: Text(
+                'Indiqué le ${formatFrenchDateTime(volunteer.createdAt)}',
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _OwnApplication extends StatelessWidget {

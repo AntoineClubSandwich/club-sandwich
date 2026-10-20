@@ -268,7 +268,7 @@ class _VolunteerMaraudes extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final open = items.where((item) => item.isOpenForApplication).toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+      ..sort(_compareOpenMaraudes);
     final ownItems = items
         .where((item) => item.ownStatus != null)
         .toList(growable: false);
@@ -326,7 +326,7 @@ class _VolunteerMaraudes extends StatelessWidget {
         MaraudeListSection(
           title: 'Maraudes ouvertes',
           items: open,
-          actionLabel: 'Je me propose',
+          actionLabelFor: _openMaraudeActionLabel,
         ),
         MaraudeListSection(
           title: 'À venir',
@@ -353,6 +353,17 @@ class _VolunteerMaraudes extends StatelessWidget {
   }
 }
 
+/// Open maraudes the volunteer already said no to go last.
+int _compareOpenMaraudes(MaraudeOverview a, MaraudeOverview b) {
+  if (a.isOwnUnavailable != b.isOwnUnavailable) {
+    return a.isOwnUnavailable ? 1 : -1;
+  }
+  return a.date.compareTo(b.date);
+}
+
+String _openMaraudeActionLabel(MaraudeOverview maraude) =>
+    maraude.isOwnUnavailable ? 'Changer ma réponse' : 'Je me propose';
+
 String _availabilityLabel(ConcertVolunteerStatus status) {
   return switch (status) {
     ConcertVolunteerStatus.pending => 'Disponibilité transmise',
@@ -378,6 +389,10 @@ MaraudeCalendarItem _volunteerCalendarItem(MaraudeOverview maraude) {
     ),
     ConcertVolunteerStatus.withdrawn => (
       'Désisté',
+      MaraudeCalendarTone.neutral,
+    ),
+    null when maraude.isOwnUnavailable => (
+      'Pas dispo',
       MaraudeCalendarTone.neutral,
     ),
     null => ('Ouverte', MaraudeCalendarTone.blue),

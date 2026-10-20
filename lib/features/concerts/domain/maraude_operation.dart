@@ -105,6 +105,7 @@ class MaraudeOverview {
     this.ownStatus,
     this.ownTeamRole,
     this.ownConfirmationStatus,
+    this.isOwnUnavailable = false,
   });
 
   factory MaraudeOverview.fromJson(Map<String, dynamic> json) {
@@ -168,6 +169,36 @@ class MaraudeOverview {
   final MaraudeRole? ownTeamRole;
   final VolunteerConfirmationStatus? ownConfirmationStatus;
   final bool isAdmin;
+
+  /// The current volunteer said they won't come — shown as a "Pas dispo"
+  /// badge rather than hidden, so they can still change their mind.
+  final bool isOwnUnavailable;
+
+  MaraudeOverview markedOwnUnavailable() => MaraudeOverview(
+    concertId: concertId,
+    artist: artist,
+    date: date,
+    maraudeStatus: maraudeStatus,
+    venueName: venueName,
+    applicationCount: applicationCount,
+    pendingApplicationCount: pendingApplicationCount,
+    selectedCount: selectedCount,
+    pendingConfirmationCount: pendingConfirmationCount,
+    confirmedCount: confirmedCount,
+    confirmedLeaderCount: confirmedLeaderCount,
+    pendingCreditValidationCount: pendingCreditValidationCount,
+    isAdmin: isAdmin,
+    time: time,
+    venueAddress: venueAddress,
+    cateringName: cateringName,
+    cateringClosesAt: cateringClosesAt,
+    totalWeightKg: totalWeightKg,
+    estimatedMeals: estimatedMeals,
+    ownStatus: ownStatus,
+    ownTeamRole: ownTeamRole,
+    ownConfirmationStatus: ownConfirmationStatus,
+    isOwnUnavailable: true,
+  );
 
   /// Whether this maraude is open for applications and the current
   /// volunteer hasn't applied to it yet.

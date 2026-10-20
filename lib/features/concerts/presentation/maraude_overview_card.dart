@@ -59,6 +59,14 @@ class MaraudeOverviewCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: DsSpacing.sm),
+                        if (maraude.isOwnUnavailable) ...[
+                          const DsStatusChip(
+                            key: ValueKey('own-unavailable-chip'),
+                            label: 'Pas dispo',
+                            status: DsChipStatus.draft,
+                          ),
+                          const SizedBox(width: DsSpacing.xs),
+                        ],
                         DsStatusChip(
                           label: maraude.maraudeStatus.label,
                           status: _maraudeChipStatus(maraude.maraudeStatus),

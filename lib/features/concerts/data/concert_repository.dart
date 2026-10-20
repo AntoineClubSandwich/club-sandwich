@@ -136,10 +136,7 @@ class ConcertRepository {
   Future<void> cancelMaraude(String concertId, {String? reason}) async {
     await _client.rpc<void>(
       'cancel_maraude',
-      params: {
-        'requested_concert_id': concertId,
-        'requested_reason': reason,
-      },
+      params: {'requested_concert_id': concertId, 'requested_reason': reason},
     );
   }
 
@@ -177,12 +174,26 @@ class ConcertRepository {
   }
 
   Future<List<MaraudeOverview>> fetchMaraudeOverview({int limit = 100}) async {
-    final rows = await _client.rpc<List<dynamic>>(
-      'get_maraude_overview',
-      params: {'requested_limit': limit},
-    );
+    final (rows, unavailableRows) = await (
+      _client.rpc<List<dynamic>>(
+        'get_maraude_overview',
+        params: {'requested_limit': limit},
+      ),
+      // RLS only returns the caller's own rows.
+      _client.from('concert_volunteer_unavailabilities').select('concert_id'),
+    ).wait;
+    final unavailableConcertIds = {
+      for (final row in unavailableRows) row['concert_id'] as String,
+    };
     return rows
-        .map((row) => MaraudeOverview.fromJson(row! as Map<String, dynamic>))
+        .map((row) {
+          final maraude = MaraudeOverview.fromJson(
+            row! as Map<String, dynamic>,
+          );
+          return unavailableConcertIds.contains(maraude.concertId)
+              ? maraude.markedOwnUnavailable()
+              : maraude;
+        })
         .toList(growable: false);
   }
 

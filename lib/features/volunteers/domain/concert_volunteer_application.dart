@@ -628,6 +628,8 @@ class ConcertVolunteerSectionData {
     bool? canViewApplications,
     bool? canManageConcert,
     bool? canApply,
+    this.isUnavailable = false,
+    this.unavailableVolunteers = const [],
   }) : canViewApplications = canViewApplications ?? isAdmin,
        canManageConcert = canManageConcert ?? isAdmin,
        canApply = canApply ?? (!isAdmin && !isPromoter);
@@ -643,8 +645,49 @@ class ConcertVolunteerSectionData {
   final bool canApply;
   final List<ConcertVolunteerApplication> applications;
 
+  /// The current volunteer has said they won't come to this maraude.
+  final bool isUnavailable;
+
+  /// Volunteers who said they won't come — only filled for accounts that
+  /// can view applications (admins, the maraude's tourneur).
+  final List<ConcertVolunteerUnavailability> unavailableVolunteers;
+
   TeamAttendanceCounts get attendanceCounts =>
       TeamAttendanceCounts.fromApplications(applications);
+}
+
+/// A volunteer who explicitly said they are not available for a maraude —
+/// kept apart from [ConcertVolunteerApplication] so it never counts as a
+/// candidacy or a withdrawal.
+class ConcertVolunteerUnavailability {
+  const ConcertVolunteerUnavailability({
+    required this.userId,
+    required this.firstName,
+    required this.lastName,
+    required this.createdAt,
+    this.avatarUrl,
+  });
+
+  factory ConcertVolunteerUnavailability.fromJson(Map<String, dynamic> json) {
+    return ConcertVolunteerUnavailability(
+      userId: json['user_id'] as String,
+      firstName: json['first_name'] as String? ?? '',
+      lastName: json['last_name'] as String? ?? '',
+      avatarUrl: json['avatar_url'] as String?,
+      createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+
+  final String userId;
+  final String firstName;
+  final String lastName;
+  final String? avatarUrl;
+  final DateTime createdAt;
+
+  String get displayName {
+    final name = '$firstName $lastName'.trim();
+    return name.isEmpty ? 'Bénévole' : name;
+  }
 }
 
 /// A read-only, non-sensitive view of one candidacy — no contact or

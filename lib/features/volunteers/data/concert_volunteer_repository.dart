@@ -54,6 +54,12 @@ class ConcertVolunteerRepository {
         .map(ConcertVolunteerApplication.fromJson)
         .toList(growable: false);
 
+    final unavailableRows =
+        (bundle['unavailable_volunteers'] as List? ?? const [])
+            .map((row) => Map<String, dynamic>.from(row as Map))
+            .toList(growable: false);
+    await _resolveApplicationAvatarRows(unavailableRows);
+
     final ownApplication = canApply
         ? details
               .where((application) => application.userId == userId)
@@ -74,6 +80,10 @@ class ConcertVolunteerRepository {
       canManageConcert: canManageConcert,
       canApply: canApply,
       applications: applications,
+      isUnavailable: bundle['is_unavailable'] as bool? ?? false,
+      unavailableVolunteers: unavailableRows
+          .map(ConcertVolunteerUnavailability.fromJson)
+          .toList(growable: false),
     );
   }
 
@@ -113,6 +123,22 @@ class ConcertVolunteerRepository {
     await client.rpc<void>(
       'reapply_to_concert',
       params: {'requested_concert_id': concertId},
+    );
+  }
+
+  /// Says (or un-says) that the current volunteer won't come to this
+  /// maraude. Only possible without an existing candidacy; applying later
+  /// clears it server-side.
+  Future<void> setUnavailable(
+    String concertId, {
+    required bool unavailable,
+  }) async {
+    await client.rpc<void>(
+      'set_concert_unavailability',
+      params: {
+        'requested_concert_id': concertId,
+        'requested_unavailable': unavailable,
+      },
     );
   }
 
