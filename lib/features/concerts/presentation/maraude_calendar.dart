@@ -241,7 +241,13 @@ class _MonthMaraudeCalendar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final firstDay = DateTime(month.year, month.month);
-    final gridStart = firstDay.subtract(Duration(days: firstDay.weekday - 1));
+    // Arithmétique calendaire (et non Duration) : une journée locale ne fait
+    // pas toujours 24 h, au changement d'heure les cases se décaleraient.
+    final gridStart = DateTime(
+      firstDay.year,
+      firstDay.month,
+      firstDay.day - (firstDay.weekday - 1),
+    );
     final itemsByDay = <DateTime, List<MaraudeCalendarItem>>{};
     for (final item in items) {
       itemsByDay.putIfAbsent(_dateOnly(item.date), () => []).add(item);
@@ -328,7 +334,11 @@ class _MonthMaraudeCalendar extends StatelessWidget {
           ),
           itemCount: 42,
           itemBuilder: (context, index) {
-            final day = gridStart.add(Duration(days: index));
+            final day = DateTime(
+              gridStart.year,
+              gridStart.month,
+              gridStart.day + index,
+            );
             return _CalendarDay(
               day: day,
               isCurrentMonth: day.month == month.month,
@@ -651,7 +661,8 @@ bool _isSameDay(DateTime left, DateTime right) {
 String _relativeDateLabel(DateTime date) {
   final today = _dateOnly(DateTime.now());
   if (_isSameDay(date, today)) return 'Aujourd’hui';
-  if (_isSameDay(date, today.add(const Duration(days: 1)))) return 'Demain';
+  final tomorrow = DateTime(today.year, today.month, today.day + 1);
+  if (_isSameDay(date, tomorrow)) return 'Demain';
   return formatLongFrenchDate(date);
 }
 
